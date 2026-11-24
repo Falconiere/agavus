@@ -1,5 +1,7 @@
 """Tests for the CLI (tests folder; ingestion mocked, no network)."""
 
+from pathlib import Path
+
 import pytest
 
 from agavus import cli
@@ -42,3 +44,9 @@ def test_ingest_fetch_error_is_friendly(
   monkeypatch.setattr(cli, "ingest_datajud", failing)
   assert cli.main(["ingest", "--source", "datajud"]) == 1
   assert "nothing saved" in capsys.readouterr().out
+
+
+def test_label_empty_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  monkeypatch.setenv("AGAVUS_DATA_DIR", str(tmp_path))
+  assert cli.main(["label"]) == 0
+  assert (tmp_path / "processed" / "labels.json").exists()

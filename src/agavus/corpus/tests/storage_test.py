@@ -72,3 +72,30 @@ def test_record_run_appends(tmp_path: Path) -> None:
   manifest = storage.load_manifest()
   assert len(manifest["runs"]) == expected_runs
   assert manifest["runs"][0]["new"] == expected_new
+
+
+def test_case_roundtrip(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  original = _case()
+  storage.save_case(original)
+  loaded = storage.load_cases()
+  assert loaded == [original]
+
+
+def test_text_roundtrip(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  original = _text()
+  storage.save_text(original)
+  assert storage.load_texts() == [original]
+
+
+def test_save_index(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  storage.save_index("labels.json", {"x": {"label": "M"}})
+  assert (tmp_path / "processed" / "labels.json").exists()
+
+
+def test_load_empty(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  assert storage.load_cases() == []
+  assert storage.load_texts() == []

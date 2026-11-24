@@ -12,7 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict
 
-from agavus.corpus.records import CaseRecord, TextDocument
+from agavus.corpus.records import CaseRecord, TextDocument, case_from_dict, text_from_dict
 
 MANIFEST_NAME = "manifest.json"
 
@@ -120,3 +120,28 @@ class CorpusStorage:
     manifest = self.load_manifest()
     manifest["watermarks"][source] = value
     self.save_manifest(manifest)
+
+  def load_cases(self) -> list[CaseRecord]:
+    """Read all stored case records, in stable order."""
+    folder = self.processed / "cases"
+    if not folder.exists():
+      return []
+    paths = sorted(folder.glob("*.json"))
+    return [case_from_dict(json.loads(path.read_text(encoding="utf-8"))) for path in paths]
+
+  def load_texts(self) -> list[TextDocument]:
+    """Read all stored text documents, in stable order."""
+    folder = self.processed / "texts"
+    if not folder.exists():
+      return []
+    paths = sorted(folder.glob("*.json"))
+    return [text_from_dict(json.loads(path.read_text(encoding="utf-8"))) for path in paths]
+
+  def save_index(self, name: str, payload: object) -> None:
+    """Write a derived index (e.g. labels.json) under processed/."""
+    self.processed.mkdir(parents=True, exist_ok=True)
+    path = self.processed / name
+    path.write_text(
+      json.dumps(payload, default=_json_default, ensure_ascii=False, indent=2),
+      encoding="utf-8",
+    )
