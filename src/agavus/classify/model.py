@@ -28,6 +28,15 @@ def _logits(rows: Sequence[dict[int, float]], weights: FloatArray, bias: FloatAr
   return out
 
 
+def _dense_matrix(rows: Sequence[dict[int, float]], n_features: int) -> FloatArray:
+  """Materialize sparse dict rows into a contiguous BLAS-ready matrix."""
+  matrix = np.zeros((len(rows), n_features), dtype=np.float64)
+  for row_index, row in enumerate(rows):
+    if row:
+      matrix[row_index, list(row.keys())] = list(row.values())
+  return matrix
+
+
 @dataclass(frozen=True)
 class LogRegModel:
   """Trained linear classifier; every weight inspectable."""
@@ -76,12 +85,11 @@ def train_logreg(
   weights = np.zeros((n_features, len(class_list)))
   bias = np.zeros(len(class_list))
   count = len(rows)
+  matrix = _dense_matrix(rows, n_features)
+  scale = sample_weights[:, None] / count
   for _ in range(cfg.epochs):
-    diff = (softmax(_logits(rows, weights, bias)) - one_hot) * sample_weights[:, None] / count
-    grad_w = np.zeros_like(weights)
-    for row_index, row in enumerate(rows):
-      for feature, value in row.items():
-        grad_w[feature] += value * diff[row_index]
+    diff = (softmax(matrix @ weights + bias) - one_hot) * scale
+    grad_w = matrix.T @ diff
     weights -= cfg.lr * (grad_w + cfg.l2 * weights)
     bias -= cfg.lr * diff.sum(axis=0)
   return LogRegModel(classes=class_list, weights=weights, bias=bias)

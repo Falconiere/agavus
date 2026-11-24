@@ -9,12 +9,14 @@ def test_negation_scoping() -> None:
   tokens = legal_tokens("indefiro a protetiva")
   assert "nega_protetiva" in tokens
   assert "verb_indefiro" in tokens
+  assert "nega_protetiva" in legal_tokens("o juiz indeferiu a medida protetiva")
   assert "nega_protetiva" not in legal_tokens("defiro a protetiva")
 
 
-def test_citation_flags() -> None:
-  tokens = legal_tokens("com base no art. 22 da Lei 11.340/2006")
+def test_citation_flags_and_crosses() -> None:
+  tokens = legal_tokens("defiro a medida com base no art. 22 da Lei 11.340/2006")
   assert any(token.startswith("cite_") for token in tokens)
+  assert any(token.startswith("cross_cite_") for token in tokens)
 
 
 def test_lexicon_applied() -> None:
