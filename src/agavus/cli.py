@@ -4,6 +4,8 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from agavus.classify.pipeline import TrainedClassifier, train_classifier
+from agavus.classify.seed import SEED_QUERIES
 from agavus.config.settings import Settings, load_settings
 from agavus.corpus.fetch import FetchError
 from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
@@ -41,6 +43,45 @@ def _run_label(settings: Settings) -> int:
   return 0
 
 
+def _run_train(settings: Settings) -> int:
+  storage = CorpusStorage(settings.data_dir)
+  labels = {decision.record_id: decision for decision in storage.load_labels()}
+  texts: list[str] = []
+  targets: list[str] = []
+  for document in storage.load_texts():
+    decision = labels.get(document.id)
+    if decision is not None and decision.domain_label is not None:
+      texts.append(document.text)
+      targets.append(decision.domain_label)
+  texts += [text for text, _ in SEED_QUERIES]
+  targets += [label for _, label in SEED_QUERIES]
+  if not texts:
+    print("train: no labeled texts — run ingest + label first")
+    return 1
+  classifier, report = train_classifier(texts, targets)
+  folder = settings.data_dir / "models" / "classifier"
+  classifier.save(folder)
+  print(
+    f"train: {report.n_train} train / {report.n_holdout} holdout · "
+    f"acc {report.holdout_accuracy:.2f} · F1 {report.holdout_macro_f1:.2f} · "
+    f"ECE {report.holdout_ece:.3f} · T {report.temperature:.2f} → {folder}"
+  )
+  return 0
+
+
+def _run_classify(settings: Settings, text: str) -> int:
+  folder = settings.data_dir / "models" / "classifier"
+  if not (folder / "meta.json").exists():
+    print("classify: no trained model — run `agavus train` first")
+    return 1
+  classifier = TrainedClassifier.load(folder)
+  probs = classifier.predict_proba([text])[0]
+  pairs = sorted(zip(classifier.model.classes, probs, strict=True), key=lambda p: -p[1])
+  rendered = " · ".join(f"{label} {prob:.3f}" for label, prob in pairs)
+  print(f"classify: {rendered}")
+  return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
   """Entry point: no args greets; subcommands run corpus pipelines."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
@@ -51,11 +92,18 @@ def main(argv: Sequence[str] | None = None) -> int:
   ingest.add_argument("--raw-file", default=None, help="offline statute payload path")
   ingest.add_argument("--statute-name", default=None, help="e.g. 'Lei 12.318/2010'")
   sub.add_parser("label", help="label stored records (TPU + organ rules)")
+  sub.add_parser("train", help="train the classifier on labeled texts")
+  classify = sub.add_parser("classify", help="classify a text with the trained model")
+  classify.add_argument("text")
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.command == "ingest":
     return _run_ingest(settings, args.source, args.limit, args)
   if args.command == "label":
     return _run_label(settings)
+  if args.command == "train":
+    return _run_train(settings)
+  if args.command == "classify":
+    return _run_classify(settings, args.text)
   print(greet(settings.name))
   return 0

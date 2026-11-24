@@ -111,3 +111,8 @@ class CorpusStorage:
     """Decisions flagged for human review."""
     with closing(db.connect(self.root)) as conn:
       return db.select_labels(conn, review_only=True)
+
+  def load_labels(self) -> list[LabelDecision]:
+    """All derived label decisions."""
+    with closing(db.connect(self.root)) as conn:
+      return db.select_labels(conn)

@@ -46,7 +46,20 @@ def test_ingest_fetch_error_is_friendly(
   assert "nothing saved" in capsys.readouterr().out
 
 
-def test_label_empty_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _run_with_data_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, argv: list[str]) -> int:
   monkeypatch.setenv("AGAVUS_DATA_DIR", str(tmp_path))
-  assert cli.main(["label"]) == 0
+  return cli.main(argv)
+
+
+def test_label_empty_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  assert _run_with_data_dir(monkeypatch, tmp_path, ["label"]) == 0
   assert (tmp_path / "processed" / "corpus.db").exists()
+
+
+def test_train_seeds_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  assert _run_with_data_dir(monkeypatch, tmp_path, ["train"]) == 0
+  assert (tmp_path / "models" / "classifier" / "meta.json").exists()
+
+
+def test_classify_without_model_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  assert _run_with_data_dir(monkeypatch, tmp_path, ["classify", "texto"]) == 1

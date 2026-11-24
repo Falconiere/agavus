@@ -92,6 +92,24 @@ Rules:
 | monthly | safety-set refresh (new adversarial phrasings) |
 | tiny-LLM layer proposal | shadow eval + ablation with/without |
 
+## First real training runs (2026-11-24)
+
+Recorded as the project's quality memory (commits-as-memory principle):
+
+1. **Statutes-only model** (61 articles): holdout acc 1.00 — but colloquial
+   queries misrouted ("divórcio e guarda" → M, because Lei 11.340 also
+   mentions guarda/alimentos in protective measures). Lesson: **domain
+   shift** — statute language ≠ query language; perfect in-domain holdout
+   does not imply query competence.
+2. **+ authored seed queries** (`classify/seed.py`, 32 queries incl. OOD,
+   firewalled from gold): "divórcio e guarda" → F 0.66 ✓; "descumpriu
+   protetiva" → M 0.90 ✓; "tráfico" → O 0.41 (weak); vague custody query →
+   F 0.49 / M 0.41 (ambiguous). Holdout acc 0.79, macro-F1 0.54, ECE 0.069.
+
+Interpretation: low-confidence and ambiguous cases are **exactly what the
+three-way decide gate must defer** — the probabilities are now meaningful
+inputs for it. Next: `decide/` + gold-set evaluation (`agavus eval`).
+
 ## Investment decisions are eval-triggered
 
 LoRA/fine-tuning and tier upgrades are considered **only when a measured

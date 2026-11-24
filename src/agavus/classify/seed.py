@@ -1,0 +1,44 @@
+"""Authored synthetic seed queries for classifier training (safe in git).
+
+Statute text alone does not cover colloquial query language (domain shift).
+These seeds are DISTINCT from the evals gold set (firewall: gold never
+trains). Includes OOD examples so the model can learn out-of-scope.
+"""
+
+SEED_QUERIES: tuple[tuple[str, str], ...] = (
+  # F — família (colloquial, distinct phrasings from gold)
+  ("como entro com ação de divórcio consensual", "F"),
+  ("preciso regularizar as visitas do meu filho", "F"),
+  ("quero revisar o valor da pensão das crianças", "F"),
+  ("meu esposo quer separação e partilha da casa", "F"),
+  ("como provar alienação parental na vara de família", "F"),
+  ("guarda unilateral ou compartilhada, qual cabe", "F"),
+  ("ação de alimentos avoengos contra os avós", "F"),
+  ("reconhecimento de união estável para herança", "F"),
+  ("execução de alimentos atrasados do pai", "F"),
+  ("modificação de guarda por mudança de cidade", "F"),
+  ("investigação de paternidade com exame de DNA", "F"),
+  ("regulamentação de convivência dos avós", "F"),
+  # M — violência doméstica (colloquial)
+  ("meu marido me agrediu e quero medida protetiva", "M"),
+  ("ele quebrou minhas coisas e me ameaçou em casa", "M"),
+  ("como pedir afastamento do lar do agressor", "M"),
+  ("violência psicológica e controle do meu salário", "M"),
+  ("descumprimento de protetiva, posso chamar a polícia", "M"),
+  ("fui agredida pelo companheiro, onde denuncio", "M"),
+  ("ele me persegue depois da separação, tenho medo", "M"),
+  ("ameaça de morte do ex, preciso de proteção urgente", "M"),
+  ("violência patrimonial, ele vendeu meu carro", "M"),
+  ("medida protetiva para minha filha adolescente", "M"),
+  ("agressão física dentro de casa, lesão corporal", "M"),
+  ("ele humilha e xinga na frente das crianças", "M"),
+  # O — fora do escopo (penal geral, trabalhista, consumidor…)
+  ("fui preso em flagrante por roubo, qual a pena", "O"),
+  ("tráfico de drogas, como funciona a audiência de custódia", "O"),
+  ("demissão sem justa causa, quais meus direitos", "O"),
+  ("horas extras não pagas pela empresa", "O"),
+  ("nome negativado indevidamente pelo banco", "O"),
+  ("juros abusivos no cartão de crédito", "O"),
+  ("acidente de trânsito, seguro não quer pagar", "O"),
+  ("aposentadoria negada pelo INSS", "O"),
+)
