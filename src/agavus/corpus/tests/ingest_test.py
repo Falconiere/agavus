@@ -1,15 +1,19 @@
 """Tests for ingestion orchestrators (tests folder, mock transport)."""
 
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
+import pytest
 
 from agavus.config.settings import Settings
+from agavus.corpus import datajud
 from agavus.corpus.cursor import decode
 from agavus.corpus.fetch import FetchPolicy
 from agavus.corpus.httpfixtures import (
   DATAJUD_HIT,
+  Handler,
   json_handler,
   mock_client,
   sample_settings,
@@ -19,6 +23,12 @@ from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_sta
 from agavus.corpus.storage import CorpusStorage
 
 FAST = FetchPolicy(min_interval=0, max_retries=0)
+_WHEN = date(2024, 5, 20)
+
+
+def _pin_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+  monkeypatch.setattr(datajud, "clock", lambda: _WHEN)
+  monkeypatch.setattr(datajud, "EMPTY_MONTHS", 2)
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -34,9 +44,56 @@ def _hit(number: str, filed: str, sort_id: str, *, sigilo: int = 0) -> dict[str,
   return {"_source": source, "sort": [filed, sort_id], "_id": sort_id}
 
 
-def test_datajud_ingest_idempotent(tmp_path: Path) -> None:
+def _empty_page() -> httpx.Response:
+  body: dict[str, object] = {"hits": {"total": {"value": 0, "relation": "eq"}, "hits": []}}
+  return httpx.Response(200, json=body)
+
+
+def _decoded(request: httpx.Request) -> tuple[dict[str, object], dict[str, object]]:
+  parsed = json.loads(request.content.decode())
+  payload: dict[str, object] = parsed if isinstance(parsed, dict) else {}
+  query = payload.get("query")
+  boolean = query.get("bool") if isinstance(query, dict) else None
+  filters = boolean.get("filter") if isinstance(boolean, dict) else None
+  first = filters[0] if isinstance(filters, list) and filters else None
+  window = first.get("range") if isinstance(first, dict) else None
+  filed = window.get("dataAjuizamento") if isinstance(window, dict) else None
+  return payload, filed if isinstance(filed, dict) else {}
+
+
+def _in_may(request: httpx.Request) -> bool:
+  _payload, filed = _decoded(request)
+  return str(filed.get("gte", "")).startswith("202405")
+
+
+def _may_only(hit: dict[str, object]) -> Handler:
+  def handler(request: httpx.Request) -> httpx.Response:
+    if not _in_may(request):
+      return _empty_page()
+    return httpx.Response(200, json={"hits": {"hits": [hit]}})
+
+  return handler
+
+
+def _month_handler(request: httpx.Request) -> httpx.Response:
+  payload, filed = _decoded(request)
+  assert str(filed.get("lte", "")).endswith("235959")
+  assert "gte" in filed
+  assert payload.get("sort") == [{"dataAjuizamento": "desc"}, {"_id": "desc"}]
+  after = payload.get("search_after")
+  if not _in_may(request) or after == ["20240502120000", "old"]:
+    return _empty_page()
+  if after == ["20240510120000", "new"]:
+    hits = [_hit("0700001-56.2024.8.07.0001", "20240502120000", "old")]
+  else:
+    hits = [_hit("0701234-56.2024.8.07.0001", "20240510120000", "new")]
+  return httpx.Response(200, json={"hits": {"hits": hits}})
+
+
+def test_datajud_ingest_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _pin_clock(monkeypatch)
   hit = _hit("0701234-56.2024.8.07.0001", "20240510120000", "a")
-  client = mock_client(json_handler({"hits": {"hits": [hit]}}))
+  client = mock_client(_may_only(hit))
   settings = _settings(tmp_path)
   first = ingest_datajud(settings, 10, client=client, policy=FAST)
   second = ingest_datajud(settings, 10, client=client, policy=FAST)
@@ -51,33 +108,16 @@ def test_datajud_ingest_idempotent(tmp_path: Path) -> None:
   assert len(storage.load_manifest()["runs"]) == 1
 
 
-def test_datajud_walks_newer_then_older(tmp_path: Path) -> None:
-  def handler(request: httpx.Request) -> httpx.Response:
-    payload = json.loads(request.content.decode())
-    filed = payload["query"]["bool"]["filter"][0]["range"]["dataAjuizamento"]
-    assert str(filed["lte"]).endswith("235959")
-    assert "gte" not in filed
-    assert payload["sort"][0] == {"dataAjuizamento": "desc"}
-    after = payload.get("search_after")
-    if after == ["20200102000000", "old"]:
-      return httpx.Response(
-        200, json={"hits": {"total": {"value": 0, "relation": "eq"}, "hits": []}}
-      )
-    if after == ["20240510120000", "new"]:
-      hits = [_hit("0700001-56.2020.8.07.0001", "20200102000000", "old")]
-    else:
-      assert after is None
-      hits = [_hit("0701234-56.2024.8.07.0001", "20240510120000", "new")]
-    return httpx.Response(200, json={"hits": {"hits": hits}})
-
+def test_datajud_walks_newer_then_older(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _pin_clock(monkeypatch)
   settings = _settings(tmp_path)
-  batch = ingest_datajud(settings, 1, client=mock_client(handler), policy=FAST)
+  batch = ingest_datajud(settings, 1, client=mock_client(_month_handler), policy=FAST)
   storage = CorpusStorage(tmp_path)
   assert batch.done
   stored = {case.id for case in storage.load_cases()}
   assert stored == {
     "0701234-56.2024.8.07.0001",
-    "0700001-56.2020.8.07.0001",
+    "0700001-56.2024.8.07.0001",
   }
 
 
@@ -90,10 +130,10 @@ def test_datajud_empty_response_keeps_watermark(tmp_path: Path) -> None:
   assert CorpusStorage(tmp_path).watermark("datajud") is None
 
 
-def test_datajud_skips_sealed_metadata(tmp_path: Path) -> None:
+def test_datajud_skips_sealed_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _pin_clock(monkeypatch)
   sealed = _hit("0701234-56.2024.8.07.0001", "20240510120000", "a", sigilo=1)
-  body: dict[str, object] = {"hits": {"hits": [sealed]}}
-  client = mock_client(json_handler(body))
+  client = mock_client(_may_only(sealed))
   batch = ingest_datajud(_settings(tmp_path), 10, client=client, policy=FAST)
   assert batch.new == 0
   assert batch.done

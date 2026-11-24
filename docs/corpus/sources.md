@@ -44,12 +44,17 @@ no start date ([data-range.md](data-range.md)): today backward until empty.
   is HTTP 400 (text field, fielddata disabled); the tie-break is `_id`.
   A `match_phrase` subject query was accepted far enough to hit the search
   pool (429, not 400) on 2026-11-24; the cluster was too busy to return
-  hits. Consequences in `corpus/fetch.py` and `corpus/datajud.py`: 2s
-  minimum interval, `Retry-After`, backoff capped at 60s, 90s timeout,
-  4 retries; `lte` is end of today in compact form; no `gte`; subject
-  `match_phrase` on órgão, assunto, and classe; `search_after` cursor
-  committed per page; a genuine empty tail (`total = 0`, `relation = eq`)
-  finishes the walk; a body without that total does not.
+  hits. That 429 is the search thread pool rejecting work
+  (`es_rejected_execution_exception`), not a quota header to route around.
+  The [terms of use](https://datajud-wiki.cnj.jus.br/api-publica/termo-uso)
+  forbid abusive use. Handling in `corpus/fetch.py` and `corpus/datajud.py`:
+  one request at a time, 2s minimum interval, Retry-After honored, equal-jitter
+  backoff capped at 120s, 8 retries, 90s timeout. Each search is one calendar
+  month (`gte`/`lte` compact) plus the subject `match_phrase` filter, with
+  `search_after` inside the month. A genuine empty month moves backward.
+  Thirty-six empty months after a stored hit end the walk. A body without
+  `total = 0` does not. The cursor stays put when retries run out, so the
+  next invocation resumes.
 - **Planalto**: reachable via normal networks; direct egress from the dev
   sandbox timed out (parser validated against real pages fetched via
   firecrawl). Statute ingestion is implemented and fixture-tested; live runs

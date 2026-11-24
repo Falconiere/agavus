@@ -11,6 +11,7 @@ from agavus.corpus import datajud, statutes
 from agavus.corpus.batch import IngestBatch
 from agavus.corpus.cursor import WalkState, decode, encode
 from agavus.corpus.fetch import Fetcher, FetchPolicy, JsonRequest
+from agavus.corpus.jsonutil import parse_date
 from agavus.corpus.span import span
 from agavus.corpus.storage import CorpusStorage
 
@@ -27,14 +28,14 @@ class _Pull:
 
 
 def _fetch_page(
-  fetcher: Fetcher, settings: Settings, limit: int, after: tuple[str, ...] | None
+  pull: _Pull, after: tuple[str, ...] | None, start: date, end: date
 ) -> dict[str, object]:
-  return fetcher.fetch_json(
+  return pull.fetcher.fetch_json(
     JsonRequest(
       "POST",
       datajud.BASE_URL,
-      headers=datajud.auth_headers(settings.datajud_api_key),
-      payload=datajud.build_query(date.today(), limit, after),
+      headers=datajud.auth_headers(pull.settings.datajud_api_key),
+      payload=datajud.build_query(end, pull.limit, after, start),
       name="search",
     )
   )
@@ -51,30 +52,55 @@ def _caught_up(taken: datajud.Taken) -> bool:
   return taken.reached_frontier or taken.exhausted or not taken.full or taken.last_key is None
 
 
+def _begin(state: WalkState) -> WalkState:
+  if state.month is not None:
+    return state
+  return WalkState(state.after, state.newest, state.done, datajud.month_of(datajud.clock()), 0)
+
+
+def _blank_month(pull: _Pull, state: WalkState) -> WalkState:
+  state = datajud.finish_month(state, had_hits=False)
+  pull.storage.set_watermark(datajud.SOURCE, encode(state))
+  return state
+
+
 def _walk_history(
   pull: _Pull, state: WalkState
 ) -> tuple[WalkState, int, tuple[tuple[str, str], ...]]:
-  """Newest to oldest until a short page, an empty tail, or the page cap."""
+  """One month at a time, newest first. An empty month is a cheap request."""
+  state = _begin(state)
   new = 0
   seen = 0
+  blanks = 0
   subjects: list[tuple[str, str]] = []
   size = datajud.clamp_size(pull.limit)
   while not state.done and (pull.pages is None or seen < pull.pages):
-    body = _fetch_page(pull.fetcher, pull.settings, pull.limit, state.after)
+    today = datajud.clock()
+    month = state.month or datajud.month_of(today)
+    start, end = datajud.month_window(month, today)
+    body = _fetch_page(pull, state.after, start, end)
     taken = datajud.take(body, pull.fetcher.last_raw_ref, size, None)
-    if taken.exhausted:
-      if state.after is not None and state.newest is not None:
-        state = WalkState(None, state.newest, True)
-        pull.storage.set_watermark(datajud.SOURCE, encode(state))
+    seen += 1
+    if taken.last_key is None and not taken.exhausted:
       break
+    if taken.last_key is None and state.after is None:
+      state = _blank_month(pull, state)
+      blanks += 1
+      if state.done or blanks >= datajud.EMPTY_MONTHS:
+        break
+      continue
     if taken.last_key is None:
-      break
+      state = datajud.finish_month(state, had_hits=True)
+      _note(pull.storage, state, taken, 0)
+      continue
+    blanks = 0
     added = pull.storage.save_cases(taken.records)
     state = datajud.advance_open(state, taken)
+    if not taken.full:
+      state = datajud.finish_month(state, had_hits=True)
     _note(pull.storage, state, taken, added)
     new += added
     subjects.extend(taken.subjects)
-    seen += 1
   return state, new, tuple(subjects)
 
 
@@ -90,8 +116,10 @@ def _refresh_newer(
   head: tuple[str, ...] | None = None
   subjects: list[tuple[str, str]] = []
   size = datajud.clamp_size(pull.limit)
+  origin = parse_date(state.newest[0])
+  start = origin if origin is not None else datajud.clock()
   while pull.pages is None or seen < pull.pages:
-    body = _fetch_page(pull.fetcher, pull.settings, pull.limit, after)
+    body = _fetch_page(pull, after, start, datajud.clock())
     taken = datajud.take(body, pull.fetcher.last_raw_ref, size, state.newest)
     added = pull.storage.save_cases(taken.records)
     new += added
@@ -101,7 +129,7 @@ def _refresh_newer(
       head = taken.newest_key
     if _caught_up(taken):
       if head is not None:
-        state = WalkState(None, head, True)
+        state = WalkState(None, head, True, state.month, 0)
         _note(pull.storage, state, taken, added)
       break
     after = taken.last_key

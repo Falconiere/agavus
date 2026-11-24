@@ -7,6 +7,7 @@ walk newest-first. TPU codes are stored as-is — labeling is a later pass.
 400). The tie-break is `_id`.
 """
 
+import calendar
 from dataclasses import dataclass
 from datetime import date
 
@@ -20,6 +21,40 @@ SOURCE = "datajud"
 BASE_URL = "https://api-publica.datajud.cnj.jus.br/api_publica_tjdft/_search"
 PAGE_MAX = 10_000
 UNKNOWN_LIMIT = 20
+_JANUARY = 1
+_DECEMBER = 12
+# An empty month is cheap. This many in a row, after at least one stored hit,
+# means the archive has ended. A run also stops here so a bad filter cannot
+# walk the calendar forever in one process.
+EMPTY_MONTHS = 36
+
+
+def clock() -> date:
+  """Today. Tests replace this; production uses the wall clock."""
+  return date.today()
+
+
+def month_of(day: date) -> str:
+  """Calendar month key, newest-first walks start at the current one."""
+  return f"{day.year:04d}-{day.month:02d}"
+
+
+def previous_month(month: str) -> str:
+  """The month before `YYYY-MM`."""
+  year = int(month[:4])
+  mon = int(month[5:7])
+  if mon == _JANUARY:
+    return f"{year - 1:04d}-{_DECEMBER:02d}"
+  return f"{year:04d}-{mon - 1:02d}"
+
+
+def month_window(month: str, today: date) -> tuple[date, date]:
+  """Inclusive bounds of one month, clipped so the end is not after today."""
+  year = int(month[:4])
+  mon = int(month[5:7])
+  start = date(year, mon, 1)
+  last = date(year, mon, calendar.monthrange(year, mon)[1])
+  return start, min(last, today)
 
 
 def clamp_size(size: int) -> int:
@@ -32,10 +67,21 @@ def upper_bound(end: date) -> str:
   return end.strftime("%Y%m%d") + "235959"
 
 
+def lower_bound(start: date) -> str:
+  """Compact start-of-day. Month slices keep each search small enough to finish."""
+  return start.strftime("%Y%m%d") + "000000"
+
+
 def build_query(
-  end: date, size: int, search_after: tuple[str, ...] | None = None
+  end: date,
+  size: int,
+  search_after: tuple[str, ...] | None = None,
+  start: date | None = None,
 ) -> dict[str, object]:
-  """Subject query from today backward. No lower bound."""
+  """One subject page. `start` bounds a single month so the cluster can answer."""
+  filed: dict[str, object] = {"lte": upper_bound(end)}
+  if start is not None:
+    filed["gte"] = lower_bound(start)
   should: list[object] = [
     {"match_phrase": {field: phrase}} for phrase in SUBJECT_PHRASES for field in DATAJUD_FIELDS
   ]
@@ -43,7 +89,7 @@ def build_query(
     "size": clamp_size(size),
     "query": {
       "bool": {
-        "filter": [{"range": {"dataAjuizamento": {"lte": upper_bound(end)}}}],
+        "filter": [{"range": {"dataAjuizamento": filed}}],
         "should": should,
         "minimum_should_match": 1,
       }
@@ -209,11 +255,27 @@ def take(
 
 
 def advance_open(state: WalkState, taken: Taken) -> WalkState:
-  """Move the historical cursor. A short page finishes the walk."""
+  """Move the cursor inside the current month. A short page stays in that month."""
   newest = state.newest if state.newest is not None else taken.newest_key
   if taken.full and taken.last_key is not None:
-    return WalkState(taken.last_key, newest, False)
-  return WalkState(None, newest, True)
+    return WalkState(taken.last_key, newest, False, state.month, 0)
+  return WalkState(None, newest, False, state.month, 0)
+
+
+def finish_month(state: WalkState, *, had_hits: bool) -> WalkState:
+  """Leave the current month. Enough empty months after a stored hit ends the walk."""
+  current = state.month if state.month is not None else month_of(clock())
+  if had_hits:
+    return WalkState(None, state.newest, False, previous_month(current), 0)
+  empty = state.empty_months + 1
+  if empty >= EMPTY_MONTHS and state.newest is not None:
+    return WalkState(None, state.newest, True, current, empty)
+  return WalkState(None, state.newest, False, previous_month(current), empty)
+
+
+def stalled(state: WalkState) -> bool:
+  """True when this run has only seen empty months and should stop without freezing."""
+  return state.empty_months >= EMPTY_MONTHS and state.newest is None and not state.done
 
 
 def format_unknown(subjects: tuple[tuple[str, str], ...]) -> tuple[str, ...]:

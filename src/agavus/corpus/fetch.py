@@ -5,9 +5,11 @@ feature. Every successful payload is preserved verbatim under data/raw/.
 """
 
 import json
+import random
 import time
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from typing import cast
 
 import httpx
@@ -22,6 +24,21 @@ class FetchError(RuntimeError):
   """A fetch failed after exhausting retries."""
 
 
+def _header_delay(header: str) -> float | None:
+  """Seconds from a Retry-After delta or HTTP-date. None when the header is absent."""
+  if header.isdigit():
+    return float(header)
+  if not header:
+    return None
+  try:
+    moment = parsedate_to_datetime(header)
+  except (TypeError, ValueError, IndexError, OverflowError):
+    return None
+  if moment.tzinfo is None:
+    moment = moment.replace(tzinfo=UTC)
+  return max(0.0, (moment - datetime.now(UTC)).total_seconds())
+
+
 @dataclass(frozen=True)
 class FetchPolicy:
   """Patience knobs: throttle, retries, backoff, timeout.
@@ -31,9 +48,9 @@ class FetchPolicy:
   """
 
   min_interval: float = 2.0
-  max_retries: int = 4
-  backoff_base: float = 3.0
-  max_backoff: float = 60.0
+  max_retries: int = 8
+  backoff_base: float = 5.0
+  max_backoff: float = 120.0
   timeout: float = 90.0
 
 
@@ -74,12 +91,19 @@ class Fetcher:
     self._last_call = time.monotonic()
 
   def _retry_wait(self, attempt: int, response: httpx.Response | None) -> float:
-    """Honor Retry-After when present; otherwise capped exponential backoff."""
+    """Honor Retry-After. Otherwise equal-jitter backoff so a full queue can drain.
+
+    `es_rejected_execution_exception` means the search pool is full. Retrying
+    at once makes the rejection worse. A zero backoff (tests) does not sleep.
+    """
     if response is not None:
-      retry_after = response.headers.get("Retry-After", "")
-      if retry_after.isdigit():
-        return float(retry_after)
-    return min(self._policy.backoff_base**attempt, self._policy.max_backoff)
+      delay = _header_delay(response.headers.get("Retry-After", ""))
+      if delay is not None:
+        return min(delay, self._policy.max_backoff)
+    if self._policy.backoff_base <= 0:
+      return 0.0
+    capped = min(self._policy.backoff_base**attempt, self._policy.max_backoff)
+    return capped / 2 + random.uniform(0, capped / 2)
 
   def fetch(self, request: JsonRequest) -> bytes:
     """Fetch with retries; preserve raw payload + query meta; return bytes."""

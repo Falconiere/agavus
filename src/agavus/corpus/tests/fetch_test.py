@@ -50,7 +50,15 @@ def test_retry_wait_honors_retry_after(tmp_path: Path) -> None:
 def test_retry_wait_capped_without_header(tmp_path: Path) -> None:
   policy = FetchPolicy(min_interval=0)
   fetcher = Fetcher(CorpusStorage(tmp_path), "datajud", policy=policy)
-  assert fetcher._retry_wait(10, None) == FetchPolicy().max_backoff
+  wait = fetcher._retry_wait(10, None)
+  cap = FetchPolicy().max_backoff
+  assert cap / 2 <= wait <= cap
+
+
+def test_zero_backoff_does_not_sleep(tmp_path: Path) -> None:
+  policy = FetchPolicy(min_interval=0, backoff_base=0)
+  fetcher = Fetcher(CorpusStorage(tmp_path), "datajud", policy=policy)
+  assert fetcher._retry_wait(0, None) == 0.0
 
 
 def test_gives_up_after_retries(tmp_path: Path) -> None:
