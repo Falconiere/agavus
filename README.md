@@ -166,6 +166,7 @@ docs/
   tiny-llm.md            # optional CPU LLM: proposer behind a verifier
   evals.md               # gold sets, benchmarks, regression gates, LoRA triggers
   response-quality.md    # delivery contract: checklist, degradation ladder
+  publishing.md          # HF model repo + Space, eval-gated, LGPD-bound
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)

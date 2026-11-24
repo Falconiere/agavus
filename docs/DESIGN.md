@@ -249,6 +249,8 @@ storage, area-parameterized pipelines.
 Cross-cutting from step 3 onward: `evals/` harness + gold sets
 ([evals.md](evals.md)) — no change ships without measured evidence;
 LoRA/tier upgrades are eval-triggered investments, never advance capabilities.
+Publishing to Hugging Face (model repo + CPU Space, eval-gated, LGPD-bound):
+**[docs/publishing.md](publishing.md)**.
 
 All modules follow repo rules: strict types, co-located tests, 2 spaces,
 size limits, zero duplication, `make check` green.
