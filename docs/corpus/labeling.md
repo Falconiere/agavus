@@ -1,0 +1,51 @@
+# Labeling — where F/M/P/O comes from
+
+Three label sources, in priority order. Every label records its source
+(`label_source`) — provenance is mandatory, not optional.
+
+## 1. TPU codes (primary, `label_source: tpu`)
+
+DataJud records carry CNJ TPU classe/assunto codes. A curated, versioned
+mapping table converts codes → F/M/P/O:
+
+| TPU signal (illustrative) | Label |
+| ------------------------------------------- | ----- |
+| violência doméstica / medida protetiva | M |
+| divórcio, guarda, alimentos, união estável | F |
+| crimes contra a pessoa, tráfico, dosimetria | P |
+| anything else | O |
+
+The table lives in git (small, public taxonomy — not case data), in the
+future `taxonomy/tpu` module. Unknown codes → O or review, never guessed.
+
+## 2. Órgão julgador weak labels (`label_source: organ` | `weak`)
+
+TJDFT specialized organs are strong signals for full texts without TPU codes:
+
+| Organ pattern | Label |
+| -------------------------------------------------------- | ----- |
+| Vara de Violência Doméstica e Familiar contra a Mulher | M |
+| Vara de Família | F |
+| Vara Criminal / Tribunal do Júri | P |
+
+Rules are versioned and auditable. A document from a violência doméstica
+vara is *almost certainly* M — "almost" is why these are **weak** labels.
+
+## 3. Manual gold set (`label_source: manual`)
+
+Small curated set of queries + documents, human-labeled. The only fully
+trusted labels; used for calibration and evaluation. Grows over time:
+reviewed boundary cases flow back in (active learning, most-uncertain first).
+
+## Conflict policy
+
+- TPU says F, organ says M (real overlap: protective measures with custody)?
+  **Never silently resolved.** Record lands with the higher-priority source,
+  the conflict is logged, and the case enters the review queue.
+- These conflicts are exactly the M↔F overlap the design expects — they are
+  data for the boundary region, not noise to delete.
+
+## Audit trail
+
+For every record: `label_source` + mapping/rule version + (if reviewed)
+reviewer decision. Any label can be traced back to *why* it exists.

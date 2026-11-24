@@ -55,6 +55,16 @@ taxonomy of legal branches:
 
 ## 3. Data sources (TJDFT only)
 
+Deep-dive documentation: **[docs/corpus/](corpus/README.md)** (range, sources,
+schema, ingestion, labeling, privacy, storage).
+
+**Time window**: case metadata and decisions from **2020-01-01 → current
+date at ingestion** (rolling end, incremental runs; `AGAVUS_DATA_START`
+configurable). Rationale: captures Lei 14.550/2023 and Lei 14.994/2024
+reforms, born-digital records, manageable volume. Statutes are the exception:
+current consolidated text, not windowed. Train/held-out split by case,
+preferably by time.
+
 | Source | Content | Use |
 | ------------------------- | -------------------------------------------- | ------------------------------ |
 | DataJud API (CNJ) | case metadata, filtered `tribunal = TJDFT` | labels (TPU codes), features |
