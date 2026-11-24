@@ -73,6 +73,10 @@ Key ideas:
 - 🔒 **Corpus never in git** (public repo + LGPD): real data lives in a
   gitignored `data/` dir (`AGAVUS_DATA_DIR`); the repo holds only code,
   schema, taxonomy tables, and synthetic fixtures.
+- 🧩 **Extensible by design**: new areas (trabalhista, bancário, …) are
+  *data packs*, not code changes — registry + namespaced corpus + composed
+  loss matrix, with a shadow-mode activation gate. See
+  [docs/extensibility.md](docs/extensibility.md).
 
 ## 🔀 Three-way decisions
 
@@ -139,6 +143,7 @@ docs/
   DESIGN.md              # architecture, data, models, loss matrix, evaluation
   math/                  # one doc per formula, with worked examples
   corpus/                # deep-dive: range (2020→today), sources, schema, LGPD
+  extensibility.md       # new areas (trabalhista, bancário…) as data packs
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)

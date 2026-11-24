@@ -220,6 +220,12 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 
 ## 9. Roadmap (maps to repo domain layout)
 
+Extension to new areas (trabalhista, bancário, …) is a first-class design
+concern: **[docs/extensibility.md](extensibility.md)** — areas are data packs
+(AreaSpec registry), the engine is invariant. Seams honored from day one:
+labels via registry, loss matrix as composed data, namespaced per-area
+storage, area-parameterized pipelines.
+
 1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema;
    gitignored `data/` + `AGAVUS_DATA_DIR` setting + staged-data guard hook.
 2. `taxonomy/` — TPU code table → F/M/O; weak-label rules; gold set;
