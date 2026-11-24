@@ -26,12 +26,19 @@ TJDFT specialized organs are strong signals for full texts without TPU codes:
 | Organ pattern | Label |
 | -------------------------------------------------------- | ----- |
 | Vara de Violência Doméstica e Familiar contra a Mulher | M |
-| Vara de Família | F |
+| Vara de Família (incl. "e Sucessões") | F |
 | Vara Criminal | O (general criminal is out of scope) |
-| Tribunal do Júri | O, unless TPU subjects confirm feminicídio/DV → M |
+| Tribunal do Júri | **review** until TPU subjects confirm feminicídio/DV → M (Jev-validated: never guess between M and O) |
 
 Rules are versioned and auditable. A document from a violência doméstica
 vara is *almost certainly* M — "almost" is why these are **weak** labels.
+
+**Implemented policy** (`taxonomy/labeling.py`): TPU mapping is primary;
+organ rules are the weak fallback. Multiple TPU areas (e.g. Violência
+Doméstica + Guarda) → **provisional M + review** (safety priority,
+Jev-validated 2026-11-24). TPU-vs-organ conflicts keep the TPU label but
+are flagged for review. The TPU code table is seeded only with verified
+codes (unknown codes never guess); it grows as real DataJud records arrive.
 
 ## 3. Manual gold set (`label_source: manual`)
 

@@ -69,6 +69,20 @@ latency 0.10–0.15s/call; tokens: triage 2059 in/383 out, documents 570/42,
 eval 775/32; cost ≈ $0.0001 input at published pricing (output free).
 `jev_called: true`, mode `jev_api`, transport `typesafe`.
 
+## Second call: taxonomy policy validation (2026-11-24)
+
+One batched request, four questions, synthetic policy scenarios only:
+
+| Question | Jev judgment | P | Adopted in code |
+| ------------------------------ | ------------------ | ----- | ------------------------------ |
+| Júri without TPU subjects | review | 0.98 | `organs.py`: júri → None (review) |
+| Mixed M+F subjects | M provisional + review | 0.99 | `labeling.py`: safety priority |
+| "Vara de Família e Sucessões" → F | true | 0.78 | rule kept, **weak** source (below 0.8 review threshold — treated accordingly) |
+| Lei 12.318/2010 → F | true | 0.94 | `STATUTE_AREA` map |
+
+Note the CLI's own review policy fired (exit 2) on the 0.78 judgment —
+the tooling practices what we preach: confidence below threshold → review.
+
 ## Caveats (read before trusting)
 
 1. **Tiny synthetic pilot ≠ production accuracy or calibration.** Near-1.0

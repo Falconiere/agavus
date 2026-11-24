@@ -141,6 +141,7 @@ Available today (corpus phase):
 ```sh
 uv run agavus ingest --source datajud --limit 500   # TJDFT metadata → data/
 uv run agavus ingest --source statutes              # Planalto articles → data/
+uv run agavus label                                 # TPU + organ labeling → labels.json
 ```
 
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).
@@ -187,7 +188,7 @@ src/agavus/
     tests/
   corpus/                # ingestion: records, storage, fetch, datajud, statutes…
     tests/               # one <module>_test.py per module
-  taxonomy/              # area registry (F/M/O); TPU mapping next
+  taxonomy/              # labeling: TPU table, organ rules, lexicon
     tests/
   classify/              # placeholders — TF-IDF + calibrated logreg
   decide/                #   three-way decision gates
