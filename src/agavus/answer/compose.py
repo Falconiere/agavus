@@ -1,20 +1,23 @@
 """Answer composition: extractive, cited, honest (docs/response-quality.md).
 
 Templates only — no generation, so no advice language and no ungrounded
-claims by construction. Degradation ladder: cited answer → honest refusal
-→ clarification. Sources are never empty on accept.
+claims by construction. Pre-delivery verifier enforces non-empty sources,
+disclaimer presence, zero personal data, and advice-language lint before
+any accepted response ships.
 """
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from agavus.corpus.anonymize import anonymize
+from agavus.corpus.anonymize import anonymize, contains_personal_data
+from agavus.corpus.statutes import extract_citations
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.reason.chain import Chain, build_chain
-from agavus.retrieve.search import WORD_RE, Hit, search
+from agavus.retrieve.search import Hit, search
 from agavus.taxonomy.areas import AREAS, OUT_OF_SCOPE
-from agavus.taxonomy.lexicon import normalize
+from agavus.taxonomy.lexicon import content_tokens
 
 DISCLAIMER = "Isto não é aconselhamento jurídico; consulte um advogado."
 SCOPE_MESSAGE = (
@@ -28,6 +31,10 @@ NO_BASIS_MESSAGE = "Não encontrei base segura no corpus para responder com cita
 CONTEXT_HITS = 2
 DOMAIN_CLEAR_MIN = 0.6
 TOPIC_HINTS = "Ex.: medidas protetivas, descumprimento, guarda, visitas, alimentos, divórcio."
+ADVICE_RE = re.compile(
+  r"\b(?:você deve|recomendo|aconselho|garanto que|causa ganha)\b",
+  re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -40,10 +47,30 @@ class Answer:
 
 
 def _relevant(query: str, hit: Hit) -> bool:
-  """At least one content query token must appear in the excerpt."""
-  query_tokens = set(WORD_RE.findall(normalize(query)))
-  excerpt_tokens = set(WORD_RE.findall(normalize(hit.snippet)))
-  return bool(query_tokens & excerpt_tokens)
+  """Content query token or citation must match the hit excerpt/reference."""
+  query_tokens = set(content_tokens(query))
+  excerpt_tokens = set(content_tokens(hit.snippet)) | set(content_tokens(hit.origin_ref))
+  if query_tokens & excerpt_tokens:
+    return True
+  query_cites = set(extract_citations(query))
+  hit_cites = set(extract_citations(hit.origin_ref)) | set(hit.citations)
+  return bool(query_cites & hit_cites)
+
+
+def verify_deliverable(text: str, sources: tuple[str, ...]) -> bool:
+  """Automated pre-delivery checklist: sources, disclaimer, privacy, no advice."""
+  return (
+    bool(sources)
+    and DISCLAIMER in text
+    and not contains_personal_data(text)
+    and not ADVICE_RE.search(text)
+  )
+
+
+def _deliver_or_defer(action: str, text: str, sources: tuple[str, ...]) -> Answer:
+  if not verify_deliverable(text, sources):
+    return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
+  return Answer(decision=action, text=text, sources=sources)
 
 
 def _render_accept(hit: Hit, context: list[Hit]) -> str:
@@ -85,21 +112,22 @@ def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStora
     return Answer(decision="reject", text=SCOPE_MESSAGE, sources=())
   if decision.action == "defer":
     return Answer(decision="defer", text=_clarification(probabilities), sources=())
-  chain = build_chain(query, storage)
+  area = decision.action.removeprefix("accept-")
+  chain = build_chain(query, storage, area=area)
   if chain is not None:
     if not chain.complete:
       return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
-    return Answer(
-      decision=decision.action,
-      text=_render_chain(chain),
-      sources=(chain.conclusion_ref,),
+    return _deliver_or_defer(
+      decision.action,
+      _render_chain(chain),
+      (chain.conclusion_ref,),
     )
   hits = search(storage, query, limit=CONTEXT_HITS + 1)
   if not hits or not _relevant(query, hits[0]):
     return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
   top, context = hits[0], hits[1 : CONTEXT_HITS + 1]
-  return Answer(
-    decision=decision.action,
-    text=_render_accept(top, context),
-    sources=tuple(hit.origin_ref for hit in hits),
+  return _deliver_or_defer(
+    decision.action,
+    _render_accept(top, context),
+    tuple(hit.origin_ref for hit in hits),
   )

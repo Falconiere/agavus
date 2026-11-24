@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from agavus.answer.compose import DISCLAIMER, compose
+from agavus.answer.compose import DISCLAIMER, compose, verify_deliverable
 from agavus.corpus.httpfixtures import sample_text
 from agavus.corpus.storage import CorpusStorage
 
@@ -89,3 +89,16 @@ def test_domain_clear_defer_asks_topic(tmp_path: Path) -> None:
   assert answer.decision == "defer"
   assert "tema específico" in answer.text
   assert "Maria da Penha" in answer.text
+
+
+def test_stopword_only_overlap_rejected_as_irrelevant(tmp_path: Path) -> None:
+  answer = compose("alienação de bens", CONFIDENT_M, _corpus(tmp_path))
+  assert answer.decision == "defer"
+  assert answer.sources == ()
+
+
+def test_verify_deliverable_checks_advice_and_disclaimer() -> None:
+  assert verify_deliverable(f"Trecho legal.\n{DISCLAIMER}", ("Lei X, art. 1",))
+  assert not verify_deliverable(f"Você deve processar.\n{DISCLAIMER}", ("Lei X, art. 1",))
+  assert not verify_deliverable("Trecho sem aviso.", ("Lei X, art. 1",))
+  assert not verify_deliverable(f"Trecho.\n{DISCLAIMER}", ())
