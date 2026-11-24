@@ -12,7 +12,10 @@ from agavus.taxonomy.areas import FAMILIA, MARIA_DA_PENHA
 
 STATUTE_AREA: dict[str, str] = {
   "Lei 11.340/2006": MARIA_DA_PENHA.code,
+  "Lei 14.994/2024": MARIA_DA_PENHA.code,
   "Lei 12.318/2010": FAMILIA.code,
+  "Lei 13.058/2014": FAMILIA.code,
+  "Lei 10.406/2002": FAMILIA.code,
 }
 
 

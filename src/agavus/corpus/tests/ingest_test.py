@@ -34,7 +34,7 @@ def test_datajud_empty_response_keeps_watermark(tmp_path: Path) -> None:
 
 
 def test_statutes_ingest_idempotent(tmp_path: Path) -> None:
-  expected_new = 4  # two statutes x two articles
+  expected_new = 8  # four statutes x two articles (CC range excludes arts. 1-2)
   html = "<p>Art. 1º Texto sintético da lei.</p><p>Art. 2º Outro texto.</p>"
   client = mock_client(text_handler(html))
   settings = _settings(tmp_path)

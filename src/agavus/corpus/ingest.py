@@ -53,7 +53,9 @@ def ingest_statutes(settings: Settings, *, client: httpx.Client | None = None) -
   for statute in statutes.STATUTES:
     payload = fetcher.fetch(JsonRequest("GET", statute.url, name="statute"))
     html = statutes.decode_html(payload)
-    documents = statutes.parse_statute(statute.name, html, fetcher.last_raw_ref)
+    documents = statutes.parse_statute(
+      statute.name, html, fetcher.last_raw_ref, statute.article_range
+    )
     fetched += len(documents)
     new += sum(storage.save_text(document) for document in documents)
   storage.record_run(statutes.SOURCE, fetched, new, today, today)
@@ -77,7 +79,10 @@ def import_statute_file(settings: Settings, name: str, path: Path) -> int:
     payload,
     {"source": "offline-file", "path": str(path), "name": name},
   )
-  documents = statutes.parse_statute(name, statutes.decode_html(payload), raw_ref)
+  article_range = next(
+    (statute.article_range for statute in statutes.STATUTES if statute.name == name), None
+  )
+  documents = statutes.parse_statute(name, statutes.decode_html(payload), raw_ref, article_range)
   new = sum(storage.save_text(document) for document in documents)
   storage.record_run(statutes.SOURCE, len(documents), new, today, today)
   return new

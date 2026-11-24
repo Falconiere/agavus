@@ -141,6 +141,29 @@ pages lose bytes irreversibly (U+FFFD in tag regions) — **always import raw
 payloads, never rendered copies**. Article segmentation captures letter
 suffixes (art. 24-A) and trims bodies at chapter headings.
 
+## Growth run (2026-11-24): corpus 89 → 355, coverage 0.20 → 0.60
+
+Levers: CC família book (arts. 1.511–1.783, 266 articles), Lei 13.058/2014
+(guarda), Lei 14.994/2024 (feminicídio package), +15 seeds. DJEN remains
+blocked from the dev sandbox (full-text decisions pending).
+
+**Safety regression caught and fixed by the eval gate**: the F-heavy corpus
+drove M-recall 1.00 → 0.25 (class imbalance). The decision gate kept
+precision 1.00 (M queries deferred, never misrouted), and the fix was
+**class balancing in the solver** (`TrainConfig.balance_classes`) — a
+modeling fix, never threshold weakening.
+
+| Metric | Before growth | Imbalanced | Balanced (final) |
+| ---------------------- | ------------- | ---------- | ---------------- |
+| gold accuracy | 0.80 | 0.50 | **1.00** |
+| M-recall | 1.00 | 0.25 ✗ | **1.00** ✓ |
+| precision-on-accepted | 1.00 | 1.00 | **1.00** ✓ |
+| coverage | 0.20 | 0.30 | **0.60** |
+| holdout ECE | 0.156 | 0.067 | **0.048** |
+
+OOD gold items now correctly **rejected** (2), ambiguous honestly deferred
+(2), 6 accepted all correct. Founding query answered with citation.
+
 ## Investment decisions are eval-triggered
 
 LoRA/fine-tuning and tier upgrades are considered **only when a measured

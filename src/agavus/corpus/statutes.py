@@ -12,18 +12,23 @@ from bs4 import BeautifulSoup
 from agavus.corpus.records import LabelSource, TextDocument, TextSource, text_document_id
 
 SOURCE = "statutes"
-ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
-ART_REF = re.compile(r"\bart\.?\s*(\d+(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
+ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
+ART_REF = re.compile(r"\bart\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
 class StatuteRef:
-  """One statute source: citable name + consolidated-text URL."""
+  """One statute source: citable name + consolidated-text URL.
+
+  article_range optionally keeps only articles in [start, end] (e.g. the
+  Civil Code's família book) — scope discipline for large codes.
+  """
 
   name: str
   url: str
+  article_range: tuple[int, int] | None = None
 
 
 STATUTES: tuple[StatuteRef, ...] = (
@@ -34,6 +39,19 @@ STATUTES: tuple[StatuteRef, ...] = (
   StatuteRef(
     name="Lei 12.318/2010",
     url="https://www.planalto.gov.br/ccivil_03/_ato2007-2010/2010/lei/l12318.htm",
+  ),
+  StatuteRef(
+    name="Lei 13.058/2014",
+    url="https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2014/lei/l13058.htm",
+  ),
+  StatuteRef(
+    name="Lei 14.994/2024",
+    url="https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2024/lei/l14994.htm",
+  ),
+  StatuteRef(
+    name="Lei 10.406/2002",
+    url="https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm",
+    article_range=(1511, 1783),
   ),
 )
 
@@ -79,11 +97,17 @@ def extract_citations(text: str) -> tuple[str, ...]:
   return tuple(sorted(refs))
 
 
-def parse_statute(name: str, html: str, raw_ref: str) -> list[TextDocument]:
+def parse_statute(
+  name: str, html: str, raw_ref: str, article_range: tuple[int, int] | None = None
+) -> list[TextDocument]:
   """One TextDocument per article, with a verbatim-citable origin_ref."""
   text = html_to_text(html)
   documents: list[TextDocument] = []
   for number, body in segment_articles(text):
+    if article_range is not None:
+      base = int(number.replace(".", "").split("-")[0])
+      if not article_range[0] <= base <= article_range[1]:
+        continue
     ref = f"{name}, art. {number}"
     documents.append(
       TextDocument(

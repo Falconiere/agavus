@@ -47,6 +47,24 @@ def test_body_trimmed_at_chapter_heading() -> None:
   assert "Texto do artigo" in articles[0][1]
 
 
+def test_article_range_filter() -> None:
+  html = (
+    "<p>Art. 100. Fora.</p><p>Art. 1511. Família.</p><p>Art. 1783. Fim.</p><p>Art. 1800. Fora.</p>"
+  )
+  docs = parse_statute("Lei X", html, "raw/x.html", article_range=(1511, 1783))
+  refs = [doc.origin_ref for doc in docs]
+  assert refs == ["Lei X, art. 1511", "Lei X, art. 1783"]
+
+
+def test_thousands_dot_article_numbers() -> None:
+  html = "<p>Art. 1.511. Texto família.</p><p>Art. 1.783. Fim.</p>"
+  docs = parse_statute("Lei 10.406/2002", html, "raw/x.html", article_range=(1511, 1783))
+  assert [doc.origin_ref for doc in docs] == [
+    "Lei 10.406/2002, art. 1.511",
+    "Lei 10.406/2002, art. 1.783",
+  ]
+
+
 def test_parse_statute_documents() -> None:
   expected_articles = 3
   docs = parse_statute("Lei 12.318/2010", FIXTURE_HTML, "raw/statutes/x.html")

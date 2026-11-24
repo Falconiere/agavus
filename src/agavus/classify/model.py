@@ -52,6 +52,7 @@ class TrainConfig:
   lr: float = 0.5
   epochs: int = 300
   l2: float = 1e-4
+  balance_classes: bool = True
 
 
 def train_logreg(
@@ -67,11 +68,16 @@ def train_logreg(
   class_list = tuple(classes)
   targets = np.array([class_list.index(label) for label in labels])
   one_hot = np.eye(len(class_list))[targets]
+  sample_weights = np.ones(len(labels))
+  if cfg.balance_classes:
+    counts = np.bincount(targets, minlength=len(class_list))
+    per_class = len(labels) / (len(class_list) * np.maximum(counts, 1))
+    sample_weights = per_class[targets]
   weights = np.zeros((n_features, len(class_list)))
   bias = np.zeros(len(class_list))
   count = len(rows)
   for _ in range(cfg.epochs):
-    diff = (softmax(_logits(rows, weights, bias)) - one_hot) / count
+    diff = (softmax(_logits(rows, weights, bias)) - one_hot) * sample_weights[:, None] / count
     grad_w = np.zeros_like(weights)
     for row_index, row in enumerate(rows):
       for feature, value in row.items():

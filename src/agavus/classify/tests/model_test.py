@@ -45,3 +45,11 @@ def test_weights_inspectable() -> None:
   model = _trained()
   m_index = model.classes.index("M")
   assert model.weights[0][m_index] > model.weights[1][m_index]
+
+
+def test_imbalanced_classes_balanced() -> None:
+  rows = [{0: 1.0}] * 12 + [{1: 1.0}] * 2
+  labels = ["F"] * 12 + ["M"] * 2
+  model = train_logreg(rows, labels, ("F", "M"), n_features=2)
+  probs = model.predict_proba([{1: 1.0}])
+  assert model.classes[int(probs[0].argmax())] == "M"

@@ -24,6 +24,12 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("onde está previsto o direito a alimentos na lei", "F"),
   ("qual lei define a alienação parental no brasil", "F"),
   ("artigo sobre guarda e visitação dos filhos", "F"),
+  ("como funciona o divórcio extrajudicial em cartório", "F"),
+  ("pensão para ex-cônjuge após a separação", "F"),
+  ("guarda do filho bebê fica com a mãe", "F"),
+  ("pai não registrou o filho, o que fazer", "F"),
+  ("união estável precisa de quanto tempo", "F"),
+  ("partilha das dívidas do casal no divórcio", "F"),
   # M — violência doméstica (colloquial)
   ("meu marido me agrediu e quero medida protetiva", "M"),
   ("ele quebrou minhas coisas e me ameaçou em casa", "M"),
@@ -39,6 +45,11 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("ele humilha e xinga na frente das crianças", "M"),
   ("qual artigo da lei maria da penha trata das medidas protetivas", "M"),
   ("que lei pune a violência doméstica contra a mulher", "M"),
+  ("ele vigia meu celular e controla meus passos", "M"),
+  ("fui estuprada pelo marido, é crime", "M"),
+  ("medida protetiva vale para namoro", "M"),
+  ("ele ameaçou tirar as crianças de mim", "M"),
+  ("violência moral, ele me difama para os vizinhos", "M"),
   # O — fora do escopo (penal geral, trabalhista, consumidor…)
   ("fui preso em flagrante por roubo, qual a pena", "O"),
   ("tráfico de drogas, como funciona a audiência de custódia", "O"),
@@ -50,4 +61,7 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("aposentadoria negada pelo INSS", "O"),
   ("qual artigo do código penal trata do homicídio", "O"),
   ("o que diz a CLT sobre férias do trabalhador", "O"),
+  ("meu chefe me assedia no trabalho", "O"),
+  ("batida de carro, quem paga o conserto", "O"),
+  ("comprei produto com defeito e a loja não troca", "O"),
 )
