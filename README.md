@@ -136,6 +136,13 @@ agavus -p "Qual é o artigo da lei de alienação parental?"
 agavus classify --file peticao.txt --explain
 ```
 
+Available today (corpus phase):
+
+```sh
+uv run agavus ingest --source datajud --limit 500   # TJDFT metadata → data/
+uv run agavus ingest --source statutes              # Planalto articles → data/
+```
+
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).
 Run them manually with `make hooks`.
 

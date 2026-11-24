@@ -34,6 +34,22 @@ All case sources are filtered to **TJDFT** and to the
 4. **Provenance**: every processed record points back to its raw payload and
    its public reference (`origin_ref`).
 
+## Access spike findings (2026-11-24)
+
+- **DataJud**: public APIKey auth works; the cluster is frequently
+  overloaded — HTTP 429 (`es_rejected_execution_exception`), queries up to
+  ~45s, partial shard failures, and 200 responses with **empty hits**.
+  Consequences implemented in `corpus/fetch.py`: 2s minimum interval
+  (0.5 req/s), `Retry-After` honored, exponential backoff capped at 60s,
+  90s timeout, max 4 retries; empty responses never advance the watermark;
+  CLI fails friendly with nothing saved. One bounded page per run.
+- **Planalto**: reachable via normal networks; direct egress from the dev
+  sandbox timed out (parser validated against real pages fetched via
+  firecrawl). Statute ingestion is implemented and fixture-tested; live runs
+  depend on network egress.
+- **DJEN**: deferred (DNS/access not verified from the sandbox); metadata +
+  statutes carry the MVP, per plan.
+
 ## Known coverage asymmetry (segredo de justiça)
 
 Family (F) and Maria da Penha (M) full texts are mostly sealed:
