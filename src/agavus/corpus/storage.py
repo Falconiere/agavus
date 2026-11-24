@@ -12,6 +12,9 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TypedDict
 
+import numpy as np
+from numpy.typing import NDArray
+
 from agavus.corpus import db
 from agavus.corpus.db import RunEntry
 from agavus.corpus.records import CaseRecord, TextDocument
@@ -34,14 +37,30 @@ class CorpusStorage:
     self.processed = root / "processed"
 
   def save_raw(self, source: str, run: date, name: str, payload: bytes, meta: object) -> str:
-    """Preserve a fetched payload verbatim plus its query metadata; return ref."""
+    """Preserve a fetched payload verbatim; register metadata in SQLite."""
     folder = self.raw / source / run.isoformat()
     folder.mkdir(parents=True, exist_ok=True)
     (folder / name).write_bytes(payload)
-    (folder / f"{name}.meta.json").write_text(
-      json.dumps(meta, default=db.json_default, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return str((folder / name).relative_to(self.root))
+    ref = str((folder / name).relative_to(self.root))
+    details = meta if isinstance(meta, dict) else {}
+    with closing(db.connect(self.root)) as conn:
+      db.insert_raw_meta(
+        conn,
+        db.RawMeta(
+          ref=ref,
+          source=source,
+          run=run.isoformat(),
+          url=str(details.get("url")) if details.get("url") else None,
+          method=str(details.get("method")) if details.get("method") else None,
+          payload_json=(
+            json.dumps(details.get("payload"), ensure_ascii=False)
+            if details.get("payload")
+            else None
+          ),
+          fetched_at=datetime.now(UTC).isoformat(),
+        ),
+      )
+    return ref
 
   def save_case(self, record: CaseRecord) -> bool:
     """Store a case record; False when it already existed (idempotent)."""
@@ -116,3 +135,25 @@ class CorpusStorage:
     """All derived label decisions."""
     with closing(db.connect(self.root)) as conn:
       return db.select_labels(conn)
+
+  def search_texts(self, query: str, limit: int = 10) -> list[tuple[str, float]]:
+    """BM25-ranked text ids (FTS5)."""
+    with closing(db.connect(self.root)) as conn:
+      return db.search_fts(conn, query, limit)
+
+  def rebuild_index(self) -> int:
+    """Rebuild the FTS index from stored texts; returns indexed count."""
+    with closing(db.connect(self.root)) as conn:
+      return db.rebuild_fts(conn)
+
+  def save_embedding(self, doc_id: str, model_version: str, vector: NDArray[np.float64]) -> None:
+    """Store a dense vector for a document (tier-4 retrieval)."""
+    with closing(db.connect(self.root)) as conn:
+      db.insert_embedding(conn, doc_id, model_version, vector)
+
+  def search_similar(
+    self, query: NDArray[np.float64], model_version: str, k: int = 5
+  ) -> list[tuple[str, float]]:
+    """Cosine KNN over stored embeddings of one model version."""
+    with closing(db.connect(self.root)) as conn:
+      return db.knn_embeddings(conn, query, model_version, k)

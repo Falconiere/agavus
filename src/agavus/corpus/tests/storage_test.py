@@ -1,8 +1,10 @@
 """Tests for corpus storage (tests folder, tmp dirs, synthetic records)."""
 
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 
+from agavus.corpus import db
 from agavus.corpus.httpfixtures import sample_case
 from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
@@ -38,9 +40,18 @@ def test_save_text_idempotent(tmp_path: Path) -> None:
 
 def test_raw_preserved_with_meta(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
-  ref = storage.save_raw("datajud", date(2026, 11, 24), "p1.json", b'{"hits": []}', {"size": 1})
+  ref = storage.save_raw(
+    "datajud",
+    date(2026, 11, 24),
+    "p1.json",
+    b'{"hits": []}',
+    {"url": "https://x.test", "method": "POST", "payload": {"size": 1}},
+  )
   assert (tmp_path / ref).read_bytes() == b'{"hits": []}'
-  assert (tmp_path / f"{ref}.meta.json").exists()
+  with closing(db.connect(tmp_path)) as conn:
+    row = conn.execute("SELECT * FROM raw_payloads WHERE ref = ?", (ref,)).fetchone()
+  assert row["url"] == "https://x.test"
+  assert row["method"] == "POST"
 
 
 def test_watermark_roundtrip(tmp_path: Path) -> None:

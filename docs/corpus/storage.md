@@ -4,17 +4,30 @@
 
 ```
 data/                      # gitignored, path via AGAVUS_DATA_DIR (default: data/)
-  raw/                     # exactly as fetched, never mutated
-    datajud/2026-11-24/…   # response payloads + query params + fetch time
-    djen/2026-11-24/…
+  raw/                     # exactly as fetched, never mutated (bytes only)
+    datajud/2026-11-24/…   # payload files; metadata lives in corpus.db
     statutes/…
   processed/
-    corpus.db              # SQLite: records, labels, runs, watermarks
-  models/                  # tiny-LLM weights (later phase), checksum-pinned
+    corpus.db              # SQLite: records, labels, runs, watermarks,
+                           # raw audit, FTS5 index, embeddings
+  models/
+    models.db              # SQLite: trained artifacts (vocab, weights BLOBs,
+                           # temperature, training reports)
 ```
 
-Model weights follow the same policy as the corpus: `AGAVUS_MODELS_DIR`
-(default `data/models/`), never in git, re-downloadable.
+**JSON is not used as a database anywhere.** Remaining files: raw payload
+bytes (verbatim audit), `.env` config. All structured state — records,
+labels, manifests, raw metadata, model artifacts, indexes — is SQLite.
+
+## Retrieval-ready indexes (inside corpus.db)
+
+- **`texts_fts`** — FTS5 virtual table with native `bm25()`: lexical
+  retrieval, zero deps. Kept in sync on insert; `rebuild_index()` backfills.
+- **`embeddings(doc_id, model_version, dim, vector BLOB)`** — float32
+  vectors keyed by doc + model version (upgrade = re-embed, never mix).
+  Brute-force cosine KNN (`search_similar`) — fine at corpus scale;
+  `sqlite-vec` extension later only if quantization/scale demands it.
+- Hybrid retrieval (BM25 + cosine + RRF) will live entirely in this file.
 
 ## Why SQLite for processed data (not JSON files)
 
@@ -42,8 +55,14 @@ texts(id PK, source, origin_ref, published_at, text, citations JSON,
 labels(record_id PK, area, source, needs_review, reason)   -- derived, re-runnable
 meta_runs(run_at, source, fetched, new, window_start, window_end)
 meta_watermarks(source PK, value)
+raw_payloads(ref PK, source, run, url, method, payload_json, fetched_at)
+texts_fts(doc_id UNINDEXED, text)                          -- FTS5 + bm25()
+embeddings(doc_id, model_version, dim, vector BLOB)
 indexes: cases(orgao), cases(data_ajuizamento), labels(needs_review, area)
 ```
+
+Model artifacts (`models.db`): `models`, `model_classes`, `model_vocab`,
+`model_weights` (BLOBs), `train_reports` — the quality memory of every run.
 
 Records are **immutable once ingested**; the labeling pass writes the
 derived `labels` table (upsert), never edits records — provenance preserved.

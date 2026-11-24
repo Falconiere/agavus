@@ -4,8 +4,9 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from agavus.classify.pipeline import TrainedClassifier, train_classifier
+from agavus.classify.pipeline import train_classifier
 from agavus.classify.seed import SEED_QUERIES
+from agavus.classify.store import load_model, save_model
 from agavus.config.settings import Settings, load_settings
 from agavus.corpus.fetch import FetchError
 from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
@@ -59,22 +60,22 @@ def _run_train(settings: Settings) -> int:
     print("train: no labeled texts — run ingest + label first")
     return 1
   classifier, report = train_classifier(texts, targets)
-  folder = settings.data_dir / "models" / "classifier"
-  classifier.save(folder)
+  db_path = settings.data_dir / "models" / "models.db"
+  save_model(db_path, "classifier", classifier, report)
   print(
     f"train: {report.n_train} train / {report.n_holdout} holdout · "
     f"acc {report.holdout_accuracy:.2f} · F1 {report.holdout_macro_f1:.2f} · "
-    f"ECE {report.holdout_ece:.3f} · T {report.temperature:.2f} → {folder}"
+    f"ECE {report.holdout_ece:.3f} · T {report.temperature:.2f} → {db_path}"
   )
   return 0
 
 
 def _run_classify(settings: Settings, text: str) -> int:
-  folder = settings.data_dir / "models" / "classifier"
-  if not (folder / "meta.json").exists():
+  db_path = settings.data_dir / "models" / "models.db"
+  if not db_path.exists():
     print("classify: no trained model — run `agavus train` first")
     return 1
-  classifier = TrainedClassifier.load(folder)
+  classifier = load_model(db_path, "classifier")
   probs = classifier.predict_proba([text])[0]
   pairs = sorted(zip(classifier.model.classes, probs, strict=True), key=lambda p: -p[1])
   rendered = " · ".join(f"{label} {prob:.3f}" for label, prob in pairs)

@@ -58,7 +58,7 @@ def test_label_empty_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_train_seeds_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
   assert _run_with_data_dir(monkeypatch, tmp_path, ["train"]) == 0
-  assert (tmp_path / "models" / "classifier" / "meta.json").exists()
+  assert (tmp_path / "models" / "models.db").exists()
 
 
 def test_classify_without_model_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

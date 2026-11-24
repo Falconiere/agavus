@@ -5,10 +5,8 @@ and temperature are fitted exclusively on the training side; the holdout
 measures honest generalization (docs/evals.md).
 """
 
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
@@ -41,7 +39,10 @@ class TrainReport:
 
 @dataclass(frozen=True)
 class TrainedClassifier:
-  """Versioned bundle: vocabulary + weights + temperature."""
+  """Versioned bundle: vocabulary + weights + temperature.
+
+  Persistence lives in classify/store.py (SQLite artifacts, no JSON files).
+  """
 
   vectorizer: TfidfVectorizer
   model: LogRegModel
@@ -51,41 +52,6 @@ class TrainedClassifier:
     """Calibrated class probabilities for raw texts."""
     rows = self.vectorizer.transform(texts)
     return softmax(apply_temperature(self.model.logits(rows), self.temperature))
-
-  def save(self, folder: Path) -> None:
-    """Persist the bundle (outside git; rebuildable by retraining)."""
-    folder.mkdir(parents=True, exist_ok=True)
-    config = self.vectorizer.config
-    vocab = {
-      "vocab": self.vectorizer.vocab,
-      "idf": self.vectorizer.idf,
-      "min_df": config.min_df,
-      "max_features": config.max_features,
-      "char_sizes": list(config.char_sizes),
-    }
-    (folder / "vocab.json").write_text(json.dumps(vocab, ensure_ascii=False), encoding="utf-8")
-    np.savez(folder / "model.npz", weights=self.model.weights, bias=self.model.bias)
-    meta = {"classes": list(self.model.classes), "temperature": self.temperature}
-    (folder / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
-
-  @staticmethod
-  def load(folder: Path) -> "TrainedClassifier":
-    """Reload a persisted bundle."""
-    vocab = json.loads((folder / "vocab.json").read_text(encoding="utf-8"))
-    meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
-    config = VectorizerConfig(
-      min_df=vocab["min_df"],
-      max_features=vocab["max_features"],
-      char_sizes=tuple(vocab["char_sizes"]),
-    )
-    vectorizer = TfidfVectorizer(config)
-    vectorizer.vocab = vocab["vocab"]
-    vectorizer.idf = vocab["idf"]
-    with np.load(folder / "model.npz") as arrays:
-      model = LogRegModel(
-        classes=tuple(meta["classes"]), weights=arrays["weights"], bias=arrays["bias"]
-      )
-    return TrainedClassifier(vectorizer, model, float(meta["temperature"]))
 
 
 def train_classifier(

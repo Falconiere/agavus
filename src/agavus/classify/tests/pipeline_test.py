@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from agavus.classify.features import VectorizerConfig
-from agavus.classify.pipeline import TrainedClassifier, train_classifier
+from agavus.classify.pipeline import train_classifier
+from agavus.classify.store import load_model, save_model
 
 TEXTS = [
   "medida protetiva violência doméstica ameaça",
@@ -33,11 +34,12 @@ def test_train_learns_and_reports() -> None:
 
 
 def test_save_load_roundtrip(tmp_path: Path) -> None:
-  classifier, _ = train_classifier(
+  classifier, report = train_classifier(
     TEXTS, LABELS, vectorizer_config=VectorizerConfig(min_df=1, char_sizes=())
   )
-  classifier.save(tmp_path)
-  loaded = TrainedClassifier.load(tmp_path)
+  db_path = tmp_path / "models.db"
+  save_model(db_path, "classifier", classifier, report)
+  loaded = load_model(db_path, "classifier")
   sample = ["guarda dos filhos", "medida protetiva"]
   assert (loaded.predict_proba(sample) == classifier.predict_proba(sample)).all()
 

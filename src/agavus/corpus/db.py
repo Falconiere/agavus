@@ -13,6 +13,9 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict
 
+import numpy as np
+from numpy.typing import NDArray
+
 from agavus.corpus.records import (
   CaseRecord,
   LabelSource,
@@ -51,6 +54,15 @@ CREATE TABLE IF NOT EXISTS labels (
   needs_review INTEGER NOT NULL, reason TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_labels_review ON labels(needs_review, area);
+CREATE TABLE IF NOT EXISTS raw_payloads (
+  ref TEXT PRIMARY KEY, source TEXT NOT NULL, run TEXT NOT NULL,
+  url TEXT, method TEXT, payload_json TEXT, fetched_at TEXT NOT NULL
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS texts_fts USING fts5(doc_id UNINDEXED, text);
+CREATE TABLE IF NOT EXISTS embeddings (
+  doc_id TEXT NOT NULL, model_version TEXT NOT NULL, dim INTEGER NOT NULL,
+  vector BLOB NOT NULL, PRIMARY KEY (doc_id, model_version)
+);
 """
 
 
@@ -103,8 +115,8 @@ def insert_case(conn: sqlite3.Connection, record: CaseRecord) -> bool:
 
 
 def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
-  """Atomic dedup insert; False when the id already existed."""
-  return _insert(
+  """Atomic dedup insert; False when the id already existed. Indexes FTS."""
+  inserted = _insert(
     conn,
     "texts",
     (
@@ -119,6 +131,91 @@ def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
       record.raw_ref,
     ),
   )
+  if inserted:
+    conn.execute("INSERT INTO texts_fts (doc_id, text) VALUES (?,?)", (record.id, record.text))
+    conn.commit()
+  return inserted
+
+
+def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tuple[str, float]]:
+  """BM25-ranked document ids via FTS5 (native, zero-dep)."""
+  rows = conn.execute(
+    "SELECT doc_id, bm25(texts_fts) AS score FROM texts_fts WHERE texts_fts MATCH ? "
+    "ORDER BY score LIMIT ?",
+    (query, limit),
+  ).fetchall()
+  return [(str(row["doc_id"]), float(row["score"])) for row in rows]
+
+
+def rebuild_fts(conn: sqlite3.Connection) -> int:
+  """Rebuild the FTS index from the texts table (idempotent maintenance)."""
+  conn.execute("DELETE FROM texts_fts")
+  conn.execute("INSERT INTO texts_fts (doc_id, text) SELECT id, text FROM texts")
+  conn.commit()
+  return int(conn.execute("SELECT count(*) FROM texts_fts").fetchone()[0])
+
+
+class RawMeta(TypedDict):
+  """Audit metadata for one preserved raw payload."""
+
+  ref: str
+  source: str
+  run: str
+  url: str | None
+  method: str | None
+  payload_json: str | None
+  fetched_at: str
+
+
+def insert_raw_meta(conn: sqlite3.Connection, meta: RawMeta) -> None:
+  """Register a preserved raw payload in the audit table (no JSON sidecars)."""
+  conn.execute(
+    "INSERT OR REPLACE INTO raw_payloads VALUES (?,?,?,?,?,?,?)",
+    (
+      meta["ref"],
+      meta["source"],
+      meta["run"],
+      meta["url"],
+      meta["method"],
+      meta["payload_json"],
+      meta["fetched_at"],
+    ),
+  )
+  conn.commit()
+
+
+def insert_embedding(
+  conn: sqlite3.Connection, doc_id: str, model_version: str, vector: NDArray[np.float64]
+) -> None:
+  """Store a dense vector as float32 BLOB, keyed by doc + model version."""
+  vec = np.asarray(vector, dtype=np.float32)
+  conn.execute(
+    "INSERT OR REPLACE INTO embeddings VALUES (?,?,?,?)",
+    (doc_id, model_version, vec.size, vec.tobytes()),
+  )
+  conn.commit()
+
+
+def knn_embeddings(
+  conn: sqlite3.Connection,
+  query: NDArray[np.float64],
+  model_version: str,
+  k: int = 5,
+) -> list[tuple[str, float]]:
+  """Brute-force cosine KNN (fine at corpus scale; sqlite-vec later if needed)."""
+  rows = conn.execute(
+    "SELECT doc_id, vector FROM embeddings WHERE model_version = ?", (model_version,)
+  ).fetchall()
+  query_vec = np.asarray(query, dtype=np.float32)
+  query_norm = float(np.linalg.norm(query_vec))
+  scored: list[tuple[str, float]] = []
+  for row in rows:
+    vec = np.frombuffer(row["vector"], dtype=np.float32)
+    denom = query_norm * float(np.linalg.norm(vec))
+    score = float(np.dot(query_vec, vec) / denom) if denom else 0.0
+    scored.append((str(row["doc_id"]), score))
+  scored.sort(key=lambda pair: -pair[1])
+  return scored[:k]
 
 
 def _row_dict(row: sqlite3.Row, json_fields: tuple[str, ...]) -> dict[str, object]:

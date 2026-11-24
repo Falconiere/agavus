@@ -5,9 +5,28 @@ from datetime import date
 
 import httpx
 
-from agavus.corpus.records import CaseRecord, LabelSource
+from agavus.corpus.records import CaseRecord, LabelSource, TextDocument, TextSource
 
 Handler = Callable[[httpx.Request], httpx.Response]
+
+
+def sample_text(
+  doc_id: str = "t1",
+  text: str = "trecho sintético",
+  origin_ref: str = "Lei 12.318/2010, art. 2",
+) -> TextDocument:
+  """One synthetic text document for tests across domains."""
+  return TextDocument(
+    id=doc_id,
+    source=TextSource.STATUTE,
+    origin_ref=origin_ref,
+    published_at=None,
+    text=text,
+    citations=(),
+    domain_label=None,
+    label_source=LabelSource.PENDING,
+    raw_ref="raw/x.html",
+  )
 
 
 def sample_case(
