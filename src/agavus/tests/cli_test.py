@@ -8,6 +8,7 @@ import pytest
 from agavus import cli
 from agavus.answer.compose import Answer
 from agavus.corpus.fetch import FetchError
+from agavus.evals.run import EvalReport
 
 
 class FakeModel:
@@ -113,3 +114,99 @@ def test_ask_json_output(
   assert payload["area"] == "M"
   assert payload["sources"] == [{"ref": "Lei 11.340/2006, art. 22"}]
   assert "trace" in payload
+
+
+def _fake_report() -> EvalReport:
+  return EvalReport(
+    accuracy=1.0,
+    macro_f1=1.0,
+    accepted=2,
+    accepted_correct=2,
+    deferred=1,
+    rejected=1,
+    precision_on_accepted=1.0,
+    coverage=0.5,
+    m_recall=1.0,
+  )
+
+
+def test_publish_dry_run(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+  def fake_stage(settings: object, staging: Path) -> EvalReport:
+    return _fake_report()
+
+  monkeypatch.setattr(cli, "stage_release", fake_stage)
+  assert _run_with_data_dir(monkeypatch, tmp_path, ["publish"]) == 0
+  assert "dry run" in capsys.readouterr().out
+
+
+def test_publish_bootstrap_and_uploads(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+  calls: list[tuple[str, object]] = []
+
+  def fake_bootstrap(settings: object, assets: Path) -> Path:
+    calls.append(("bootstrap", assets))
+    return tmp_path / "models" / "models.db"
+
+  def fake_stage(settings: object, staging: Path) -> EvalReport:
+    calls.append(("stage", staging))
+    return _fake_report()
+
+  def fake_upload(staging: Path, repo: str) -> str:
+    calls.append(("model", repo))
+    return "https://huggingface.co/model"
+
+  def fake_stage_space(space_dir: Path, staging: Path, revision: str) -> Path:
+    calls.append(("space-stage", revision))
+    return staging
+
+  def fake_upload_space(staging: Path, repo: str) -> str:
+    calls.append(("space", repo))
+    return "https://huggingface.co/spaces/demo"
+
+  monkeypatch.setattr(cli, "bootstrap_corpus", fake_bootstrap)
+  monkeypatch.setattr(cli, "stage_release", fake_stage)
+  monkeypatch.setattr(cli, "upload", fake_upload)
+  monkeypatch.setattr(cli, "stage_space", fake_stage_space)
+  monkeypatch.setattr(cli, "upload_space", fake_upload_space)
+  assets = tmp_path / "assets"
+  code = _run_with_data_dir(
+    monkeypatch,
+    tmp_path,
+    [
+      "publish",
+      "--bootstrap",
+      str(assets),
+      "--repo",
+      "owner/model",
+      "--space",
+      "owner/space",
+      "--revision",
+      "v1.0.0",
+    ],
+  )
+  assert code == 0
+  assert calls == [
+    ("bootstrap", assets),
+    ("stage", tmp_path / "hf-staging"),
+    ("model", "owner/model"),
+    ("space-stage", "v1.0.0"),
+    ("space", "owner/space"),
+  ]
+  output = capsys.readouterr().out
+  assert "model live" in output
+  assert "Space live" in output
+
+
+def test_publish_bootstrap_failure(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+  def failing(settings: object, assets: Path) -> Path:
+    raise ValueError("non-public texts")
+
+  monkeypatch.setattr(cli, "bootstrap_corpus", failing)
+  code = _run_with_data_dir(monkeypatch, tmp_path, ["publish", "--bootstrap", "assets"])
+  assert code == 1
+  assert "bootstrap failed" in capsys.readouterr().out

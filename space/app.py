@@ -11,21 +11,13 @@ from pathlib import Path
 import gradio as gr
 
 from agavus.answer.compose import compose
-from agavus.classify.pipeline import train_classifier, training_set
-from agavus.classify.store import load_model, save_model
+from agavus.classify.store import load_model
 from agavus.config.settings import load_settings
-from agavus.corpus.ingest import import_statute_file
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
+from agavus.publish.bootstrap import ensure_model
 
 ASSETS = Path(__file__).parent / "assets"
-ASSET_NAMES = {
-  "l11340": "Lei 11.340/2006",
-  "l12318": "Lei 12.318/2010",
-  "l13058": "Lei 13.058/2014",
-  "l14994": "Lei 14.994/2024",
-  "l10406": "Lei 10.406/2002",
-}
 EXAMPLES = [
   "Qual é o artigo da lei de alienação parental?",
   "ele descumpriu a medida protetiva, o que acontece?",
@@ -34,19 +26,9 @@ EXAMPLES = [
 
 
 @cache
-def _bootstrap(data_dir: Path) -> None:
+def _bootstrap(data_dir: Path) -> Path:
   """Import bundled public statutes, label, train — once per data dir."""
-  settings = load_settings()
-  db_path = data_dir / "models" / "models.db"
-  if db_path.exists():
-    return
-  for stem, name in ASSET_NAMES.items():
-    import_statute_file(settings, name, ASSETS / f"{stem}.html")
-  storage = CorpusStorage(data_dir)
-  storage.run_labeling()
-  texts, targets = training_set(storage)
-  classifier, report = train_classifier(texts, targets)
-  save_model(db_path, "classifier", classifier, report)
+  return ensure_model(load_settings(), ASSETS)
 
 
 def answer_question(question: str) -> tuple[str, str, str]:
@@ -54,8 +36,7 @@ def answer_question(question: str) -> tuple[str, str, str]:
   if not question.strip():
     return ("", "Digite uma pergunta.", "")
   settings = load_settings()
-  _bootstrap(settings.data_dir)
-  classifier = load_model(settings.data_dir / "models" / "models.db", "classifier")
+  classifier = load_model(_bootstrap(settings.data_dir), "classifier")
   probs = classifier.predict_proba([question])[0]
   mapping = {
     label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)

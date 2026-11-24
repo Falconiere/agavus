@@ -21,10 +21,13 @@ from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
 from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
+from agavus.publish.bootstrap import bootstrap_corpus
 from agavus.publish.export import stage_release, upload
+from agavus.publish.space_release import stage_space, upload_space
 from agavus.retrieve.search import search
 
 DEFAULT_LIMIT = 500
+SPACE_DIR = Path("space")
 
 
 def _print_json(payload: dict[str, object]) -> None:
@@ -192,7 +195,19 @@ def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) ->
   return 10 if answer.decision == "defer" else 20
 
 
-def _run_publish(settings: Settings, repo: str | None) -> int:
+def _run_publish(
+  settings: Settings,
+  repo: str | None,
+  space_repo: str | None,
+  revision: str,
+  bootstrap: Path | None,
+) -> int:
+  if bootstrap is not None:
+    try:
+      bootstrap_corpus(settings, bootstrap)
+    except (KeyError, OSError, ValueError) as exc:
+      print(f"publish: bootstrap failed — {exc}")
+      return 1
   staging = settings.data_dir / "hf-staging"
   try:
     report = stage_release(settings, staging)
@@ -203,15 +218,25 @@ def _run_publish(settings: Settings, repo: str | None) -> int:
     f"publish: staged at {staging} · precision {report.precision_on_accepted:.2f} · "
     f"M-recall {report.m_recall:.2f} · coverage {report.coverage:.2f}"
   )
-  if repo is None:
-    print("publish: dry run (pass --repo OWNER/NAME to upload; requires `hf auth login`)")
-    return 0
-  try:
-    url = upload(staging, repo)
-  except Exception as exc:
-    print(f"publish: upload failed — {exc}")
-    return 1
-  print(f"publish: live at {url}")
+  if repo is not None:
+    try:
+      url = upload(staging, repo)
+    except Exception as exc:
+      print(f"publish: upload failed — {exc}")
+      return 1
+    print(f"publish: model live at {url}")
+  if space_repo is not None:
+    try:
+      space_staging = stage_space(SPACE_DIR, settings.data_dir / "hf-space-staging", revision)
+      space_url = upload_space(space_staging, space_repo)
+    except Exception as exc:
+      print(f"publish: Space upload failed — {exc}")
+      return 1
+    print(f"publish: Space live at {space_url}")
+  if repo is None and space_repo is None:
+    print(
+      "publish: dry run (pass --repo and/or --space OWNER/NAME to upload; requires `hf auth login`)"
+    )
   return 0
 
 
@@ -250,6 +275,15 @@ def main(argv: Sequence[str] | None = None) -> int:
   publish.add_argument(
     "--repo", default=None, help="HF model repo, e.g. Falconiere/agavus-classifier"
   )
+  publish.add_argument(
+    "--space", dest="space_repo", default=None, help="HF Space repo, e.g. Falconiere/agavus"
+  )
+  publish.add_argument(
+    "--revision", default="main", help="git ref the Space installs agavus from (tag/sha)"
+  )
+  publish.add_argument(
+    "--bootstrap", type=Path, default=None, help="assets dir for an offline public-corpus build"
+  )
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.pergunta is not None:
@@ -261,7 +295,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     "classify": lambda: _run_classify(settings, args.text, args.explain, args.as_json),
     "eval": lambda: _run_eval(settings, args.as_json),
     "search": lambda: _run_search(settings, args.query, args.limit, args.as_json),
-    "publish": lambda: _run_publish(settings, args.repo),
+    "publish": lambda: _run_publish(
+      settings, args.repo, args.space_repo, args.revision, args.bootstrap
+    ),
   }
   handler = handlers.get(args.command)
   if handler is not None:

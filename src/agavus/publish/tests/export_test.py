@@ -10,6 +10,7 @@ from agavus.classify.store import save_model
 from agavus.config.settings import Settings
 from agavus.corpus.httpfixtures import sample_settings
 from agavus.evals.run import EvalReport
+from agavus.publish import export
 from agavus.publish.export import gate, stage_release
 
 
@@ -41,12 +42,17 @@ def _settings(tmp_path: Path) -> Settings:
   return sample_settings(tmp_path)
 
 
-def test_stage_release_builds_card(tmp_path: Path) -> None:
+def _trained_seeds(tmp_path: Path) -> Settings:
   settings = _settings(tmp_path)
   texts = [text for text, _ in SEED_QUERIES]
   labels = [label for _, label in SEED_QUERIES]
   classifier, report = train_classifier(texts, labels)
   save_model(tmp_path / "models" / "models.db", "classifier", classifier, report)
+  return settings
+
+
+def test_stage_release_builds_card(tmp_path: Path) -> None:
+  settings = _trained_seeds(tmp_path)
   staging = tmp_path / "staging"
   stage_release(settings, staging)
   assert (staging / "models.db").exists()
@@ -59,4 +65,17 @@ def test_stage_release_builds_card(tmp_path: Path) -> None:
 def test_stage_release_refuses_without_model(tmp_path: Path) -> None:
   settings = _settings(tmp_path)
   with pytest.raises(KeyError):
+    stage_release(settings, tmp_path / "staging")
+
+
+def test_stage_release_blocks_personal_data(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+  settings = _trained_seeds(tmp_path)
+
+  def card_with_email(**_: object) -> str:
+    return "contato fulano@example.com"
+
+  monkeypatch.setattr(export, "build_model_card", card_with_email)
+  with pytest.raises(ValueError, match="personal data"):
     stage_release(settings, tmp_path / "staging")

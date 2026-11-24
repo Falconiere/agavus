@@ -1,9 +1,9 @@
 # CLI usage — how to use agavus
 
 Status: **implemented** — `-p`, `classify`, `search`, `train`, `eval`,
-`ingest`, `label` are live, with `--explain` (decision trace: probabilities,
-expected losses, top features) and `--json` (typed output) accepted before
-or after subcommands.
+`ingest`, `label`, `publish` are live, with `--explain` (decision trace:
+probabilities, expected losses, top features) and `--json` (typed output)
+accepted before or after subcommands.
 The CLI is the product surface for both goals: asking questions and
 classifying documents. User-facing I/O is **pt-BR**; code and docs stay
 English.
@@ -19,7 +19,8 @@ agavus ingest --source datajud --limit 500                # TJDFT metadata
 agavus label                                              # TPU + organ labeling
 agavus train                                              # fit + calibrate + report
 agavus eval                                               # gold-set evaluation
-agavus publish [--repo OWNER/NAME]                        # eval-gated HF release
+agavus publish [--bootstrap ASSETS_DIR] [--repo OWNER/NAME] \
+               [--space OWNER/NAME] [--revision REF]   # eval-gated HF release
 ```
 
 Flags (ask, classify, eval, search):
@@ -28,6 +29,15 @@ Flags (ask, classify, eval, search):
 | ------------ | ------------------------------------------------ |
 | `--json` | machine-readable typed output (schema below) |
 | `--explain` | decision trace: probabilities, expected losses, top features |
+
+Publish flags (CI/CD runs them; [publishing.md](publishing.md)):
+
+| Flag | Effect |
+| ---------------------- | ------------------------------------------------ |
+| `--bootstrap DIR` | offline build from public statutes in DIR + seeds before gating |
+| `--repo OWNER/NAME` | upload the eval-gated model release |
+| `--space OWNER/NAME` | stage + upload the Gradio Space |
+| `--revision REF` | git ref the Space installs agavus from (default `main`) |
 
 ## What happens on `-p` (the full flow)
 
