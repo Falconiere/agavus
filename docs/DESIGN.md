@@ -131,6 +131,28 @@ Formula-by-formula explanations with worked examples: **[docs/math/](math/README
 - **Probability calibration** (Platt/isotonic on held-out set) is mandatory:
   the decision layer consumes calibrated probabilities only.
 
+### 6.1 Known limitations → required mitigations
+
+These are **implementation requirements**, not optional improvements. Each
+limitation of the math core has a designated fix; mitigations live in
+preprocessing/features — deterministic, inspectable, CPU-only. Auditability
+beats opaque accuracy in legal text.
+
+| # | Limitation | Required mitigation | Module |
+| - | ---------------------------------------- | ------------------------------------------------------------------ | ------------------ |
+| 1 | Negation/word order lost ("nega a protetiva" ≈ "concede a protetiva") | Negation-aware features: closed lexicon of legal decision verbs (deferir/indeferir, conceder/negar, prover/desprover, revogar, homologar); NegEx-style scope marking so `nega_protetiva` ≠ `protetiva`; bigrams/trigrams | `classify/features` |
+| 2 | Lexical gap (alimentos vs pensão alimentícia; abbreviations LMP, VP) | Curated synonym/abbreviation → canonical-term lexicon applied at preprocessing and query expansion; LSA/NMF latent topics (tier 3); hybrid BM25 + dense with reciprocal rank fusion (tier 4) | `taxonomy` (lexicon), `retrieve` |
+| 3 | Linear model misses feature interactions | Explicit feature crosses (citation × domain, negation × term, bigrams); model stays linear for auditability | `classify/features` |
+| 4 | Calibration needs data we don't have yet | Cross-validated Platt on the small gold set; **defer-queue reviews feed the gold set** (human-in-the-loop); active learning — label most-uncertain examples first | `classify`, `decide` |
+| 5 | Loss matrix values are placeholders | Calibrate from held-out α/β sweeps and boundary-queue review outcomes; version every change | `decide/losses` |
+
+Fallback for #1 only if rules prove insufficient: CPU dependency parsing
+(spaCy pt) for negation scope — heavier, still no GPU.
+
+Architectural invariant: even perfect NLU would not remove the need for
+**citations + defer**. Correctness comes from quoting real sources and
+abstaining, not from deeper understanding.
+
 ## 7. Decision layer: three-way decisions (Yao / DTRS)
 
 Actions: **accept** (classify/answer), **reject** (out of scope), **defer**
@@ -172,10 +194,12 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 ## 8. Evaluation plan
 
 - **Classifier**: macro-F1 per domain on held-out TJDFT data; confusion matrix
-  with special attention to M↔F errors.
+  with special attention to M↔F errors; expected calibration error (ECE)
+  reported alongside F1.
 - **Decision layer**: accuracy-vs-coverage curves while sweeping α/β; target
   e.g. ≥ 0.95 precision on accepted answers; track deferral rate and boundary
-  queue composition; review sampled boundary cases weekly.
+  queue composition; review sampled boundary cases weekly. Reviewed boundary
+  cases flow back into the gold set (active learning: most-uncertain first).
 - **Retrieval**: recall@k on the gold question set; citation correctness
   (every excerpt must carry a verifiable source reference).
 - **Safety**: zero tolerance for party-name leakage (automated scan);
@@ -185,10 +209,14 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 
 1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema;
    gitignored `data/` + `AGAVUS_DATA_DIR` setting + staged-data guard hook.
-2. `taxonomy/` — TPU code table → F/M/P/O; weak-label rules; gold set.
-3. `classify/` — TF-IDF + calibrated logreg; baselines; evaluation.
-4. `decide/` — loss matrix, expected-loss rule, three-way gates.
-5. `retrieve/` — BM25 + citation features over statutes/decisions.
+2. `taxonomy/` — TPU code table → F/M/P/O; weak-label rules; gold set;
+   synonym/abbreviation normalization lexicon (§6.1 #2).
+3. `classify/` — TF-IDF + calibrated logreg; negation-aware features and
+   feature crosses (§6.1 #1, #3); baselines; evaluation.
+4. `decide/` — loss matrix, expected-loss rule, three-way gates; boundary
+   queue feeding the gold set (§6.1 #4, #5).
+5. `retrieve/` — BM25 + citation features over statutes/decisions; query
+   expansion via the lexicon; hybrid dense upgrade later (§6.1 #2).
 6. `answer/` — extractive, cited answers; abstain/escalate paths.
 7. Later: tiers 4–5, subtopic discovery, other tribunals.
 
