@@ -93,6 +93,27 @@ Frozen, typed records (implementation will live in `corpus/`):
   citations[] (regex-extracted `art. X, Lei Y`), domain_label, label_source.
 - All party names stripped at ingestion (LGPD); ingestion is idempotent.
 
+### Corpus storage policy: never in git
+
+The repo is **public**; real case data must never be committed, even
+anonymized (re-identification risk). Split:
+
+| In the repo | Outside git |
+| ------------------------------------------ | -------------------------------------- |
+| ingestion code + typed schema | `data/raw/` (as fetched) |
+| TPU code table → F/M/P mapping | `data/processed/` (cleaned, labeled) |
+| tiny **synthetic** test fixtures | anything derived from real cases |
+
+- Corpus lives in `data/` (gitignored), location configurable via
+  `AGAVUS_DATA_DIR` in the isolated settings module (default: `data/`).
+- Ingestion is idempotent and resumable: the corpus is a rebuildable cache,
+  not an asset — losing it costs a re-fetch, nothing more.
+- Hard guard: a pre-commit hook fails if anything under `data/` is staged,
+  on top of `.gitignore`.
+- Later, if sharing/versioning is needed: object storage (S3/R2) or a private
+  dataset host, referenced by config — never by git. DVC-style snapshot
+  versioning only if reproducibility demands it (skip for MVP).
+
 ## 6. Model stack
 
 | Tier | Component | Math | Role |
@@ -160,7 +181,8 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 
 ## 9. Roadmap (maps to repo domain layout)
 
-1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema.
+1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema;
+   gitignored `data/` + `AGAVUS_DATA_DIR` setting + staged-data guard hook.
 2. `taxonomy/` — TPU code table → F/M/P/O; weak-label rules; gold set.
 3. `classify/` — TF-IDF + calibrated logreg; baselines; evaluation.
 4. `decide/` — loss matrix, expected-loss rule, three-way gates.
