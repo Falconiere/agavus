@@ -13,7 +13,8 @@ strict, machine-enforced quality gates.
 ![mypy](https://img.shields.io/badge/types-mypy%20strict-blue)
 ![pre-commit](https://img.shields.io/badge/hooks-pre--commit-fab040)
 
-> Status: **design complete, implementation not started.**
+> Status: **MVP live** — [demo Space](https://huggingface.co/spaces/Falconiere/agavus) ·
+> [model repo](https://huggingface.co/Falconiere/agavus-classifier).
 > Full design: **[docs/DESIGN.md](docs/DESIGN.md)**
 
 ## 🎯 Vision
@@ -190,7 +191,7 @@ docs/
   external-validation.md # Jev comparator pilot: protocol, results, caveats
 src/agavus/
   __main__.py            # CLI entry point (delegates to cli.py)
-  cli.py                 # greeting + `ingest` subcommand
+  cli.py                 # all subcommands: -p, ingest, label, train, classify, eval, search, publish
   tests/                 # tests for root-level modules
   config/                # configuration domain (isolated, env-driven)
     settings.py
@@ -208,6 +209,8 @@ src/agavus/
   reason/                #   verified chains (syllogism, rules, graph)
   answer/                #   extractive, cited answers
   evals/                 #   gold sets + benchmark harness (cross-cutting)
+  publish/               #   eval-gated HF release: card, staging, upload
+space/                   # Gradio demo deployed to HF (assets = public laws)
 scripts/
   pyutils.py             # shared tokenization helpers for quality scripts
   check_sizes.py         # size-limit enforcement

@@ -1,6 +1,7 @@
 # agavus — Design Document
 
-Status: **design only, no implementation yet**.
+Status: **MVP implemented and published** (corpus → taxonomy → classify →
+decide → retrieve → reason → answer; HF model repo + Space live).
 Scope: CPU-only legal classification + retrieval/answer engine for Brazilian law,
 restricted to **TJDFT** data and two domains.
 
@@ -97,9 +98,9 @@ Caveats:
 3. **Manual gold set**: small curated set (queries + documents) for calibration
    and evaluation; the only human-labeled data.
 
-## 5. Corpus schema (draft)
+## 5. Corpus schema (implemented in `corpus/records.py`)
 
-Frozen, typed records (implementation will live in `corpus/`):
+Frozen, typed records:
 
 - `CaseRecord`: id, tribunal, orgao_julgador, classe_tpu, assuntos_tpu[],
   datas, movimentos, domain_label, label_source (tpu | organ | manual | weak).
@@ -230,20 +231,22 @@ concern: **[docs/extensibility.md](extensibility.md)** — areas are data packs
 labels via registry, loss matrix as composed data, namespaced per-area
 storage, area-parameterized pipelines.
 
-1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema;
-   gitignored `data/` + `AGAVUS_DATA_DIR` setting + staged-data guard hook.
-2. `taxonomy/` — TPU code table → F/M/O; weak-label rules; gold set;
-   synonym/abbreviation normalization lexicon (§6.1 #2).
-3. `classify/` — TF-IDF + calibrated logreg; negation-aware features and
-   feature crosses (§6.1 #1, #3); baselines; evaluation.
-4. `decide/` — loss matrix, expected-loss rule, three-way gates; boundary
-   queue feeding the gold set (§6.1 #4, #5).
-5. `retrieve/` — BM25 + citation features over statutes/decisions; query
-   expansion via the lexicon; hybrid dense upgrade later (§6.1 #2).
-6. `reason/` — symbolic syllogism, requirements checklists, citation graph;
-   verified chains only ([reasoning.md](reasoning.md)).
-7. `answer/` — extractive, cited answers; abstain/escalate paths.
-8. Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
+1. `corpus/` — ✅ DataJud + statute ingestion (offline import), anonymization,
+   schema, SQLite store; gitignored `data/` + `AGAVUS_DATA_DIR` + guard hook.
+   ⬜ DJEN full-text decisions (network-blocked in dev sandbox).
+2. `taxonomy/` — ✅ area registry, organ weak-label rules, statute map,
+   lexicon, gold-set seed; ⬜ TPU code table populated from real DataJud codes.
+3. `classify/` — ✅ TF-IDF (word-internal char n-grams) + balanced, calibrated
+   logreg; negation/citation/verb features; seeds; ⬜ feature crosses, baselines.
+4. `decide/` — ✅ loss matrix, expected-loss rule, three-way gates, safety
+   ceiling; ⬜ boundary queue feeding the gold set automatically.
+5. `retrieve/` — ✅ FTS5 BM25 + law-name column + citation boost;
+   ⬜ hybrid dense upgrade (tier 4).
+6. `reason/` — ✅ facts + rule pack + verified chains (R-24A, R-22);
+   ⬜ citation graph, temporal reasoning, more rules.
+7. `answer/` — ✅ extractive cited answers, degradation ladder, topic-targeted
+   clarification; ⬜ relevance scoring, advice lint.
+8. ⬜ Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
    other tribunals.
 
 Cross-cutting from step 3 onward: `evals/` harness + gold sets

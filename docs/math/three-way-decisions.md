@@ -84,6 +84,12 @@ $$
 **Reading**: α rises when false acceptance is expensive; β falls when false
 rejection is expensive.
 
+## In agavus
+
+Implemented in `decide/losses.py` + `decide/rule.py`: matrix composed from
+the area registry, safety ceiling validated in code, ties prefer defer.
+`agavus classify --explain` prints the full expected-loss table.
+
 ## Properties
 
 - Applied at **two gates**: routing (classify) and answering

@@ -13,18 +13,21 @@ English.
 ```sh
 agavus -p "Qual é o artigo da lei de alienação parental?"   # ask (primary UX)
 agavus classify "texto…"                                  # classify inline text
-agavus classify --file peticao.txt                        # classify a document
-agavus ingest --area F                                    # pipeline ops (later)
-agavus index                                              # rebuild retrieval index
+agavus search "medida protetiva art. 22"                  # BM25 + citation retrieval
+agavus ingest --source statutes                           # corpus ingestion
+agavus ingest --source datajud --limit 500                # TJDFT metadata
+agavus label                                              # TPU + organ labeling
+agavus train                                              # fit + calibrate + report
+agavus eval                                               # gold-set evaluation
+agavus publish [--repo OWNER/NAME]                        # eval-gated HF release
 ```
 
-Flags (ask and classify):
+Flags (ask, classify, eval, search):
 
 | Flag | Effect |
 | ------------ | ------------------------------------------------ |
 | `--json` | machine-readable typed output (schema below) |
-| `--explain` | decision trace: probabilities, expected losses, top features, retrieval scores |
-| `--area X` | optional hint; never overrides the safety gate |
+| `--explain` | decision trace: probabilities, expected losses, top features |
 
 ## What happens on `-p` (the full flow)
 
@@ -125,7 +128,7 @@ scores. This is the auditability payoff of the linear core.
 
 1. **No legal advice, ever**: fixed disclaimer on every answered output.
 2. **No excerpt without a source**: `sources` is never empty on accept.
-3. **Safety gate is not bypassable**: `--area` hints never force acceptance;
+3. **Safety gate is not bypassable**: no flag forces acceptance;
    the M ceiling governs all routing.
 4. **Determinism**: same question + same corpus/index version → same output.
 5. Corpus/index version is reported by `agavus --version` (reproducibility).

@@ -47,6 +47,12 @@ confidently wrong ($P(M) = 0.05$), the loss would be $-\ln 0.05 = 3.0$ —
 - Cross-entropy is convex in the weights → gradient descent reaches the
   **global optimum**. CPU training takes minutes, no GPU.
 
+## In agavus
+
+Implemented in `classify/model.py`: hand-rolled numpy full-batch gradient
+descent (deterministic, convex), **class-balanced** sample weights, L2.
+No sklearn/torch in the core — inspectable weights, CPU-minutes.
+
 ## Limitations
 
 - Linear decision surface: cannot express interactions like "guarda AND

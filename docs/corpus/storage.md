@@ -23,7 +23,8 @@ labels, manifests, raw metadata, model artifacts, indexes — is SQLite.
 
 - **`texts_fts`** — FTS5 virtual table with native `bm25()`: lexical
   retrieval, zero deps. Columns: `doc_id` (unindexed), `origin_ref`
-  (**10x weight** — article numbers are decisive in legal queries), `text`.
+  (**10x weight**), `law_name` (**8x**, index-only popular names so named-law
+  queries reach the law's own articles), `text`.
   Kept in sync on insert; `rebuild_index()` backfills; schema migrations
   drop/recreate the rebuildable index automatically.
 - **`embeddings(doc_id, model_version, dim, vector BLOB)`** — float32
@@ -59,7 +60,7 @@ labels(record_id PK, area, source, needs_review, reason)   -- derived, re-runnab
 meta_runs(run_at, source, fetched, new, window_start, window_end)
 meta_watermarks(source PK, value)
 raw_payloads(ref PK, source, run, url, method, payload_json, fetched_at)
-texts_fts(doc_id UNINDEXED, text)                          -- FTS5 + bm25()
+texts_fts(doc_id UNINDEXED, origin_ref, law_name, text)    -- FTS5 + bm25()
 embeddings(doc_id, model_version, dim, vector BLOB)
 indexes: cases(orgao), cases(data_ajuizamento), labels(needs_review, area)
 ```

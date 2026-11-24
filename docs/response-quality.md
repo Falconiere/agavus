@@ -1,6 +1,10 @@
 # Response quality — the delivery contract
 
-Status: design. The front-end guarantee: **a response is delivered only
+Status: **partially implemented**. Live by construction: cited extractive
+answers, sources-never-empty, degradation ladder, disclaimer, topic-targeted
+clarifications, ingestion privacy scan. Pending: automated relevance scoring
+and advice-language lint (templates currently make advice impossible).
+The front-end guarantee: **a response is delivered only
 after passing automated checks; otherwise the engine degrades gracefully.**
 Complements [cli.md](cli.md) (surface) and [evals.md](evals.md) (measurement).
 Future module: `answer/`.

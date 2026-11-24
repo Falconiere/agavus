@@ -1,6 +1,7 @@
 # Evals — guaranteeing and benchmarking quality
 
-Status: design. Principle: **no change ships without measured evidence.**
+Status: **harness live** (`agavus eval`, gold set v1, release gate in
+`publish/export.gate`). Principle: **no change ships without measured evidence.**
 Gold sets are the constitution; the harness is the gate. Future module:
 `evals/` (cross-cutting, active from the `classify` step onward).
 
@@ -58,7 +59,8 @@ Rules:
 
 ## Harness and regression policy
 
-- `make eval` runs all dimensions → JSON + Markdown report (metrics, set
+- `agavus eval` runs the gold dimensions → console report; `--json` for the
+  typed report; `agavus publish` gates releases on it (metrics, set
   versions, corpus/model versions, confusion matrix, reliability diagram,
   accuracy/coverage curve).
 - **Baselines committed** (metrics only, no data): a change that regresses
@@ -87,7 +89,7 @@ Rules:
 
 | Event | Action |
 | ---------------------------------------- | ---------------------------- |
-| model / corpus / lexicon / rules / thresholds change | full `make eval` |
+| model / corpus / lexicon / rules / thresholds change | full `agavus eval` |
 | weekly | boundary review → gold growth |
 | monthly | safety-set refresh (new adversarial phrasings) |
 | tiny-LLM layer proposal | shadow eval + ablation with/without |

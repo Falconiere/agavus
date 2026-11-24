@@ -42,6 +42,8 @@ works for any language.
 - **Sublinear tf**: $1 + \log(\text{count})$ dampens very frequent terms.
 - **Char n-grams**: features like `prot`, `rotet` capture Portuguese
   morphology (protetiva/protetivas/protetivo) without a dictionary.
+  In agavus these are **word-internal only** (never across word boundaries —
+  cross-word grams proved to be function-word noise).
 - **Word bigrams**: keep "medida protetiva", "violência doméstica" as units.
 - Stopwords ("de", "da", "que") need no explicit list: high df kills them.
 

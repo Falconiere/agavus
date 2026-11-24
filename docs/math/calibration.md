@@ -42,6 +42,13 @@ A monotone step function fitted to the reliability curve — more flexible than
 Platt, but needs more data to avoid overfitting. With our small gold set,
 **Platt first**; isotonic later if data grows.
 
+## In agavus
+
+Implemented as **temperature scaling** (`classify/calibrate.py`): a single
+scalar T on the logits, grid-searched on held-out NLL — the multiclass
+analogue of Platt scaling. ECE is reported by `agavus eval` and gates
+releases. Isotonic remains an option if data grows.
+
 ## Rules
 
 - Fit on **held-out** data only — never the training set (it would look

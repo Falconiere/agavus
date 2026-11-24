@@ -5,7 +5,7 @@ is never mutated.
 
 ```mermaid
 flowchart LR
-  F["fetch<br/>(incremental, polite)"] --> R[("data/raw/<br/>as fetched + manifest")]
+  F["fetch<br/>(incremental, polite)"] --> R[("data/raw/<br/>as fetched + run log")]
   R --> A["anonymize<br/>(LGPD)"]
   A --> N["normalize<br/>(synonym/abbreviation lexicon)"]
   N --> L["label<br/>(TPU → organ → review queue)"]
@@ -32,7 +32,8 @@ flowchart LR
   (deterministic ids + dedup).
 - **Resumable**: a crash costs a resume from the watermark, not a restart.
 - **Auditable**: every processed record points to its raw payload
-  (`raw_ref`); every run writes a manifest (date, window, counts, watermark).
+  (`raw_ref`); every run writes a run-log entry (SQLite `meta_runs`: date,
+  window, counts) and advances the watermark only on success.
 - **Versioned, never edited**: reprocessing creates a new processed version;
   raw stays untouched forever.
 

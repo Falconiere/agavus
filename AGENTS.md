@@ -1,8 +1,9 @@
 # AGENTS.md
 
-Guide for AI coding agents in this repo. **Phase: design complete,
-implementation not started** — domain packages under `src/agavus/` are
-placeholders. Implement against the design docs, not from scratch ideas.
+Guide for AI coding agents in this repo. **Phase: MVP implemented and
+published** (GitHub + HF model repo + live Gradio Space). Domain packages
+under `src/agavus/` are live; `retrieve/reason/answer` work end-to-end.
+Implement against the design docs, not from scratch ideas.
 
 ## Read before touching
 
