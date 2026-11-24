@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      AGAVUS_DATA_DIR: ${{ runner.temp }}/agavus-data
+      AGAVUS_DATA_DIR: ${{ github.workspace }}/.agavus-data
     steps:
       - name: Checkout
         uses: actions/checkout@v4
