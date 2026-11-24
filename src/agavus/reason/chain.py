@@ -31,24 +31,26 @@ class Chain:
   complete: bool
 
 
-def _matching_rule(fields: set[str]) -> Rule | None:
+def _matching_rule(fields: set[str], area: str | None = None) -> Rule | None:
   for rule in RULES:
+    if area is not None and rule.area != area:
+      continue
     if all(condition in fields for condition in rule.conditions):
       return rule
   return None
 
 
 def _premise(storage: CorpusStorage, ref: str) -> Premise | None:
-  for document in storage.load_texts():
-    if document.origin_ref == ref:
-      return Premise(ref=ref, text=document.text)
+  document = storage.load_text_by_origin_ref(ref)
+  if document is not None:
+    return Premise(ref=ref, text=document.text)
   return None
 
 
-def build_chain(query: str, storage: CorpusStorage) -> Chain | None:
-  """Fire the first fully-grounded rule; None when no rule applies."""
+def build_chain(query: str, storage: CorpusStorage, area: str | None = None) -> Chain | None:
+  """Fire the first fully-grounded rule (scoped to area when provided)."""
   facts = extract_facts(query)
-  rule = _matching_rule({fact.field for fact in facts})
+  rule = _matching_rule({fact.field for fact in facts}, area=area)
   if rule is None:
     return None
   used = tuple(fact for fact in facts if fact.field in rule.conditions)

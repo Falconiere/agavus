@@ -33,6 +33,21 @@ FACT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
   ),
   ("urgencia", re.compile(r"urgente|urgência|imediat|risco|tenho medo|com medo", re.IGNORECASE)),
+  (
+    "campanha_desqualificacao",
+    re.compile(
+      r"fala mal|desqualifica|fazendo a cabeça|campanha de desqualificação",
+      re.IGNORECASE,
+    ),
+  ),
+  (
+    "obstaculo_convivencia",
+    re.compile(
+      r"impede (?:a )?(?:visita|convivência)|dificulta (?:a )?(?:visita|convivência)|"
+      r"não deixa (?:eu |o pai |a mãe )?ver (?:o |a |meu |minha )?(?:filh[oa]|criança)",
+      re.IGNORECASE,
+    ),
+  ),
 )
 NEG_PREFIX = re.compile(r"(?:não|nunca|jamais)\s+$", re.IGNORECASE)
 

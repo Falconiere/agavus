@@ -6,7 +6,9 @@ to verbatim-citable provisions. Human-reviewed, versioned (docs/reasoning.md).
 
 from dataclasses import dataclass
 
-RULES_VERSION = "rules-v1"
+from agavus.taxonomy.areas import FAMILIA, MARIA_DA_PENHA
+
+RULES_VERSION = "rules-v2"
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,7 @@ class Rule:
   conditions: tuple[str, ...]
   conclusion_ref: str
   conclusion: str
+  area: str = MARIA_DA_PENHA.code
 
 
 RULES: tuple[Rule, ...] = (
@@ -28,6 +31,7 @@ RULES: tuple[Rule, ...] = (
       "Descumprir medida protetiva de urgência é crime "
       "(art. 24-A, Lei 11.340/2006, redação da Lei 14.994/2024)."
     ),
+    area=MARIA_DA_PENHA.code,
   ),
   Rule(
     id="R-22",
@@ -38,5 +42,16 @@ RULES: tuple[Rule, ...] = (
       "de urgência/risco, cabem medidas protetivas de urgência "
       "(art. 22, Lei 11.340/2006)."
     ),
+    area=MARIA_DA_PENHA.code,
+  ),
+  Rule(
+    id="R-AP",
+    conditions=("campanha_desqualificacao", "obstaculo_convivencia"),
+    conclusion_ref="Lei 12.318/2010, art. 2",
+    conclusion=(
+      "A desqualificação da conduta do genitor aliada ao obstáculo à convivência "
+      "caracteriza indício de ato de alienação parental (art. 2º, Lei 12.318/2010)."
+    ),
+    area=FAMILIA.code,
   ),
 )

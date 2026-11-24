@@ -40,3 +40,9 @@ def test_broken_chain_without_premise(tmp_path: Path) -> None:
 
 def test_no_rule_no_chain(tmp_path: Path) -> None:
   assert build_chain("quero pedir divórcio", _corpus(tmp_path, True)) is None
+
+
+def test_area_filter_blocks_cross_domain_rule(tmp_path: Path) -> None:
+  storage = _corpus(tmp_path, with_provision=True)
+  assert build_chain(QUERY, storage, area="F") is None
+  assert build_chain(QUERY, storage, area="M") is not None
