@@ -49,4 +49,4 @@ def test_ingest_fetch_error_is_friendly(
 def test_label_empty_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
   monkeypatch.setenv("AGAVUS_DATA_DIR", str(tmp_path))
   assert cli.main(["label"]) == 0
-  assert (tmp_path / "processed" / "labels.json").exists()
+  assert (tmp_path / "processed" / "corpus.db").exists()

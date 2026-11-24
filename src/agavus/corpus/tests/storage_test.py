@@ -3,23 +3,10 @@
 from datetime import date
 from pathlib import Path
 
-from agavus.corpus.records import CaseRecord, LabelSource, TextDocument, TextSource
+from agavus.corpus.httpfixtures import sample_case
+from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
-
-
-def _case(process: str = "0701234-56.2024.8.07.0001") -> CaseRecord:
-  return CaseRecord(
-    id=process,
-    tribunal="TJDFT",
-    orgao_julgador="Vara de Família",
-    classe_tpu="123",
-    assuntos_tpu=("Guarda",),
-    data_ajuizamento=date(2024, 1, 2),
-    movimentos=(),
-    domain_label=None,
-    label_source=LabelSource.PENDING,
-    raw_ref="raw/datajud/x.json",
-  )
+from agavus.taxonomy.labeling import LabelDecision
 
 
 def _text() -> TextDocument:
@@ -38,9 +25,9 @@ def _text() -> TextDocument:
 
 def test_save_case_idempotent(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
-  assert storage.save_case(_case()) is True
-  assert storage.save_case(_case()) is False
-  assert len(list((tmp_path / "processed" / "cases").glob("*.json"))) == 1
+  assert storage.save_case(sample_case()) is True
+  assert storage.save_case(sample_case()) is False
+  assert len(storage.load_cases()) == 1
 
 
 def test_save_text_idempotent(tmp_path: Path) -> None:
@@ -76,7 +63,7 @@ def test_record_run_appends(tmp_path: Path) -> None:
 
 def test_case_roundtrip(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
-  original = _case()
+  original = sample_case(orgao="Vara de Família", assuntos=("Guarda",))
   storage.save_case(original)
   loaded = storage.load_cases()
   assert loaded == [original]
@@ -89,10 +76,17 @@ def test_text_roundtrip(tmp_path: Path) -> None:
   assert storage.load_texts() == [original]
 
 
-def test_save_index(tmp_path: Path) -> None:
+def test_save_labels_and_review_queue(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
-  storage.save_index("labels.json", {"x": {"label": "M"}})
-  assert (tmp_path / "processed" / "labels.json").exists()
+  decisions = [
+    LabelDecision("a", "M", LabelSource.ORGAN, False, "organ weak label"),
+    LabelDecision("b", None, LabelSource.PENDING, True, "no signal"),
+  ]
+  storage.save_labels(decisions)
+  queue = storage.review_queue()
+  assert [d.record_id for d in queue] == ["b"]
+  storage.save_labels(decisions)
+  assert len(storage.review_queue()) == 1
 
 
 def test_load_empty(tmp_path: Path) -> None:

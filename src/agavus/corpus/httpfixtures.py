@@ -1,10 +1,34 @@
 """Shared synthetic HTTP fixtures for corpus tests (no network, no real data)."""
 
 from collections.abc import Callable
+from datetime import date
 
 import httpx
 
+from agavus.corpus.records import CaseRecord, LabelSource
+
 Handler = Callable[[httpx.Request], httpx.Response]
+
+
+def sample_case(
+  process: str = "0701234-56.2024.8.07.0001",
+  orgao: str = "Vara Cível",
+  assuntos: tuple[str, ...] = (),
+) -> CaseRecord:
+  """One synthetic case record for tests across domains."""
+  return CaseRecord(
+    id=process,
+    tribunal="TJDFT",
+    orgao_julgador=orgao,
+    classe_tpu="123",
+    assuntos_tpu=assuntos,
+    data_ajuizamento=date(2024, 1, 2),
+    movimentos=(),
+    domain_label=None,
+    label_source=LabelSource.PENDING,
+    raw_ref="raw/x.json",
+  )
+
 
 DATAJUD_HIT: dict[str, object] = {
   "_source": {

@@ -27,16 +27,7 @@ def _run_label(settings: Settings) -> int:
   storage = CorpusStorage(settings.data_dir)
   decisions: list[LabelDecision] = [label_case(record) for record in storage.load_cases()]
   decisions += [label_text(document) for document in storage.load_texts()]
-  index = {
-    decision.record_id: {
-      "label": decision.domain_label,
-      "source": decision.label_source.value,
-      "needs_review": decision.needs_review,
-      "reason": decision.reason,
-    }
-    for decision in decisions
-  }
-  storage.save_index("labels.json", index)
+  storage.save_labels(decisions)
   review = sum(decision.needs_review for decision in decisions)
   print(f"label: {len(decisions)} records, {review} to review")
   return 0
