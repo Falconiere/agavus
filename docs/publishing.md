@@ -1,8 +1,12 @@
 # Publishing — agavus on Hugging Face
 
-Status: design. HF is the public home for artifacts and the demo; the
-**privacy policy governs everything** ([corpus/privacy.md](corpus/privacy.md)).
-Publishing is **eval-gated**: no artifact ships without a green eval report.
+Status: **model repo LIVE** — https://huggingface.co/Falconiere/agavus-classifier
+(first release 2026-11-24, eval-gated: precision 1.00, M-recall 1.00).
+Pipeline: `agavus publish` (dry run) / `agavus publish --repo OWNER/NAME`.
+HF bucket `Falconiere/agavus` available for private artifacts (corpus
+snapshots, future datasets). The **privacy policy governs everything**
+([corpus/privacy.md](corpus/privacy.md)). Publishing is **eval-gated**: no
+artifact ships without a green eval report (`publish/export.gate`).
 
 ## What gets published (three repo types)
 

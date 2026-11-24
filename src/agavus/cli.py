@@ -20,8 +20,9 @@ from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_sta
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
-from agavus.evals.run import evaluate
+from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
+from agavus.publish.export import stage_release, upload
 from agavus.retrieve.search import search
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
@@ -147,12 +148,7 @@ def _run_eval(settings: Settings, as_json: bool) -> int:
   classifier = _load_classifier(settings, "eval")
   if classifier is None:
     return 1
-  probs = classifier.predict_proba([item.text for item in ROUTING_V1])
-  mappings = [
-    {label: float(value) for label, value in zip(classifier.model.classes, row, strict=True)}
-    for row in probs
-  ]
-  report = evaluate(mappings, ROUTING_V1)
+  report = evaluate(gold_mappings(classifier), ROUTING_V1)
   if as_json:
     _print_json({"gold_version": GOLD_VERSION, **asdict(report)})
     return 0
@@ -209,6 +205,29 @@ def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) ->
   return 10 if answer.decision == "defer" else 20
 
 
+def _run_publish(settings: Settings, repo: str | None) -> int:
+  staging = settings.data_dir / "hf-staging"
+  try:
+    report = stage_release(settings, staging)
+  except (KeyError, ValueError) as exc:
+    print(f"publish: blocked — {exc}")
+    return 1
+  print(
+    f"publish: staged at {staging} · precision {report.precision_on_accepted:.2f} · "
+    f"M-recall {report.m_recall:.2f} · coverage {report.coverage:.2f}"
+  )
+  if repo is None:
+    print("publish: dry run (pass --repo OWNER/NAME to upload; requires `hf auth login`)")
+    return 0
+  try:
+    url = upload(staging, repo)
+  except Exception as exc:
+    print(f"publish: upload failed — {exc}")
+    return 1
+  print(f"publish: live at {url}")
+  return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
   """Entry point: no args greets; subcommands run corpus pipelines."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
@@ -238,6 +257,12 @@ def main(argv: Sequence[str] | None = None) -> int:
   )
   search_cmd.add_argument("query")
   search_cmd.add_argument("--limit", type=int, default=5)
+  publish = sub.add_parser(
+    "publish", parents=[common], help="stage (and optionally upload) the HF release"
+  )
+  publish.add_argument(
+    "--repo", default=None, help="HF model repo, e.g. Falconiere/agavus-classifier"
+  )
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.pergunta is not None:
@@ -249,6 +274,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     "classify": lambda: _run_classify(settings, args.text, args.explain, args.as_json),
     "eval": lambda: _run_eval(settings, args.as_json),
     "search": lambda: _run_search(settings, args.query, args.limit, args.as_json),
+    "publish": lambda: _run_publish(settings, args.repo),
   }
   handler = handlers.get(args.command)
   if handler is not None:

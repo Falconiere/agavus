@@ -1,18 +1,21 @@
 """Tests for ingestion orchestrators (tests folder, mock transport)."""
 
-from datetime import date
 from pathlib import Path
 
 from agavus.config.settings import Settings
-from agavus.corpus.httpfixtures import DATAJUD_HIT, json_handler, mock_client, text_handler
+from agavus.corpus.httpfixtures import (
+  DATAJUD_HIT,
+  json_handler,
+  mock_client,
+  sample_settings,
+  text_handler,
+)
 from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
 from agavus.corpus.storage import CorpusStorage
 
 
 def _settings(tmp_path: Path) -> Settings:
-  return Settings(
-    name="world", data_dir=tmp_path, data_start=date(2020, 1, 1), datajud_api_key="test-key"
-  )
+  return sample_settings(tmp_path)
 
 
 def test_datajud_ingest_idempotent(tmp_path: Path) -> None:

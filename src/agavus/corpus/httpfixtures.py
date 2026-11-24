@@ -2,12 +2,21 @@
 
 from collections.abc import Callable
 from datetime import date
+from pathlib import Path
 
 import httpx
 
+from agavus.config.settings import Settings
 from agavus.corpus.records import CaseRecord, LabelSource, TextDocument, TextSource
 
 Handler = Callable[[httpx.Request], httpx.Response]
+
+
+def sample_settings(data_dir: Path) -> Settings:
+  """Synthetic settings pointing at a test data dir."""
+  return Settings(
+    name="world", data_dir=data_dir, data_start=date(2020, 1, 1), datajud_api_key="test-key"
+  )
 
 
 def sample_text(

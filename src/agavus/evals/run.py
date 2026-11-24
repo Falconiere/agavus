@@ -7,9 +7,19 @@ model. Gold never trains (firewall, docs/evals.md).
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from agavus.classify.pipeline import TrainedClassifier
 from agavus.decide.rule import decide
-from agavus.evals.goldset import GoldItem
+from agavus.evals.goldset import ROUTING_V1, GoldItem
 from agavus.evals.metrics import accuracy, macro_f1
+
+
+def gold_mappings(classifier: TrainedClassifier) -> list[dict[str, float]]:
+  """Calibrated probabilities for every gold item (shared by eval/publish)."""
+  probs = classifier.predict_proba([item.text for item in ROUTING_V1])
+  return [
+    {label: float(value) for label, value in zip(classifier.model.classes, row, strict=True)}
+    for row in probs
+  ]
 
 
 @dataclass(frozen=True)
