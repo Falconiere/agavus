@@ -7,6 +7,7 @@ name = "agavus"
 version = "0.1.0"
 description = "Domain-organized Python scaffold (hello world) with strict quality gates."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.15.0",

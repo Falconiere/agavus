@@ -61,7 +61,7 @@ uv run python -c "from huggingface_hub import create_repo; \
 | Intended use | routing/retrieval aid for F/M; **not legal advice** |
 | Limitations | TJDFT-only, lexical core, defer behavior, M↔F overlap |
 | Safety | M ceiling, privacy policy, hallucination guards |
-| License | code Apache-2.0/MIT; tiny-LLM artifacts inherit base license (Qwen: Apache-2.0) |
+| License | code MIT (LICENSE in repo); tiny-LLM artifacts inherit base license (Qwen: Apache-2.0) |
 
 Artifacts are versioned triples: **corpus version + model version + eval
 report**. A card without its eval report is incomplete and must not ship.

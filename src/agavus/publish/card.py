@@ -19,7 +19,7 @@ def build_model_card(
   """Render the HF model card (README.md) for the classifier artifact."""
   stats_rows = "\n".join(f"| {name} | {count} |" for name, count in sorted(corpus_stats.items()))
   return f"""---
-license: apache-2.0
+license: mit
 language:
 - pt
 tags:
@@ -112,5 +112,5 @@ and training reports; load it with `agavus.classify.store.load_model`.
 
 ## License
 
-Apache-2.0. {DISCLAIMER}
+MIT. {DISCLAIMER}
 """
