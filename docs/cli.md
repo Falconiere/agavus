@@ -125,3 +125,6 @@ scores. This is the auditability payoff of the linear core.
    the M ceiling governs all routing.
 4. **Determinism**: same question + same corpus/index version → same output.
 5. Corpus/index version is reported by `agavus --version` (reproducibility).
+
+Delivery guarantees (pre-delivery checklist, degradation ladder, feedback
+loop): **[response-quality.md](response-quality.md)**.

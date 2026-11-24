@@ -165,6 +165,7 @@ docs/
   reasoning.md           # verified chains: syllogism, checklists, citation graph
   tiny-llm.md            # optional CPU LLM: proposer behind a verifier
   evals.md               # gold sets, benchmarks, regression gates, LoRA triggers
+  response-quality.md    # delivery contract: checklist, degradation ladder
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)
