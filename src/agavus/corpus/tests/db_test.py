@@ -102,3 +102,15 @@ def test_origin_ref_weighted(tmp_path: Path) -> None:
     )
     hits = db.search_fts(conn, "22")
     assert hits[0][0] == "a22"
+
+
+def test_point_and_batch_text_lookups(tmp_path: Path) -> None:
+  expected_new = 2
+  d1 = sample_text(doc_id="a1", origin_ref="Lei X, art. 1", text="primeiro")
+  d2 = sample_text(doc_id="a2", origin_ref="Lei X, art. 2", text="segundo")
+  with closing(db.connect(tmp_path)) as conn:
+    assert db.insert_texts(conn, [d1, d2, d1]) == expected_new
+    assert db.select_texts_by_ids(conn, []) == {}
+    assert db.select_texts_by_ids(conn, ["a2"]) == {"a2": d2}
+    assert db.select_text_by_origin_ref(conn, "Lei X, art. 1") == d1
+    assert db.select_text_by_origin_ref(conn, "Lei X, art. 99") is None

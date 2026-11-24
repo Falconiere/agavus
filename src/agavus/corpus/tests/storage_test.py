@@ -104,3 +104,14 @@ def test_load_empty(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
   assert storage.load_cases() == []
   assert storage.load_texts() == []
+
+
+def test_batch_save_and_targeted_text_load(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  doc = _text()
+  assert storage.save_texts([doc, doc]) == 1
+  assert storage.load_texts_by_ids(["abc123"]) == {"abc123": doc}
+  assert storage.load_text_by_origin_ref(doc.origin_ref) == doc
+  assert storage.load_text_by_origin_ref("inexistente") is None
+  case = sample_case()
+  assert storage.save_cases([case, case]) == 1

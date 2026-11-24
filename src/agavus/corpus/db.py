@@ -7,6 +7,7 @@ Raw payloads stay as immutable files — this db is a rebuildable cache.
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import date, datetime
 from enum import Enum
@@ -26,7 +27,7 @@ from agavus.corpus.records import (
 from agavus.corpus.statutes import popular_name
 from agavus.taxonomy.labeling import LabelDecision
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DB_NAME = "corpus.db"
 
 _SCHEMA = """
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS texts (
   published_at TEXT, text TEXT NOT NULL, citations TEXT NOT NULL,
   domain_label TEXT, label_source TEXT NOT NULL, raw_ref TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_texts_origin_ref ON texts(origin_ref);
 CREATE TABLE IF NOT EXISTS labels (
   record_id TEXT PRIMARY KEY, area TEXT, source TEXT NOT NULL,
   needs_review INTEGER NOT NULL, reason TEXT NOT NULL
@@ -83,10 +85,12 @@ def connect(root: Path) -> sqlite3.Connection:
   path.parent.mkdir(parents=True, exist_ok=True)
   conn = sqlite3.connect(path)
   conn.row_factory = sqlite3.Row
-  conn.execute("PRAGMA journal_mode=WAL")
-  conn.executescript(_SCHEMA)
-  _migrate_fts(conn)
-  conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+  version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+  if version != SCHEMA_VERSION:
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.executescript(_SCHEMA)
+    _migrate_fts(conn)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
   return conn
 
 
@@ -101,14 +105,17 @@ def _migrate_fts(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _insert(conn: sqlite3.Connection, table: str, values: tuple[object, ...]) -> bool:
+def _insert(
+  conn: sqlite3.Connection, table: str, values: tuple[object, ...], *, commit: bool = True
+) -> bool:
   placeholders = ",".join("?" for _ in values)
   cursor = conn.execute(f"INSERT OR IGNORE INTO {table} VALUES ({placeholders})", values)
-  conn.commit()
+  if commit:
+    conn.commit()
   return cursor.rowcount > 0
 
 
-def insert_case(conn: sqlite3.Connection, record: CaseRecord) -> bool:
+def insert_case(conn: sqlite3.Connection, record: CaseRecord, *, commit: bool = True) -> bool:
   """Atomic dedup insert; False when the id already existed."""
   return _insert(
     conn,
@@ -125,10 +132,18 @@ def insert_case(conn: sqlite3.Connection, record: CaseRecord) -> bool:
       record.label_source.value,
       record.raw_ref,
     ),
+    commit=commit,
   )
 
 
-def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
+def insert_cases(conn: sqlite3.Connection, records: Sequence[CaseRecord]) -> int:
+  """Batch atomic dedup insert in a single transaction; returns new count."""
+  new = sum(insert_case(conn, record, commit=False) for record in records)
+  conn.commit()
+  return new
+
+
+def insert_text(conn: sqlite3.Connection, record: TextDocument, *, commit: bool = True) -> bool:
   """Atomic dedup insert; False when the id already existed. Indexes FTS."""
   inserted = _insert(
     conn,
@@ -144,14 +159,23 @@ def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
       record.label_source.value,
       record.raw_ref,
     ),
+    commit=False,
   )
   if inserted:
     conn.execute(
       "INSERT INTO texts_fts (doc_id, origin_ref, law_name, text) VALUES (?,?,?,?)",
       (record.id, record.origin_ref, popular_name(record.origin_ref), record.text),
     )
+  if commit:
     conn.commit()
   return inserted
+
+
+def insert_texts(conn: sqlite3.Connection, records: Sequence[TextDocument]) -> int:
+  """Batch atomic dedup insert + FTS indexing in one transaction."""
+  new = sum(insert_text(conn, record, commit=False) for record in records)
+  conn.commit()
+  return new
 
 
 def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tuple[str, float]]:
@@ -265,6 +289,29 @@ def select_texts(conn: sqlite3.Connection) -> list[TextDocument]:
   """All text documents in stable id order."""
   rows = conn.execute("SELECT * FROM texts ORDER BY id").fetchall()
   return [text_from_dict(_row_dict(row, ("citations",))) for row in rows]
+
+
+def select_texts_by_ids(
+  conn: sqlite3.Connection, doc_ids: Sequence[str]
+) -> dict[str, TextDocument]:
+  """Point-batch lookup of text documents by primary key (O(k), no table scan)."""
+  if not doc_ids:
+    return {}
+  placeholders = ",".join("?" for _ in doc_ids)
+  rows = conn.execute(
+    f"SELECT * FROM texts WHERE id IN ({placeholders})", tuple(doc_ids)
+  ).fetchall()
+  return {str(row["id"]): text_from_dict(_row_dict(row, ("citations",))) for row in rows}
+
+
+def select_text_by_origin_ref(conn: sqlite3.Connection, origin_ref: str) -> TextDocument | None:
+  """Indexed point lookup by verbatim origin_ref (O(log N), no table scan)."""
+  row = conn.execute(
+    "SELECT * FROM texts WHERE origin_ref = ? ORDER BY id LIMIT 1", (origin_ref,)
+  ).fetchone()
+  if row is None:
+    return None
+  return text_from_dict(_row_dict(row, ("citations",)))
 
 
 def get_watermark(conn: sqlite3.Connection, source: str) -> str | None:

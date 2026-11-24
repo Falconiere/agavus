@@ -35,7 +35,7 @@ def ingest_datajud(settings: Settings, limit: int, *, client: httpx.Client | Non
     )
   )
   records = datajud.parse_hits(body, fetcher.last_raw_ref)
-  new = sum(storage.save_case(record) for record in records)
+  new = storage.save_cases(records)
   storage.record_run(datajud.SOURCE, datajud.hit_count(body), new, start, end)
   latest = datajud.latest_filing(records)
   if latest is not None:
@@ -57,7 +57,7 @@ def ingest_statutes(settings: Settings, *, client: httpx.Client | None = None) -
       statute.name, html, fetcher.last_raw_ref, statute.article_range
     )
     fetched += len(documents)
-    new += sum(storage.save_text(document) for document in documents)
+    new += storage.save_texts(documents)
   storage.record_run(statutes.SOURCE, fetched, new, today, today)
   return new
 
@@ -83,6 +83,6 @@ def import_statute_file(settings: Settings, name: str, path: Path) -> int:
     (statute.article_range for statute in statutes.STATUTES if statute.name == name), None
   )
   documents = statutes.parse_statute(name, statutes.decode_html(payload), raw_ref, article_range)
-  new = sum(storage.save_text(document) for document in documents)
+  new = storage.save_texts(documents)
   storage.record_run(statutes.SOURCE, len(documents), new, today, today)
   return new

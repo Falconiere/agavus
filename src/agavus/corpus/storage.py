@@ -7,6 +7,7 @@ cache that never enters git.
 """
 
 import json
+from collections.abc import Sequence
 from contextlib import closing
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -67,10 +68,20 @@ class CorpusStorage:
     with closing(db.connect(self.root)) as conn:
       return db.insert_case(conn, record)
 
+  def save_cases(self, records: Sequence[CaseRecord]) -> int:
+    """Batch-store case records in one transaction; returns new count."""
+    with closing(db.connect(self.root)) as conn:
+      return db.insert_cases(conn, records)
+
   def save_text(self, record: TextDocument) -> bool:
     """Store a text document; False when it already existed (idempotent)."""
     with closing(db.connect(self.root)) as conn:
       return db.insert_text(conn, record)
+
+  def save_texts(self, records: Sequence[TextDocument]) -> int:
+    """Batch-store text documents + FTS index in one transaction."""
+    with closing(db.connect(self.root)) as conn:
+      return db.insert_texts(conn, records)
 
   def load_cases(self) -> list[CaseRecord]:
     """Read all stored case records, in stable order."""
@@ -81,6 +92,16 @@ class CorpusStorage:
     """Read all stored text documents, in stable order."""
     with closing(db.connect(self.root)) as conn:
       return db.select_texts(conn)
+
+  def load_texts_by_ids(self, doc_ids: Sequence[str]) -> dict[str, TextDocument]:
+    """Fetch a subset of text documents by id without scanning the table."""
+    with closing(db.connect(self.root)) as conn:
+      return db.select_texts_by_ids(conn, doc_ids)
+
+  def load_text_by_origin_ref(self, origin_ref: str) -> TextDocument | None:
+    """Fetch one text document by its indexed origin_ref."""
+    with closing(db.connect(self.root)) as conn:
+      return db.select_text_by_origin_ref(conn, origin_ref)
 
   def load_manifest(self) -> Manifest:
     """Assemble the manifest view from runs + watermarks tables."""
