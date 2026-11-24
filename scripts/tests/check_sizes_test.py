@@ -1,4 +1,4 @@
-"""Tests for the size-limit checker (co-located with the module)."""
+"""Tests for the size-limit checker (in the domain tests folder)."""
 
 from pathlib import Path
 

@@ -37,8 +37,9 @@ to make a gate pass — fix the code.
    helpers (scripts share `scripts/pyutils.py`).
 5. **No unused deps** (deptry). CLI-only tools need a `DEP002` entry in
    `[tool.deptry.per_rule_ignores]`.
-6. **Tests co-located**: `foo.py` → `foo_test.py` beside it. Every new
-   module gets tests.
+6. **Tests in per-domain `tests/` folders**: `src/agavus/<domain>/tests/`
+   (e.g. `corpus/tests/storage_test.py`); tooling tests in `scripts/tests/`.
+   Naming stays `<module>_test.py`. Every new module gets tests.
 7. **Line length ≤ 100**; ruff lint + format clean.
 
 ## Project invariants (violating these is a design bug)
@@ -86,7 +87,7 @@ the commit-msg hook). One coherent change per commit; no WIP.
 
 1. Read the relevant design section (table above).
 2. Smallest coherent change, consistent with surrounding code.
-3. Add/update co-located tests (synthetic data only).
+3. Add/update tests in the domain's `tests/` folder (synthetic data only).
 4. `make check` — everything green.
 5. Commit with a clear message; hooks run automatically. Push only when
    asked or when the task clearly includes it.

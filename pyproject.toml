@@ -8,13 +8,17 @@ version = "0.1.0"
 description = "Domain-organized Python scaffold (hello world) with strict quality gates."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["python-dotenv>=1.0"]
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.0",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.8", "mypy>=1.13", "deptry>=0.20", "pre-commit>=4.0"]
 
 [project.scripts]
-agavus = "agavus.__main__:main"
+agavus = "agavus.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agavus"]
@@ -42,7 +46,14 @@ pythonpath = ["scripts"]
 addopts = "-q"
 
 [tool.deptry]
-known_first_party = ["agavus", "check_sizes", "check_duplication", "check_commit_msg", "pyutils"]
+known_first_party = [
+  "agavus",
+  "check_sizes",
+  "check_duplication",
+  "check_commit_msg",
+  "check_staged_data",
+  "pyutils",
+]
 
 [tool.deptry.per_rule_ignores]
 # CLI tools invoked via Makefile/pre-commit, never imported in code.

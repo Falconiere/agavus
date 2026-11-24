@@ -149,7 +149,7 @@ Run them manually with `make hooks`.
 | `make dupcheck`    | Token-based clone detector — zero tolerance             |
 | `make depcheck`    | deptry — fails on unused/missing dependencies           |
 | `make sizes`       | Custom checker: function/file size limits               |
-| `make test`        | pytest (tests are co-located with sources)              |
+| `make test`        | pytest (tests in per-domain `tests/` folders)           |
 | `make check`       | Everything above, in order                              |
 | `make hooks`       | pre-commit against all files                            |
 
@@ -169,16 +169,20 @@ docs/
   publishing.md          # HF model repo + Space, eval-gated, LGPD-bound
   external-validation.md # Jev comparator pilot: protocol, results, caveats
 src/agavus/
-  __main__.py            # CLI entry point
+  __main__.py            # CLI entry point (delegates to cli.py)
+  cli.py                 # greeting + `ingest` subcommand
+  tests/                 # tests for root-level modules
   config/                # configuration domain (isolated, env-driven)
     settings.py
-    settings_test.py     # tests live next to the code they test
+    tests/               # settings_test.py
   greeting/              # greeting domain (hello world)
     greet.py
-    greet_test.py
-  corpus/                # placeholders — design complete, no implementation yet
-  taxonomy/              #   TPU mapping + weak labels
-  classify/              #   TF-IDF + calibrated logreg
+    tests/
+  corpus/                # ingestion: records, storage, fetch, datajud, statutes…
+    tests/               # one <module>_test.py per module
+  taxonomy/              # area registry (F/M/O); TPU mapping next
+    tests/
+  classify/              # placeholders — TF-IDF + calibrated logreg
   decide/                #   three-way decision gates
   retrieve/              #   BM25 + citations
   reason/                #   verified chains (syllogism, rules, graph)
@@ -188,11 +192,13 @@ scripts/
   pyutils.py             # shared tokenization helpers for quality scripts
   check_sizes.py         # size-limit enforcement
   check_duplication.py   # copy-paste detection (jscpd replacement)
-  *_test.py              # co-located tests for each script
+  check_commit_msg.py    # commit convention gate
+  check_staged_data.py   # LGPD guard: no corpus data in git
+  tests/                 # one <module>_test.py per script
 ```
 
-New domains (`corpus`, `taxonomy`, `classify`, `decide`, `retrieve`, `answer`)
-follow the same pattern: module + co-located `*_test.py`.
+New domains (`classify`, `decide`, `retrieve`, `answer`) follow the same
+pattern: module + `tests/<module>_test.py`.
 
 ## ⚙️ Configuration
 
@@ -218,7 +224,8 @@ Planned (see design doc): `AGAVUS_DATA_DIR` for the gitignored corpus location.
   >= 30 tokens (comments/whitespace ignored), within or across files.
 - **No unused dependencies**: deptry checks imports against `pyproject.toml`.
   (knip is JavaScript-only; deptry is its Python equivalent.)
-- **Tests co-located**: `foo.py` is tested by `foo_test.py` in the same directory.
+- **Tests in per-domain `tests/` folders**: `corpus/tests/storage_test.py`,
+  `scripts/tests/…` for tooling; naming stays `<module>_test.py`.
 - **Domain-first layout**: group by business domain, not by technical layer.
 - **All gates run on every commit** via pre-commit local hooks.
 - **Commits are semantic and concise** (`type(scope): subject`, body only

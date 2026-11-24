@@ -1,4 +1,4 @@
-"""Tests for shared source-analysis helpers (co-located with the module)."""
+"""Tests for shared source-analysis helpers (in the domain tests folder)."""
 
 from pyutils import code_lines, code_tokens
 

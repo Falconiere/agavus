@@ -1,4 +1,4 @@
-"""Tests for the commit-message convention checker (co-located)."""
+"""Tests for the commit-message convention checker (tests folder)."""
 
 from pathlib import Path
 

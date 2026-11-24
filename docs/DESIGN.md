@@ -252,8 +252,8 @@ LoRA/tier upgrades are eval-triggered investments, never advance capabilities.
 Publishing to Hugging Face (model repo + CPU Space, eval-gated, LGPD-bound):
 **[docs/publishing.md](publishing.md)**.
 
-All modules follow repo rules: strict types, co-located tests, 2 spaces,
-size limits, zero duplication, `make check` green.
+All modules follow repo rules: strict types, tests in per-domain `tests/`
+folders, 2 spaces, size limits, zero duplication, `make check` green.
 
 ## 10. CLI usage contract
 

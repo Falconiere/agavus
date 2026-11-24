@@ -1,4 +1,4 @@
-"""Tests for the duplication detector (co-located with the module)."""
+"""Tests for the duplication detector (in the domain tests folder)."""
 
 from pathlib import Path
 

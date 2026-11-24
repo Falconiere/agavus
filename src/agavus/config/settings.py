@@ -2,11 +2,20 @@
 
 import os
 from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 DEFAULT_NAME = "world"
 NAME_ENV_VAR = "AGAVUS_NAME"
+DATA_DIR_ENV_VAR = "AGAVUS_DATA_DIR"
+DATA_START_ENV_VAR = "AGAVUS_DATA_START"
+DATAJUD_KEY_ENV_VAR = "DATAJUD_API_KEY"
+DEFAULT_DATA_DIR = "data"
+DEFAULT_DATA_START = "2020-01-01"
+# CNJ's published public key for the DataJud public API — not a secret.
+DEFAULT_DATAJUD_KEY = "cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=="
 
 
 @dataclass(frozen=True)
@@ -14,10 +23,21 @@ class Settings:
   """Immutable, fully typed application configuration."""
 
   name: str
+  data_dir: Path
+  data_start: date
+  datajud_api_key: str
 
 
 def load_settings() -> Settings:
   """Load settings from `.env` (if present) and the process environment."""
   load_dotenv()
-  raw = os.environ.get(NAME_ENV_VAR, DEFAULT_NAME).strip()
-  return Settings(name=raw or DEFAULT_NAME)
+  name = os.environ.get(NAME_ENV_VAR, DEFAULT_NAME).strip()
+  data_dir = os.environ.get(DATA_DIR_ENV_VAR, DEFAULT_DATA_DIR).strip()
+  start = os.environ.get(DATA_START_ENV_VAR, DEFAULT_DATA_START).strip()
+  key = os.environ.get(DATAJUD_KEY_ENV_VAR, DEFAULT_DATAJUD_KEY).strip()
+  return Settings(
+    name=name or DEFAULT_NAME,
+    data_dir=Path(data_dir or DEFAULT_DATA_DIR),
+    data_start=date.fromisoformat(start or DEFAULT_DATA_START),
+    datajud_api_key=key or DEFAULT_DATAJUD_KEY,
+  )

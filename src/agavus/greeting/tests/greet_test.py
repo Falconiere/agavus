@@ -1,4 +1,4 @@
-"""Tests for the greeting domain (co-located with the module)."""
+"""Tests for the greeting domain (in the domain tests folder)."""
 
 from agavus.greeting.greet import greet
 

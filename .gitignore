@@ -12,5 +12,8 @@ dist/
 # Local config
 .env
 
+# Corpus (LGPD: real data never in git)
+data/
+
 # Web research cache
 .firecrawl/
