@@ -108,3 +108,10 @@ def test_ordinal_joined_and_cr_stripped() -> None:
   text = html_to_text(html)
   assert "Art. 2o" in text
   assert "\r" not in text
+
+
+def test_article_body_lines_joined() -> None:
+  html = "<p>Art. 1o</p><p>Esta</p><p>Lei dispõe sobre o tema.</p><p>§ 1º Outro.</p>"
+  docs = parse_statute("Lei X", html, "raw/x.html")
+  assert "Esta Lei dispõe sobre o tema." in docs[0].text
+  assert "\n§ 1º" in docs[0].text

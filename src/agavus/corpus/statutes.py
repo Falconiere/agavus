@@ -92,6 +92,7 @@ def segment_articles(text: str) -> list[tuple[str, str]]:
     heading = HEADING.search(body)
     if heading:
       body = body[: heading.start()]
+    body = re.sub(r"\n(?!(?:§|Art\.|CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO))", " ", body)
     articles.append((number, body.strip()))
   return articles
 
