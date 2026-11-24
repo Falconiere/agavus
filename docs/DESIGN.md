@@ -237,15 +237,17 @@ storage, area-parameterized pipelines.
 2. `taxonomy/` — ✅ area registry, organ weak-label rules, statute map,
    lexicon, gold-set seed; ⬜ TPU code table populated from real DataJud codes.
 3. `classify/` — ✅ TF-IDF (word-internal char n-grams) + balanced, calibrated
-   logreg; negation/citation/verb features; seeds; ⬜ feature crosses, baselines.
+   vectorized logreg; negation/citation/verb features + citation-verb crosses;
+   seeds; ⬜ baselines.
 4. `decide/` — ✅ loss matrix, expected-loss rule, three-way gates, safety
    ceiling; ⬜ boundary queue feeding the gold set automatically.
-5. `retrieve/` — ✅ FTS5 BM25 + law-name column + citation boost;
-   ⬜ hybrid dense upgrade (tier 4).
-6. `reason/` — ✅ facts + rule pack + verified chains (R-24A, R-22);
-   ⬜ citation graph, temporal reasoning, more rules.
+5. `retrieve/` — ✅ FTS5 BM25 + law-name column + citation boost + stopword
+   filtering + query-centered verbatim snippets; ⬜ hybrid dense upgrade (tier 4).
+6. `reason/` — ✅ facts + area-scoped rule pack + verified chains (R-24A, R-22,
+   R-AP); ⬜ citation graph, temporal reasoning, more rules.
 7. `answer/` — ✅ extractive cited answers, degradation ladder, topic-targeted
-   clarification; ⬜ relevance scoring, advice lint.
+   clarification, content-token/citation relevance check, pre-delivery privacy
+   and advice-language verifier.
 8. ⬜ Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
    other tribunals.
 

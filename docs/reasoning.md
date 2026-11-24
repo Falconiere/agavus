@@ -9,12 +9,16 @@ verifiable, broken chains defer. Companion: [tiny-llm.md](tiny-llm.md).
 
 - **Extractive facts**: conservative patterns + negation guard; every fact
   carries its verbatim query span (`medida_vigente`, `descumprimento`,
-  `violencia_domestica`, `contexto_familiar`, `urgencia`).
-- **Rule pack v1**: R-24A (protetiva vigente + descumprimento → art. 24-A),
-  R-22 (violência + contexto familiar + urgência → art. 22). Versioned data.
+  `violencia_domestica`, `contexto_familiar`, `urgencia`,
+  `campanha_desqualificacao`, `obstaculo_convivencia`).
+- **Rule pack v2**: area-scoped rules — R-24A (protetiva vigente +
+  descumprimento → art. 24-A), R-22 (violência + contexto familiar + urgência
+  → art. 22), R-AP (campanha de desqualificação + obstáculo à convivência →
+  Lei 12.318/2010, art. 2). Versioned data.
 - **Verified chains**: a chain is complete only when the conclusion's
-  provision exists verbatim in the corpus; broken chains defer. Answer
-  renders conclusion + grounded facts + verbatim premise + disclaimer.
+  provision exists verbatim in the corpus (via indexed `origin_ref` lookup);
+  broken chains defer. Answer renders conclusion + grounded facts + verbatim
+  premise + disclaimer.
 - Live example: *"ele descumpriu a medida protetiva"* → R-24A chain citing
   the current art. 24-A text (incl. Lei 14.994/2024 and Lei 15.383/2026
   amendments).
