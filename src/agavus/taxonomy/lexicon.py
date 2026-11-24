@@ -7,6 +7,7 @@ Seed set — grows with reviewed corpus evidence.
 LEXICON_VERSION = "lexicon-v1"
 SYNONYMS: dict[str, str] = {
   "lmp": "lei maria da penha",
+  "lei da maria da penha": "lei maria da penha",
   "lei 11.340": "lei maria da penha",
   "lei maria da penha": "lei maria da penha",
   "pensão alimentícia": "alimentos",

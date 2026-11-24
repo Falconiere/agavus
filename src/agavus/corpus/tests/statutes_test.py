@@ -80,6 +80,12 @@ def test_extract_citations() -> None:
   assert "Lei 11.340/2006" in refs
 
 
+def test_named_law_aliases() -> None:
+  refs = extract_citations("qual é o artigo da lei da Maria da Penha?")
+  assert "Lei 11.340/2006" in refs
+  assert "Lei 12.318/2010" in extract_citations("o que é alienação parental")
+
+
 def test_decode_cp1252_fallback() -> None:
   payload = "Considera-se alienação parental".encode("cp1252")
   assert "alienação" in decode_html(payload)

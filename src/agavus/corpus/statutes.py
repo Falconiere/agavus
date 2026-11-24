@@ -10,12 +10,33 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from agavus.corpus.records import LabelSource, TextDocument, TextSource, text_document_id
+from agavus.taxonomy.lexicon import normalize
 
 SOURCE = "statutes"
 ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 ART_REF = re.compile(r"\bart\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
+LAW_ALIASES = {
+  "lei maria da penha": "Lei 11.340/2006",
+  "alienação parental": "Lei 12.318/2010",
+  "código civil": "Lei 10.406/2002",
+}
+LAW_POPULAR_NAMES = {
+  "Lei 11.340/2006": "lei maria da penha violência doméstica",
+  "Lei 12.318/2010": "lei de alienação parental",
+  "Lei 10.406/2002": "código civil família",
+  "Lei 13.058/2014": "guarda compartilhada",
+  "Lei 14.994/2024": "feminicídio",
+}
+
+
+def popular_name(origin_ref: str) -> str:
+  """Searchable popular name for a law (index-only; citations stay verbatim)."""
+  for prefix, name in LAW_POPULAR_NAMES.items():
+    if origin_ref.startswith(prefix):
+      return name
+  return ""
 
 
 @dataclass(frozen=True)
@@ -98,9 +119,11 @@ def segment_articles(text: str) -> list[tuple[str, str]]:
 
 
 def extract_citations(text: str) -> tuple[str, ...]:
-  """Normalized references found in text (articles and laws)."""
+  """Normalized references found in text (articles, laws, named-law aliases)."""
   refs = {f"art. {number}" for number in ART_REF.findall(text)}
   refs |= {f"Lei {number}" for number in LAW_REF.findall(text)}
+  lowered = normalize(text)
+  refs |= {canonical for alias, canonical in LAW_ALIASES.items() if normalize(alias) in lowered}
   return tuple(sorted(refs))
 
 

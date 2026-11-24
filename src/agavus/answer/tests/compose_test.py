@@ -81,3 +81,11 @@ def test_broken_chain_defers(tmp_path: Path) -> None:
   answer = compose("ele descumpriu a medida protetiva", CONFIDENT_M, _corpus(tmp_path))
   assert answer.decision == "defer"
   assert answer.sources == ()
+
+
+def test_domain_clear_defer_asks_topic(tmp_path: Path) -> None:
+  probs = {"F": 0.20, "M": 0.70, "O": 0.10}
+  answer = compose("qual é o artigo da lei da maria da penha", probs, _corpus(tmp_path))
+  assert answer.decision == "defer"
+  assert "tema específico" in answer.text
+  assert "Maria da Penha" in answer.text

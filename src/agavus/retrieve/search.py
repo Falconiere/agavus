@@ -14,6 +14,7 @@ from agavus.corpus.storage import CorpusStorage
 from agavus.taxonomy.lexicon import normalize
 
 CITATION_BOOST = 2.0
+ORIGIN_CITATION_BOOST = 3.0
 SNIPPET_LEN = 200
 OVERFETCH = 3
 WORD_RE = re.compile(r"[a-zà-ú0-9]+")
@@ -36,10 +37,6 @@ def match_expression(query: str) -> str:
   return " OR ".join(f'"{token}"' for token in tokens)
 
 
-def _document_citations(origin_ref: str, citations: tuple[str, ...]) -> set[str]:
-  return set(citations) | set(extract_citations(origin_ref))
-
-
 def search(storage: CorpusStorage, query: str, limit: int = 5) -> list[Hit]:
   """Ranked hits: BM25 + citation boost; empty query yields no hits."""
   expression = match_expression(query)
@@ -53,12 +50,15 @@ def search(storage: CorpusStorage, query: str, limit: int = 5) -> list[Hit]:
     document = texts.get(doc_id)
     if document is None:
       continue
-    overlap = query_citations & _document_citations(document.origin_ref, document.citations)
+    origin_cites = set(extract_citations(document.origin_ref))
+    body_cites = set(document.citations)
+    boost = ORIGIN_CITATION_BOOST * len(query_citations & origin_cites)
+    boost += CITATION_BOOST * len(query_citations & body_cites)
     hits.append(
       Hit(
         doc_id=doc_id,
         origin_ref=document.origin_ref,
-        score=-bm25_score + CITATION_BOOST * len(overlap),
+        score=-bm25_score + boost,
         snippet=document.text[:SNIPPET_LEN],
         citations=document.citations,
       )

@@ -23,6 +23,7 @@ from agavus.corpus.records import (
   case_from_dict,
   text_from_dict,
 )
+from agavus.corpus.statutes import popular_name
 from agavus.taxonomy.labeling import LabelDecision
 
 SCHEMA_VERSION = 1
@@ -58,7 +59,8 @@ CREATE TABLE IF NOT EXISTS raw_payloads (
   ref TEXT PRIMARY KEY, source TEXT NOT NULL, run TEXT NOT NULL,
   url TEXT, method TEXT, payload_json TEXT, fetched_at TEXT NOT NULL
 );
-CREATE VIRTUAL TABLE IF NOT EXISTS texts_fts USING fts5(doc_id UNINDEXED, origin_ref, text);
+CREATE VIRTUAL TABLE IF NOT EXISTS texts_fts
+  USING fts5(doc_id UNINDEXED, origin_ref, law_name, text);
 CREATE TABLE IF NOT EXISTS embeddings (
   doc_id TEXT NOT NULL, model_version TEXT NOT NULL, dim INTEGER NOT NULL,
   vector BLOB NOT NULL, PRIMARY KEY (doc_id, model_version)
@@ -91,9 +93,11 @@ def connect(root: Path) -> sqlite3.Connection:
 def _migrate_fts(conn: sqlite3.Connection) -> None:
   """FTS index is rebuildable: recreate when the column layout changed."""
   columns = {row[1] for row in conn.execute("PRAGMA table_info(texts_fts)")}
-  if "origin_ref" not in columns:
+  if "law_name" not in columns:
     conn.execute("DROP TABLE texts_fts")
-    conn.execute("CREATE VIRTUAL TABLE texts_fts USING fts5(doc_id UNINDEXED, origin_ref, text)")
+    conn.execute(
+      "CREATE VIRTUAL TABLE texts_fts USING fts5(doc_id UNINDEXED, origin_ref, law_name, text)"
+    )
     conn.commit()
 
 
@@ -143,17 +147,17 @@ def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
   )
   if inserted:
     conn.execute(
-      "INSERT INTO texts_fts (doc_id, origin_ref, text) VALUES (?,?,?)",
-      (record.id, record.origin_ref, record.text),
+      "INSERT INTO texts_fts (doc_id, origin_ref, law_name, text) VALUES (?,?,?,?)",
+      (record.id, record.origin_ref, popular_name(record.origin_ref), record.text),
     )
     conn.commit()
   return inserted
 
 
 def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tuple[str, float]]:
-  """BM25-ranked ids; origin_ref weighted 10x (article numbers are decisive)."""
+  """BM25-ranked ids; origin_ref 10x, law_name 8x (names/numbers decisive)."""
   rows = conn.execute(
-    "SELECT doc_id, bm25(texts_fts, 0.0, 10.0, 1.0) AS score FROM texts_fts "
+    "SELECT doc_id, bm25(texts_fts, 0.0, 10.0, 8.0, 1.0) AS score FROM texts_fts "
     "WHERE texts_fts MATCH ? ORDER BY score LIMIT ?",
     (query, limit),
   ).fetchall()
@@ -163,11 +167,21 @@ def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tu
 def rebuild_fts(conn: sqlite3.Connection) -> int:
   """Rebuild the FTS index from the texts table (idempotent maintenance)."""
   conn.execute("DELETE FROM texts_fts")
-  conn.execute(
-    "INSERT INTO texts_fts (doc_id, origin_ref, text) SELECT id, origin_ref, text FROM texts"
+  rows = conn.execute("SELECT id, origin_ref, text FROM texts").fetchall()
+  conn.executemany(
+    "INSERT INTO texts_fts (doc_id, origin_ref, law_name, text) VALUES (?,?,?,?)",
+    [
+      (
+        str(row["id"]),
+        str(row["origin_ref"]),
+        popular_name(str(row["origin_ref"])),
+        str(row["text"]),
+      )
+      for row in rows
+    ],
   )
   conn.commit()
-  return int(conn.execute("SELECT count(*) FROM texts_fts").fetchone()[0])
+  return len(rows)
 
 
 class RawMeta(TypedDict):

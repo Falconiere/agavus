@@ -13,6 +13,7 @@ from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.reason.chain import Chain, build_chain
 from agavus.retrieve.search import WORD_RE, Hit, search
+from agavus.taxonomy.areas import AREAS, OUT_OF_SCOPE
 from agavus.taxonomy.lexicon import normalize
 
 DISCLAIMER = "Isto não é aconselhamento jurídico; consulte um advogado."
@@ -25,6 +26,8 @@ CLARIFY_MESSAGE = (
 )
 NO_BASIS_MESSAGE = "Não encontrei base segura no corpus para responder com citação."
 CONTEXT_HITS = 2
+DOMAIN_CLEAR_MIN = 0.6
+TOPIC_HINTS = "Ex.: medidas protetivas, descumprimento, guarda, visitas, alimentos, divórcio."
 
 
 @dataclass(frozen=True)
@@ -67,13 +70,21 @@ def _render_chain(chain: Chain) -> str:
   return "\n".join(lines)
 
 
+def _clarification(probabilities: Mapping[str, float]) -> str:
+  """Domain-clear defers ask for the topic; ambiguous ones ask for the domain."""
+  top = max(probabilities, key=lambda state: probabilities[state])
+  if top != OUT_OF_SCOPE.code and probabilities[top] >= DOMAIN_CLEAR_MIN:
+    return f"Sua pergunta parece ser sobre {AREAS[top].name}. Qual o tema específico? {TOPIC_HINTS}"
+  return CLARIFY_MESSAGE
+
+
 def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStorage) -> Answer:
   """Classify → decide → reason/retrieve → cited excerpt, or degrade honestly."""
   decision = decide(probabilities)
   if decision.action == "reject":
     return Answer(decision="reject", text=SCOPE_MESSAGE, sources=())
   if decision.action == "defer":
-    return Answer(decision="defer", text=CLARIFY_MESSAGE, sources=())
+    return Answer(decision="defer", text=_clarification(probabilities), sources=())
   chain = build_chain(query, storage)
   if chain is not None:
     if not chain.complete:
