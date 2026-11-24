@@ -25,6 +25,13 @@ def test_bigrams_present() -> None:
   assert "medida_protetiva" in legal_tokens("medida protetiva")
 
 
+def test_char_ngrams_word_internal() -> None:
+  vectorizer = TfidfVectorizer(VectorizerConfig(min_df=1, char_sizes=(3,)))
+  vectorizer.fit(["protetiva urgente", "protetiva deferida"])
+  assert "c_pro" in vectorizer.vocab
+  assert not any(" " in term for term in vectorizer.vocab)
+
+
 def test_vectorizer_fit_transform() -> None:
   texts = ["medida protetiva urgente", "medida protetiva deferida", "guarda compartilhada"]
   vectorizer = TfidfVectorizer(VectorizerConfig(min_df=2, char_sizes=()))

@@ -50,8 +50,12 @@ def legal_tokens(text: str) -> list[str]:
 
 
 def _char_ngrams(text: str, size: int) -> list[str]:
-  cleaned = normalize(text)
-  return [f"c_{cleaned[i : i + size]}" for i in range(len(cleaned) - size + 1)]
+  """Word-internal char n-grams (morphology), never across word boundaries."""
+  grams: list[str] = []
+  for word in tokenize(text):
+    if len(word) >= size:
+      grams += [f"c_{word[i : i + size]}" for i in range(len(word) - size + 1)]
+  return grams
 
 
 @dataclass(frozen=True)
