@@ -15,6 +15,7 @@ SCOPES = (
   "classify",
   "decide",
   "retrieve",
+  "reason",
   "answer",
   "config",
   "greeting",

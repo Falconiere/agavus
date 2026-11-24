@@ -77,6 +77,11 @@ Key ideas:
   *data packs*, not code changes — registry + namespaced corpus + composed
   loss matrix, with a shadow-mode activation gate. See
   [docs/extensibility.md](docs/extensibility.md).
+- 🧠 **Reasoning as verified chains**: symbolic syllogism + requirements
+  checklists + citation graph; an optional tiny CPU LLM may *propose*, but
+  the engine *verifies* — verified or discarded. See
+  [docs/reasoning.md](docs/reasoning.md) and
+  [docs/tiny-llm.md](docs/tiny-llm.md).
 
 ## 🔀 Three-way decisions
 
@@ -103,8 +108,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-  C["1 · corpus"] --> T["2 · taxonomy"] --> K["3 · classify"] --> D["4 · decide"] --> R["5 · retrieve"] --> A["6 · answer"]
-  A -.-> NEXT["later: CPU embeddings,<br/>subtopics, other tribunals"]
+  C["1 · corpus"] --> T["2 · taxonomy"] --> K["3 · classify"] --> D["4 · decide"] --> R["5 · retrieve"] --> RE["6 · reason"] --> A["7 · answer"]
+  A -.-> NEXT["later: CPU embeddings, tiny LLM,<br/>subtopics, other tribunals"]
 ```
 
 ## 🚀 Quickstart
@@ -152,6 +157,9 @@ docs/
   math/                  # one doc per formula, with worked examples
   corpus/                # deep-dive: range (2020→today), sources, schema, LGPD
   extensibility.md       # new areas (trabalhista, bancário…) as data packs
+  cli.md                 # usage contract: agavus -p, classify, --explain
+  reasoning.md           # verified chains: syllogism, checklists, citation graph
+  tiny-llm.md            # optional CPU LLM: proposer behind a verifier
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)
@@ -165,6 +173,7 @@ src/agavus/
   classify/              #   TF-IDF + calibrated logreg
   decide/                #   three-way decision gates
   retrieve/              #   BM25 + citations
+  reason/                #   verified chains (syllogism, rules, graph)
   answer/                #   extractive, cited answers
 scripts/
   pyutils.py             # shared tokenization helpers for quality scripts

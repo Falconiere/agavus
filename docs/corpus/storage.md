@@ -12,7 +12,11 @@ data/                      # gitignored, path via AGAVUS_DATA_DIR (default: data
     cases/…
     texts/…
     manifest.json          # run date, window, counts per source, watermark
+  models/                  # tiny-LLM weights (later phase), checksum-pinned
 ```
+
+Model weights follow the same policy as the corpus: `AGAVUS_MODELS_DIR`
+(default `data/models/`), never in git, re-downloadable.
 
 ## Principles
 

@@ -140,7 +140,7 @@ End-to-end data-to-prediction flow: **[math/classification-pipeline.md](math/cla
 | 2 | BM25 + cosine + citation features | saturating TF, length normalization; regex citations | retrieval |
 | 3 | NMF/LDA, HDBSCAN, PageRank | matrix factorization; density clustering; citation graph | subtopic discovery, authority ranking |
 | 4 | Small CPU embeddings (MiniLM-class) | cosine over dense vectors | semantic retrieval upgrade (later) |
-| 5 | Quantized 0.5–1.5B via llama.cpp | CPU inference | optional fluency over retrieved facts (later) |
+| 5 | Quantized 0.5–4B via llama.cpp | CPU inference | optional bounded proposer behind a verifier (later, [tiny-llm.md](tiny-llm.md)) |
 
 - Word + char n-grams (Portuguese morphology/typos); binary citation features.
 - **Probability calibration** (Platt/isotonic on held-out set) is mandatory:
@@ -237,8 +237,11 @@ storage, area-parameterized pipelines.
    queue feeding the gold set (§6.1 #4, #5).
 5. `retrieve/` — BM25 + citation features over statutes/decisions; query
    expansion via the lexicon; hybrid dense upgrade later (§6.1 #2).
-6. `answer/` — extractive, cited answers; abstain/escalate paths.
-7. Later: tiers 4–5, subtopic discovery, other tribunals.
+6. `reason/` — symbolic syllogism, requirements checklists, citation graph;
+   verified chains only ([reasoning.md](reasoning.md)).
+7. `answer/` — extractive, cited answers; abstain/escalate paths.
+8. Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
+   other tribunals.
 
 All modules follow repo rules: strict types, co-located tests, 2 spaces,
 size limits, zero duplication, `make check` green.
@@ -250,3 +253,13 @@ The product surface is defined in **[docs/cli.md](cli.md)**:
 `agavus classify` for documents, `--explain` auditability trace, `--json`
 typed output, scriptable exit codes (0 accept / 10 defer / 20 reject).
 pt-BR user I/O; fixed no-legal-advice disclaimer; sources never empty.
+
+## 11. Reasoning and the tiny-LLM layer
+
+- **Reasoning**: verified chains — symbolic syllogism, requirements
+  checklists, citation graph, temporal logic. Every conclusion carries its
+  cited premises; broken chains defer. **[docs/reasoning.md](reasoning.md)**.
+- **Tiny CPU LLM** (0.5–4B quantized, llama.cpp): optional bounded proposer
+  behind a verifier — transformer, not oracle. Disabled by default,
+  shadow-gated, cached; the classical core is complete without it.
+  **[docs/tiny-llm.md](tiny-llm.md)**.
