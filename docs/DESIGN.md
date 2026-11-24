@@ -116,6 +116,8 @@ anonymized (re-identification risk). Split:
 
 ## 6. Model stack
 
+Formula-by-formula explanations with worked examples: **[docs/math/](math/README.md)**.
+
 | Tier | Component | Math | Role |
 | ---- | ------------------------- | ------------------------------------------------ | ------------------------- |
 | 1 | TF-IDF + logistic regression | `tfidf(t,d) = count(t,d)·log(N/df(t))`; softmax, cross-entropy | domain classifier (probabilities) |

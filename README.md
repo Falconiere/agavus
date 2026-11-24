@@ -136,6 +136,7 @@ Run them manually with `make hooks`.
 ```
 docs/
   DESIGN.md              # architecture, data, models, loss matrix, evaluation
+  math/                  # one doc per formula, with worked examples
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)
