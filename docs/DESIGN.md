@@ -207,6 +207,9 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 
 ## 8. Evaluation plan
 
+Full plan, gold sets, targets, and regression policy:
+**[docs/evals.md](evals.md)**. Summary:
+
 - **Classifier**: macro-F1 per domain on held-out TJDFT data; confusion matrix
   with special attention to M↔F errors; expected calibration error (ECE)
   reported alongside F1.
@@ -242,6 +245,10 @@ storage, area-parameterized pipelines.
 7. `answer/` — extractive, cited answers; abstain/escalate paths.
 8. Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
    other tribunals.
+
+Cross-cutting from step 3 onward: `evals/` harness + gold sets
+([evals.md](evals.md)) — no change ships without measured evidence;
+LoRA/tier upgrades are eval-triggered investments, never advance capabilities.
 
 All modules follow repo rules: strict types, co-located tests, 2 spaces,
 size limits, zero duplication, `make check` green.

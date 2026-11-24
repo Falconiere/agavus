@@ -33,8 +33,8 @@ Refs: docs/DESIGN.md §7        ← only for design commits
 ## Scopes (closed list)
 
 Domains: `corpus`, `taxonomy`, `classify`, `decide`, `retrieve`, `reason`,
-`answer`, `config`, `greeting`. Cross-cutting: `docs`, `scripts`, `tooling`,
-`repo`.
+`answer`, `evals`, `config`, `greeting`. Cross-cutting: `docs`, `scripts`,
+`tooling`, `repo`.
 
 One scope per commit; span two domains → split into two commits.
 

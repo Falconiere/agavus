@@ -82,6 +82,10 @@ Key ideas:
   the engine *verifies* — verified or discarded. See
   [docs/reasoning.md](docs/reasoning.md) and
   [docs/tiny-llm.md](docs/tiny-llm.md).
+- 📏 **Eval-gated quality**: versioned gold sets, hard safety targets
+  (M recall, citation correctness, zero leakage), ablations per mitigation,
+  regression-blocking reports. LoRA is an eval-triggered investment, not a
+  plan. See [docs/evals.md](docs/evals.md).
 
 ## 🔀 Three-way decisions
 
@@ -160,6 +164,7 @@ docs/
   cli.md                 # usage contract: agavus -p, classify, --explain
   reasoning.md           # verified chains: syllogism, checklists, citation graph
   tiny-llm.md            # optional CPU LLM: proposer behind a verifier
+  evals.md               # gold sets, benchmarks, regression gates, LoRA triggers
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)
@@ -175,6 +180,7 @@ src/agavus/
   retrieve/              #   BM25 + citations
   reason/                #   verified chains (syllogism, rules, graph)
   answer/                #   extractive, cited answers
+  evals/                 #   gold sets + benchmark harness (cross-cutting)
 scripts/
   pyutils.py             # shared tokenization helpers for quality scripts
   check_sizes.py         # size-limit enforcement

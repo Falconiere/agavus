@@ -81,6 +81,38 @@ The classical core is deterministic; LLM sampling is not. Contract:
 - New runtime dep when implemented: `llama-cpp-python` (CPU build needs a
   C compiler/cmake — documented in setup).
 
+## Fine-tuning (LoRA): not now — trigger-based investment
+
+LoRA trains small low-rank weight adapters on a pretrained model — cheap
+fine-tuning, but still **GPU training** (QLoRA on a 1.7B model wants a
+consumer GPU; CPU training is impractical). No GPU owned ≠ never possible:
+one rented session (hours, tens of dollars) suffices. The question is
+whether it buys anything here.
+
+**Assessment, in value order:**
+
+1. **Data quality + labels** — biggest lever, free.
+2. **Features/mitigations** (negation, lexicon, citations) — cheap, auditable.
+3. **Calibration + thresholds** — cheap, safety-critical.
+4. **Off-the-shelf embeddings, hybrid retrieval** — no training at all.
+5. **Only then LoRA**, and prefer it on a **small encoder/retriever**
+   (contrastive pairs from weak labels: same-area docs = positives).
+   Retrieval quality is where learned weights plausibly beat lexicon math.
+   Generative-LLM LoRA for style/format is low value: constrained decoding
+   already handles format, and **LoRA does not fix knowledge reliability** —
+   the verifier stays mandatory regardless.
+
+**Trigger condition** (recorded decision): consider LoRA only when the
+eval harness shows a specific metric plateaued below target **after**
+data/feature/threshold fixes are exhausted, and the gap is attributable to
+model weights (e.g. embeddings keep missing legal synonyms). Never invest
+in LoRA as a capability in advance.
+
+**Risks if triggered**: overfitting to TJDFT vocabulary (hurts area
+expansion), catastrophic forgetting of pt-BR ability, license checks,
+versioning + full eval burden. Adapters are artifacts: checksum-pinned,
+outside git, eval-gated like the base model.
+
 ## Activation gate (like areas: shadow first)
 
 | Check | Target |
