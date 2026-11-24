@@ -1,10 +1,10 @@
 """agavus Gradio Space — public demo.
 
-Privacy by construction: only public-domain statutes + synthetic seeds are
-bootstrapped here; no real case data ever enters this Space (LGPD).
+Privacy by construction: only public-domain statutes (bundled in assets/)
++ synthetic seeds are bootstrapped here; no real case data ever enters this
+Space (LGPD). No network needed at startup.
 """
 
-from contextlib import suppress
 from functools import cache
 from pathlib import Path
 
@@ -14,11 +14,18 @@ from agavus.answer.compose import compose
 from agavus.classify.pipeline import train_classifier, training_set
 from agavus.classify.store import load_model, save_model
 from agavus.config.settings import load_settings
-from agavus.corpus.fetch import FetchError
-from agavus.corpus.ingest import ingest_statutes
+from agavus.corpus.ingest import import_statute_file
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 
+ASSETS = Path(__file__).parent / "assets"
+ASSET_NAMES = {
+  "l11340": "Lei 11.340/2006",
+  "l12318": "Lei 12.318/2010",
+  "l13058": "Lei 13.058/2014",
+  "l14994": "Lei 14.994/2024",
+  "l10406": "Lei 10.406/2002",
+}
 EXAMPLES = [
   "Qual é o artigo da lei de alienação parental?",
   "ele descumpriu a medida protetiva, o que acontece?",
@@ -28,15 +35,14 @@ EXAMPLES = [
 
 @cache
 def _bootstrap(data_dir: Path) -> None:
-  """Fetch public statutes, label, train — once per data dir."""
+  """Import bundled public statutes, label, train — once per data dir."""
   settings = load_settings()
   db_path = data_dir / "models" / "models.db"
   if db_path.exists():
     return
+  for stem, name in ASSET_NAMES.items():
+    import_statute_file(settings, name, ASSETS / f"{stem}.html")
   storage = CorpusStorage(data_dir)
-  # Seeds-only fallback keeps the demo alive when egress is blocked.
-  with suppress(FetchError):
-    ingest_statutes(settings)
   storage.run_labeling()
   texts, targets = training_set(storage)
   classifier, report = train_classifier(texts, targets)
