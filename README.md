@@ -12,6 +12,7 @@ strict, machine-enforced quality gates.
 ![Ruff](https://img.shields.io/badge/lint%20%2B%20format-ruff-d7ff64)
 ![mypy](https://img.shields.io/badge/types-mypy%20strict-blue)
 ![pre-commit](https://img.shields.io/badge/hooks-pre--commit-fab040)
+[![CI](https://github.com/Falconiere/agavus/actions/workflows/ci.yml/badge.svg)](https://github.com/Falconiere/agavus/actions/workflows/ci.yml)
 
 > Status: **MVP live** — [demo Space](https://huggingface.co/spaces/Falconiere/agavus) ·
 > [model repo](https://huggingface.co/Falconiere/agavus-classifier).
@@ -152,13 +153,17 @@ uv run agavus train                                 # TF-IDF + logreg + calibrat
 uv run agavus classify "ele descumpriu a medida protetiva"
 uv run agavus eval                                  # gold set + three-way decisions
 uv run agavus search "medida protetiva art. 22"       # BM25 + citation-weighted retrieval
+uv run agavus publish --bootstrap space/assets      # offline build + eval-gated staging
 ```
 
 Exit codes for `-p`: 0 answered · 10 deferred (clarification) · 20 out of
 scope · 1 error.
 
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).
-Run them manually with `make hooks`.
+Run them manually with `make hooks`. GitHub Actions runs the same gates on
+every push/PR plus an offline bootstrap + eval gate; `v*` tags publish
+eval-gated releases to Hugging Face and GitHub Releases
+([docs/publishing.md](docs/publishing.md)).
 
 ## 🛠️ Commands
 
@@ -177,6 +182,9 @@ Run them manually with `make hooks`.
 ## 📁 Structure (by domain)
 
 ```
+.github/workflows/
+  ci.yml                 # all gates + offline bootstrap/eval gate
+  release.yml            # tag-gated HF model/Space + GitHub Release
 docs/
   DESIGN.md              # architecture, data, models, loss matrix, evaluation
   math/                  # one doc per formula, with worked examples
@@ -216,6 +224,7 @@ scripts/
   check_sizes.py         # size-limit enforcement
   check_duplication.py   # copy-paste detection (jscpd replacement)
   check_commit_msg.py    # commit convention gate
+  check_commit_range.py  # CI: convention over a push/PR range
   check_staged_data.py   # LGPD guard: no corpus data in git
   tests/                 # one <module>_test.py per script
 ```

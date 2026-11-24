@@ -6,7 +6,8 @@ Status: **model repo + Space LIVE**
 - Demo: https://huggingface.co/spaces/Falconiere/agavus
   (Gradio, cpu-basic; offline bootstrap from bundled public-domain statutes
   in `space/assets/` — UTF-8 transcriptions, LGPD-safe, no network at startup)
-Pipeline: `agavus publish` (dry run) / `agavus publish --repo OWNER/NAME`.
+Pipeline: `agavus publish` (dry run) /
+`agavus publish --bootstrap space/assets --repo OWNER/NAME --space OWNER/NAME`.
 HF bucket `Falconiere/agavus` available for private artifacts (corpus
 snapshots, future datasets). The **privacy policy governs everything**
 ([corpus/privacy.md](corpus/privacy.md)). Publishing is **eval-gated**: no
@@ -72,14 +73,36 @@ report**. A card without its eval report is incomplete and must not ship.
 
 ## Release sequence
 
-1. **Now**: nothing publishable (scaffold). Optionally reserve names as
-   empty private repos.
-2. **After classify + evals**: model repo (artifacts + report + card).
-3. **After answer/CLI**: public Space demo + Collection.
-4. **Datasets**: private only; public = synthetic gold sets at most.
-5. **Later**: GitHub Actions release workflow — HF token as secret,
-   publishes only on tagged releases with green evals (regression policy
-   from [evals.md](evals.md) applies to publishing too).
+1. ✅ **Done**: model repo (artifacts + report + card).
+2. ✅ **Done**: public Space demo.
+3. **Datasets**: private only; public = synthetic gold sets at most.
+4. ✅ **Done**: CI/CD on GitHub Actions — see below.
+
+## CI/CD (GitHub Actions)
+
+| Workflow | Trigger | Does |
+| ------------------- | ------------------------------ | ---------------------------------------------- |
+| `ci.yml` | pushes to `main`, PRs, manual | LGPD tracked-data guard, commit-message convention, `make check`, offline bootstrap + eval gate |
+| `release.yml` | tags `v*`, manual dispatch | tag/version check, `make check`, `uv build`, eval-gated HF publish, GitHub Release |
+
+- **Secret**: `HF_TOKEN` (write scope) covering
+  `Falconiere/agavus-classifier` and `Falconiere/agavus`.
+- **Release**: bump `pyproject.toml`, refresh `uv lock`, commit, then
+  `git tag v0.1.0 && git push origin v0.1.0`. The tag must equal the package
+  version; the run fails otherwise.
+- **Manual runs**: Actions → Release → Run workflow. `dry_run=true` stages
+  and eval-gates without uploading.
+- **Reproducible build**: `agavus publish --bootstrap space/assets` starts
+  from a clean data dir and imports only the bundled public-domain statutes
+  plus authored seeds — no network, no case data. A data dir holding case
+  records or non-statute texts is refused (LGPD).
+- **Pinned Space**: staging writes
+  `agavus @ git+<repo>@<tag>` into the Space requirements, so the app, the
+  installed engine, and the model artifact always match the release.
+- **Privacy scan**: every model and Space staging tree is scanned before
+  upload; the upload is blocked on any hit.
+- **No gate weakening**: the gold-set release gate runs in the same code
+  path locally, in CI, and before every upload.
 
 ## Rules
 

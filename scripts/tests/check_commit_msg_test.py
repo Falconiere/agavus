@@ -9,6 +9,10 @@ def test_valid_minimal_header() -> None:
   assert validate("feat(corpus): add DataJud ingestion\n") == []
 
 
+def test_publish_scope_allowed() -> None:
+  assert validate("feat(publish): add release staging\n") == []
+
+
 def test_valid_with_body_and_comments() -> None:
   message = "design(decide): narrow scope to F+M\n\n# comment line\nWhy: overlap.\n"
   assert validate(message) == []

@@ -33,8 +33,8 @@ Refs: docs/DESIGN.md §7        ← only for design commits
 ## Scopes (closed list)
 
 Domains: `corpus`, `taxonomy`, `classify`, `decide`, `retrieve`, `reason`,
-`answer`, `evals`, `config`, `greeting`. Cross-cutting: `docs`, `scripts`,
-`tooling`, `repo`.
+`answer`, `publish`, `evals`, `config`, `greeting`. Cross-cutting: `docs`,
+`scripts`, `tooling`, `repo`.
 
 One scope per commit; span two domains → split into two commits.
 
@@ -76,5 +76,8 @@ restating the diff.
 
 - Hook validates: type, scope, header ≤ 72, no trailing period, blank line
   before body, body lines ≤ 100. Conciseness of spirit is on us.
+- CI validates every message in the push/PR range
+  (`scripts/check_commit_range.py`), so the convention holds even where
+  hooks are not installed.
 - `Merge …` / `Revert …` pass through. History before this convention is
   grandfathered.

@@ -32,6 +32,11 @@ repos:
         language: system
         pass_filenames: false
         files: ^(src|scripts|space)/.*\.py$
+      - id: staged-data
+        name: no corpus data in git (LGPD)
+        entry: uv run python scripts/check_staged_data.py
+        language: system
+        files: ^data/
       - id: depcheck
         name: unused dependencies
         entry: uv run deptry src space

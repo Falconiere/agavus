@@ -62,6 +62,7 @@ known_first_party = [
   "check_sizes",
   "check_duplication",
   "check_commit_msg",
+  "check_commit_range",
   "check_staged_data",
   "pyutils",
 ]

@@ -17,6 +17,7 @@ SCOPES = (
   "retrieve",
   "reason",
   "answer",
+  "publish",
   "evals",
   "config",
   "greeting",
