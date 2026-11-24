@@ -5,7 +5,7 @@ from pathlib import Path
 
 from agavus.config.settings import Settings
 from agavus.corpus.httpfixtures import DATAJUD_HIT, json_handler, mock_client, text_handler
-from agavus.corpus.ingest import ingest_datajud, ingest_statutes
+from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
 from agavus.corpus.storage import CorpusStorage
 
 
@@ -40,3 +40,13 @@ def test_statutes_ingest_idempotent(tmp_path: Path) -> None:
   settings = _settings(tmp_path)
   assert ingest_statutes(settings, client=client) == expected_new
   assert ingest_statutes(settings, client=client) == 0
+
+
+def test_offline_statute_import(tmp_path: Path) -> None:
+  payload = tmp_path / "law.html"
+  payload.write_text("<p>Art. 1º Texto offline.</p>", encoding="utf-8")
+  settings = _settings(tmp_path)
+  assert import_statute_file(settings, "Lei 12.318/2010", payload) == 1
+  assert import_statute_file(settings, "Lei 12.318/2010", payload) == 0
+  storage = CorpusStorage(tmp_path)
+  assert storage.load_texts()[0].origin_ref == "Lei 12.318/2010, art. 1"

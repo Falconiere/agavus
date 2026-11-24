@@ -1,6 +1,7 @@
 """Ingestion orchestrators: fetch → parse → store → manifest → watermark."""
 
 from datetime import date
+from pathlib import Path
 
 import httpx
 
@@ -56,4 +57,27 @@ def ingest_statutes(settings: Settings, *, client: httpx.Client | None = None) -
     fetched += len(documents)
     new += sum(storage.save_text(document) for document in documents)
   storage.record_run(statutes.SOURCE, fetched, new, today, today)
+  return new
+
+
+def import_statute_file(settings: Settings, name: str, path: Path) -> int:
+  """Offline import of an already-fetched statute page (raw preserved).
+
+  For networks where direct egress is blocked: fetch via any authorized
+  tool, then import the payload. Same parsing, provenance, and idempotency
+  as the online path.
+  """
+  storage = CorpusStorage(settings.data_dir)
+  payload = path.read_bytes()
+  today = date.today()
+  raw_ref = storage.save_raw(
+    statutes.SOURCE,
+    today,
+    f"{name.replace('/', '-')}.html",
+    payload,
+    {"source": "offline-file", "path": str(path), "name": name},
+  )
+  documents = statutes.parse_statute(name, statutes.decode_html(payload), raw_ref)
+  new = sum(storage.save_text(document) for document in documents)
+  storage.record_run(statutes.SOURCE, len(documents), new, today, today)
   return new

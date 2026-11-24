@@ -2,10 +2,11 @@
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 from agavus.config.settings import Settings, load_settings
 from agavus.corpus.fetch import FetchError
-from agavus.corpus.ingest import ingest_datajud, ingest_statutes
+from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
 from agavus.corpus.storage import CorpusStorage
 from agavus.greeting.greet import greet
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
@@ -13,7 +14,14 @@ from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 DEFAULT_LIMIT = 500
 
 
-def _run_ingest(settings: Settings, source: str, limit: int) -> int:
+def _run_ingest(settings: Settings, source: str, limit: int, args: argparse.Namespace) -> int:
+  if source == "statutes" and args.raw_file is not None:
+    if not args.statute_name:
+      print("--raw-file requires --statute-name")
+      return 1
+    new = import_statute_file(settings, args.statute_name, Path(args.raw_file))
+    print(f"import {args.statute_name}: {new} new records")
+    return 0
   try:
     new = ingest_datajud(settings, limit) if source == "datajud" else ingest_statutes(settings)
   except FetchError as exc:
@@ -40,11 +48,13 @@ def main(argv: Sequence[str] | None = None) -> int:
   ingest = sub.add_parser("ingest", help="ingest corpus sources into the data dir")
   ingest.add_argument("--source", choices=("datajud", "statutes"), required=True)
   ingest.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
+  ingest.add_argument("--raw-file", default=None, help="offline statute payload path")
+  ingest.add_argument("--statute-name", default=None, help="e.g. 'Lei 12.318/2010'")
   sub.add_parser("label", help="label stored records (TPU + organ rules)")
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.command == "ingest":
-    return _run_ingest(settings, args.source, args.limit)
+    return _run_ingest(settings, args.source, args.limit, args)
   if args.command == "label":
     return _run_label(settings)
   print(greet(settings.name))
