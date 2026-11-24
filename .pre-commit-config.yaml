@@ -1,0 +1,46 @@
+# All hooks are local and run through uv: pure Python, no Node, no extra envs.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix src scripts
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format src scripts
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$
+      - id: duplication
+        name: duplication check
+        entry: uv run python scripts/check_duplication.py src scripts
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$
+      - id: sizes
+        name: function/file size limits
+        entry: uv run python scripts/check_sizes.py src scripts
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$
+      - id: depcheck
+        name: unused dependencies
+        entry: uv run deptry src
+        language: system
+        pass_filenames: false
+        files: ^(src/.*\.py|pyproject\.toml)$
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        files: ^(src|scripts)/.*\.py$

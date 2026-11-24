@@ -1,0 +1,13 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Local config
+.env
