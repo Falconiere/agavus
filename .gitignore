@@ -11,3 +11,6 @@ dist/
 
 # Local config
 .env
+
+# Web research cache
+.firecrawl/
