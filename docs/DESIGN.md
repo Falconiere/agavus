@@ -30,6 +30,29 @@ Constraints:
 Subtopics come from CNJ's **TPU** (Tabelas Processuais Unificadas) taxonomy,
 filtered to these domains.
 
+### Taxonomy nature: routing, not legal branches
+
+F/M/P is a **routing taxonomy** (which procedure, urgency, and corpus), not a
+taxonomy of legal branches:
+
+- *Direito penal* and *direito criminal* are synonyms — one domain (P).
+- **Maria da Penha (Lei 11.340/2006) is a hybrid special law**: penal facet
+  (art. 24-A, CP art. 129 §13, CPP art. 313 III), civil/família facet
+  (protective measures: removal from home, no-contact, temporary custody and
+  alimentos), and procedural autonomy (protective measures independent of any
+  criminal case — STJ case law, Lei 14.550/2023). TJDFT's specialized Varas de
+  Violência Doméstica e Familiar handle both facets.
+
+**Real overlap**: M↔F (guarda/alimentos inside protective measures) and M↔P
+(lesão corporal, ameaça, feminicídio) genuinely co-occur. Consequences:
+
+- Single-label routing resolves ambiguity through the **boundary region**:
+  mixed M/F matters are deferred (clarify/escalate), never forced into one class.
+- Evaluation watches the M↔F confusion cells explicitly (§8).
+- If TJDFT data shows frequent co-occurrence, evolve to **multi-label**
+  classification; the decision layer's expected-loss rule generalizes to
+  label sets without structural change.
+
 ## 3. Data sources (TJDFT only)
 
 | Source | Content | Use |
