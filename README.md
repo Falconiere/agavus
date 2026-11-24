@@ -136,17 +136,22 @@ agavus -p "Qual é o artigo da lei de alienação parental?"
 agavus classify --file peticao.txt --explain
 ```
 
-Available today (corpus phase):
+Available today (MVP — full chain live):
 
 ```sh
+uv run agavus -p "Qual é o artigo da lei de alienação parental?"
+# → cited excerpt of Lei 12.318/2010 + context + disclaimer (exit 0)
 uv run agavus ingest --source datajud --limit 500   # TJDFT metadata → data/
 uv run agavus ingest --source statutes              # Planalto articles → data/
-uv run agavus label                                 # TPU + organ labeling → labels.json
+uv run agavus label                                 # TPU + organ labeling
 uv run agavus train                                 # TF-IDF + logreg + calibration
 uv run agavus classify "ele descumpriu a medida protetiva"
 uv run agavus eval                                  # gold set + three-way decisions
 uv run agavus search "medida protetiva art. 22"       # BM25 + citation-weighted retrieval
 ```
+
+Exit codes for `-p`: 0 answered · 10 deferred (clarification) · 20 out of
+scope · 1 error.
 
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).
 Run them manually with `make hooks`.

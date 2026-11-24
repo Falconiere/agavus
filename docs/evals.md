@@ -123,6 +123,15 @@ model, almost everything is honestly deferred instead of guessed. The
 accuracy/coverage dial is visible: coverage grows with training data
 (DJEN decisions) and features, **never by weakening safety thresholds**.
 
+## Founding query milestone (2026-11-24)
+
+`agavus -p "Qual é o artigo da lei de alienação parental?"` → **accept**,
+verbatim Lei 12.318/2010 art. 1 excerpt + context refs + disclaimer, exit 0.
+Reached by adding provision-question seeds (data, not threshold tuning):
+before them the query sat at F 0.888 vs α_F 0.889 and was honestly deferred
+— the gate working as designed. Eval after: M-recall 1.00,
+precision-on-accepted 1.00, coverage 0.20.
+
 ## Investment decisions are eval-triggered
 
 LoRA/fine-tuning and tier upgrades are considered **only when a measured

@@ -1,8 +1,10 @@
 # CLI usage — how to use agavus
 
-Status: **design contract, not implemented yet**. The CLI is the product
-surface for both goals: asking questions and classifying documents.
-User-facing I/O is **pt-BR**; code and docs stay English.
+Status: **MVP implemented** — `-p`, `classify`, `search`, `train`, `eval`,
+`ingest`, `label` are live. `--explain` / `--json` remain planned.
+The CLI is the product surface for both goals: asking questions and
+classifying documents. User-facing I/O is **pt-BR**; code and docs stay
+English.
 
 ## Command surface
 

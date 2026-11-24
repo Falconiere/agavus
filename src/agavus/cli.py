@@ -4,6 +4,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from agavus.answer.compose import compose
 from agavus.classify.pipeline import train_classifier
 from agavus.classify.seed import SEED_QUERIES
 from agavus.classify.store import load_model, save_model
@@ -124,9 +125,27 @@ def _run_search(settings: Settings, query: str, limit: int) -> int:
   return 0
 
 
+def _run_ask(settings: Settings, question: str) -> int:
+  db_path = settings.data_dir / "models" / "models.db"
+  if not db_path.exists():
+    print("ask: no trained model — run `agavus train` first")
+    return 1
+  classifier = load_model(db_path, "classifier")
+  probs = classifier.predict_proba([question])[0]
+  mapping = {
+    label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)
+  }
+  answer = compose(question, mapping, CorpusStorage(settings.data_dir))
+  print(answer.text)
+  if answer.decision.startswith("accept-"):
+    return 0
+  return 10 if answer.decision == "defer" else 20
+
+
 def main(argv: Sequence[str] | None = None) -> int:
   """Entry point: no args greets; subcommands run corpus pipelines."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
+  parser.add_argument("-p", "--pergunta", default=None, help="ask a legal question")
   sub = parser.add_subparsers(dest="command")
   ingest = sub.add_parser("ingest", help="ingest corpus sources into the data dir")
   ingest.add_argument("--source", choices=("datajud", "statutes"), required=True)
@@ -143,6 +162,8 @@ def main(argv: Sequence[str] | None = None) -> int:
   search_cmd.add_argument("--limit", type=int, default=5)
   args = parser.parse_args(argv)
   settings = load_settings()
+  if args.pergunta is not None:
+    return _run_ask(settings, args.pergunta)
   handlers = {
     "ingest": lambda: _run_ingest(settings, args.source, args.limit, args),
     "label": lambda: _run_label(settings),

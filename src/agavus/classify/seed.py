@@ -19,6 +19,11 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("modificação de guarda por mudança de cidade", "F"),
   ("investigação de paternidade com exame de DNA", "F"),
   ("regulamentação de convivência dos avós", "F"),
+  ("qual artigo da lei trata da alienação parental", "F"),
+  ("que lei fala sobre guarda compartilhada dos filhos", "F"),
+  ("onde está previsto o direito a alimentos na lei", "F"),
+  ("qual lei define a alienação parental no brasil", "F"),
+  ("artigo sobre guarda e visitação dos filhos", "F"),
   # M — violência doméstica (colloquial)
   ("meu marido me agrediu e quero medida protetiva", "M"),
   ("ele quebrou minhas coisas e me ameaçou em casa", "M"),
@@ -32,6 +37,8 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("medida protetiva para minha filha adolescente", "M"),
   ("agressão física dentro de casa, lesão corporal", "M"),
   ("ele humilha e xinga na frente das crianças", "M"),
+  ("qual artigo da lei maria da penha trata das medidas protetivas", "M"),
+  ("que lei pune a violência doméstica contra a mulher", "M"),
   # O — fora do escopo (penal geral, trabalhista, consumidor…)
   ("fui preso em flagrante por roubo, qual a pena", "O"),
   ("tráfico de drogas, como funciona a audiência de custódia", "O"),
@@ -41,4 +48,6 @@ SEED_QUERIES: tuple[tuple[str, str], ...] = (
   ("juros abusivos no cartão de crédito", "O"),
   ("acidente de trânsito, seguro não quer pagar", "O"),
   ("aposentadoria negada pelo INSS", "O"),
+  ("qual artigo do código penal trata do homicídio", "O"),
+  ("o que diz a CLT sobre férias do trabalhador", "O"),
 )

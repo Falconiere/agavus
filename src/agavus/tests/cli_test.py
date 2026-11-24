@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from agavus import cli
+from agavus.answer.compose import Answer
 from agavus.corpus.fetch import FetchError
 
 
@@ -63,3 +64,27 @@ def test_train_seeds_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_classify_without_model_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
   assert _run_with_data_dir(monkeypatch, tmp_path, ["classify", "texto"]) == 1
+
+
+def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  (tmp_path / "models").mkdir()
+  (tmp_path / "models" / "models.db").touch()
+
+  class FakeModel:
+    classes = ("F", "M", "O")
+
+  class FakeClassifier:
+    model = FakeModel()
+
+    def predict_proba(self, texts: list[str]) -> list[list[float]]:
+      return [[0.3, 0.3, 0.4]]
+
+  monkeypatch.setattr(cli, "load_model", lambda path, name: FakeClassifier())
+  answers = {
+    "accept-M": Answer("accept-M", "resposta", ("fonte",)),
+    "defer": Answer("defer", "clarify", ()),
+    "reject": Answer("reject", "fora", ()),
+  }
+  for decision, expected_code in (("accept-M", 0), ("defer", 10), ("reject", 20)):
+    monkeypatch.setattr(cli, "compose", lambda q, p, s, a=answers[decision]: a)
+    assert _run_with_data_dir(monkeypatch, tmp_path, ["-p", "pergunta"]) == expected_code

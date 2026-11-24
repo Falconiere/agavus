@@ -14,6 +14,7 @@ def sample_text(
   doc_id: str = "t1",
   text: str = "trecho sintético",
   origin_ref: str = "Lei 12.318/2010, art. 2",
+  citations: tuple[str, ...] = (),
 ) -> TextDocument:
   """One synthetic text document for tests across domains."""
   return TextDocument(
@@ -22,7 +23,7 @@ def sample_text(
     origin_ref=origin_ref,
     published_at=None,
     text=text,
-    citations=(),
+    citations=citations,
     domain_label=None,
     label_source=LabelSource.PENDING,
     raw_ref="raw/x.html",

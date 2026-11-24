@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from agavus.corpus.records import LabelSource, TextDocument, TextSource
+from agavus.corpus.httpfixtures import sample_text
 from agavus.corpus.storage import CorpusStorage
 from agavus.retrieve.search import match_expression, search
 
@@ -10,27 +10,15 @@ from agavus.retrieve.search import match_expression, search
 def _corpus(tmp_path: Path) -> CorpusStorage:
   storage = CorpusStorage(tmp_path)
   docs = [
-    TextDocument(
-      id="d1",
-      source=TextSource.STATUTE,
+    sample_text(
+      doc_id="d1",
       origin_ref="Lei 11.340/2006, art. 22",
-      published_at=None,
       text="A medida protetiva de urgência poderá ser concedida pelo juiz.",
       citations=("art. 22",),
-      domain_label=None,
-      label_source=LabelSource.PENDING,
-      raw_ref="raw/x.html",
     ),
-    TextDocument(
-      id="d2",
-      source=TextSource.STATUTE,
-      origin_ref="Lei 12.318/2010, art. 2",
-      published_at=None,
+    sample_text(
+      doc_id="d2",
       text="Considera-se ato de alienação parental a interferência psicológica.",
-      citations=(),
-      domain_label=None,
-      label_source=LabelSource.PENDING,
-      raw_ref="raw/y.html",
     ),
   ]
   for document in docs:
