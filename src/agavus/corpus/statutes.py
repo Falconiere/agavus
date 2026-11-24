@@ -67,8 +67,14 @@ def decode_html(payload: bytes) -> str:
 
 
 def html_to_text(html: str) -> str:
-  """Strip markup, keeping line structure for article segmentation."""
-  return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
+  """Strip markup; drop revoked (line-through) text; keep line structure."""
+  soup = BeautifulSoup(html, "html.parser")
+  for tag in soup.find_all(["s", "strike", "del"]):
+    tag.decompose()
+  for tag in soup.find_all(style=re.compile(r"line-through", re.IGNORECASE)):
+    tag.decompose()
+  text = soup.get_text("\n", strip=True).replace("\r", "")
+  return re.sub(r"(?m)^(Art\.?\s*[\d.\-A-Za-z]+)\n([ºo°])$", r"\1\2", text)
 
 
 def segment_articles(text: str) -> list[tuple[str, str]]:

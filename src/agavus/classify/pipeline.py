@@ -53,6 +53,18 @@ class TrainedClassifier:
     rows = self.vectorizer.transform(texts)
     return softmax(apply_temperature(self.model.logits(rows), self.temperature))
 
+  def top_features(self, text: str, k: int = 5) -> list[tuple[str, float]]:
+    """Largest logit contributions to the winning class (auditability)."""
+    row = self.vectorizer.transform([text])[0]
+    winner = int(self.predict_proba([text])[0].argmax())
+    inverse = {index: term for term, index in self.vectorizer.vocab.items()}
+    contributions = [
+      (inverse[index], value * float(self.model.weights[index][winner]))
+      for index, value in row.items()
+    ]
+    contributions.sort(key=lambda pair: -abs(pair[1]))
+    return contributions[:k]
+
 
 def train_classifier(
   texts: Sequence[str],

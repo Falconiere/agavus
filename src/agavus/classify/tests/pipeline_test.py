@@ -49,3 +49,12 @@ def test_degenerate_inputs_raise() -> None:
     train_classifier(["a"], ["F"])
   with pytest.raises(ValueError):
     train_classifier(["a", "b"], ["F", "F"])
+
+
+def test_top_features_attributable() -> None:
+  classifier, _ = train_classifier(
+    TEXTS, LABELS, vectorizer_config=VectorizerConfig(min_df=1, char_sizes=())
+  )
+  features = classifier.top_features("violência doméstica protetiva")
+  assert features
+  assert all(isinstance(term, str) and isinstance(value, float) for term, value in features)

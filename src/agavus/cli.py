@@ -1,11 +1,17 @@
-"""CLI: greeting by default; `ingest` and `label` subcommands."""
+"""CLI: greeting by default; corpus, model, and answer subcommands.
+
+Global flags: --explain (decision trace) and --json (typed output),
+per docs/cli.md. Exit codes for -p: 0 accept · 10 defer · 20 reject · 1 error.
+"""
 
 import argparse
+import json
 from collections.abc import Sequence
+from dataclasses import asdict
 from pathlib import Path
 
 from agavus.answer.compose import compose
-from agavus.classify.pipeline import train_classifier
+from agavus.classify.pipeline import TrainedClassifier, train_classifier
 from agavus.classify.seed import SEED_QUERIES
 from agavus.classify.store import load_model, save_model
 from agavus.config.settings import Settings, load_settings
@@ -20,6 +26,40 @@ from agavus.retrieve.search import search
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
 DEFAULT_LIMIT = 500
+
+
+def _print_json(payload: dict[str, object]) -> None:
+  print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _probabilities(classifier: TrainedClassifier, text: str) -> dict[str, float]:
+  probs = classifier.predict_proba([text])[0]
+  return {label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)}
+
+
+def _trace(
+  classifier: TrainedClassifier, text: str, mapping: dict[str, float]
+) -> dict[str, object]:
+  return {
+    "probabilities": mapping,
+    "expected_losses": decide(mapping).expected_losses,
+    "top_features": [
+      {"term": term, "contribution": value} for term, value in classifier.top_features(text)
+    ],
+  }
+
+
+def _print_trace(classifier: TrainedClassifier, text: str, mapping: dict[str, float]) -> None:
+  trace = _trace(classifier, text, mapping)
+  losses = trace["expected_losses"]
+  features = trace["top_features"]
+  print("-- explain --")
+  print("probabilities: " + " · ".join(f"{k} {v:.3f}" for k, v in mapping.items()))
+  if isinstance(losses, dict):
+    print("expected losses: " + " · ".join(f"{k} {v:.2f}" for k, v in losses.items()))
+  if isinstance(features, list):
+    rendered = ", ".join(f"{f['term']} ({f['contribution']:+.2f})" for f in features)
+    print(f"top features: {rendered}")
 
 
 def _run_ingest(settings: Settings, source: str, limit: int, args: argparse.Namespace) -> int:
@@ -75,33 +115,47 @@ def _run_train(settings: Settings) -> int:
   return 0
 
 
-def _run_classify(settings: Settings, text: str) -> int:
+def _load_classifier(settings: Settings, command: str) -> TrainedClassifier | None:
   db_path = settings.data_dir / "models" / "models.db"
   if not db_path.exists():
-    print("classify: no trained model — run `agavus train` first")
+    print(f"{command}: no trained model — run `agavus train` first")
+    return None
+  return load_model(db_path, "classifier")
+
+
+def _run_classify(settings: Settings, text: str, explain: bool, as_json: bool) -> int:
+  classifier = _load_classifier(settings, "classify")
+  if classifier is None:
     return 1
-  classifier = load_model(db_path, "classifier")
-  probs = classifier.predict_proba([text])[0]
-  pairs = sorted(zip(classifier.model.classes, probs, strict=True), key=lambda p: -p[1])
-  rendered = " · ".join(f"{label} {prob:.3f}" for label, prob in pairs)
-  decision = decide({label: float(prob) for label, prob in pairs})
+  mapping = _probabilities(classifier, text)
+  decision = decide(mapping)
+  if as_json:
+    payload: dict[str, object] = {"probabilities": mapping, "decision": decision.action}
+    if explain:
+      payload["trace"] = _trace(classifier, text, mapping)
+    _print_json(payload)
+    return 0
+  rendered = " · ".join(f"{label} {prob:.3f}" for label, prob in mapping.items())
   print(f"classify: {rendered}")
   print(f"decision: {decision.action}")
+  if explain:
+    _print_trace(classifier, text, mapping)
   return 0
 
 
-def _run_eval(settings: Settings) -> int:
-  db_path = settings.data_dir / "models" / "models.db"
-  if not db_path.exists():
-    print("eval: no trained model — run `agavus train` first")
+def _run_eval(settings: Settings, as_json: bool) -> int:
+  classifier = _load_classifier(settings, "eval")
+  if classifier is None:
     return 1
-  classifier = load_model(db_path, "classifier")
   probs = classifier.predict_proba([item.text for item in ROUTING_V1])
   mappings = [
     {label: float(value) for label, value in zip(classifier.model.classes, row, strict=True)}
     for row in probs
   ]
   report = evaluate(mappings, ROUTING_V1)
+  if as_json:
+    _print_json({"gold_version": GOLD_VERSION, **asdict(report)})
+    return 0
   print(
     f"eval ({GOLD_VERSION}, {len(ROUTING_V1)} items): "
     f"acc {report.accuracy:.2f} · F1 {report.macro_f1:.2f} · M-recall {report.m_recall:.2f}\n"
@@ -113,9 +167,12 @@ def _run_eval(settings: Settings) -> int:
   return 0
 
 
-def _run_search(settings: Settings, query: str, limit: int) -> int:
+def _run_search(settings: Settings, query: str, limit: int, as_json: bool) -> int:
   storage = CorpusStorage(settings.data_dir)
   hits = search(storage, query, limit=limit)
+  if as_json:
+    _print_json({"hits": [asdict(hit) for hit in hits]})
+    return 0
   if not hits:
     print("search: no hits — ingest + label + rebuild the corpus first")
     return 0
@@ -125,19 +182,29 @@ def _run_search(settings: Settings, query: str, limit: int) -> int:
   return 0
 
 
-def _run_ask(settings: Settings, question: str) -> int:
-  db_path = settings.data_dir / "models" / "models.db"
-  if not db_path.exists():
-    print("ask: no trained model — run `agavus train` first")
+def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) -> int:
+  classifier = _load_classifier(settings, "ask")
+  if classifier is None:
     return 1
-  classifier = load_model(db_path, "classifier")
-  probs = classifier.predict_proba([question])[0]
-  mapping = {
-    label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)
-  }
+  mapping = _probabilities(classifier, question)
   answer = compose(question, mapping, CorpusStorage(settings.data_dir))
-  print(answer.text)
-  if answer.decision.startswith("accept-"):
+  accepted = answer.decision.startswith("accept-")
+  if as_json:
+    payload: dict[str, object] = {
+      "decision": answer.decision,
+      "area": answer.decision.removeprefix("accept-") if accepted else None,
+      "confidence": max(mapping.values()),
+      "text": answer.text,
+      "sources": [{"ref": ref} for ref in answer.sources],
+    }
+    if explain:
+      payload["trace"] = _trace(classifier, question, mapping)
+    _print_json(payload)
+  else:
+    print(answer.text)
+    if explain:
+      _print_trace(classifier, question, mapping)
+  if accepted:
     return 0
   return 10 if answer.decision == "defer" else 20
 
@@ -146,31 +213,42 @@ def main(argv: Sequence[str] | None = None) -> int:
   """Entry point: no args greets; subcommands run corpus pipelines."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
   parser.add_argument("-p", "--pergunta", default=None, help="ask a legal question")
+  parser.add_argument("--explain", action="store_true", help="show the decision trace")
+  parser.add_argument("--json", action="store_true", dest="as_json", help="typed JSON output")
+  common = argparse.ArgumentParser(add_help=False)
+  common.add_argument("--explain", action="store_true", default=argparse.SUPPRESS)
+  common.add_argument("--json", action="store_true", dest="as_json", default=argparse.SUPPRESS)
   sub = parser.add_subparsers(dest="command")
-  ingest = sub.add_parser("ingest", help="ingest corpus sources into the data dir")
+  ingest = sub.add_parser(
+    "ingest", parents=[common], help="ingest corpus sources into the data dir"
+  )
   ingest.add_argument("--source", choices=("datajud", "statutes"), required=True)
   ingest.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
   ingest.add_argument("--raw-file", default=None, help="offline statute payload path")
   ingest.add_argument("--statute-name", default=None, help="e.g. 'Lei 12.318/2010'")
-  sub.add_parser("label", help="label stored records (TPU + organ rules)")
-  sub.add_parser("train", help="train the classifier on labeled texts")
-  classify = sub.add_parser("classify", help="classify a text with the trained model")
+  sub.add_parser("label", parents=[common], help="label stored records (TPU + organ rules)")
+  sub.add_parser("train", parents=[common], help="train the classifier on labeled texts")
+  classify = sub.add_parser(
+    "classify", parents=[common], help="classify a text with the trained model"
+  )
   classify.add_argument("text")
-  sub.add_parser("eval", help="evaluate the trained model on the gold set")
-  search_cmd = sub.add_parser("search", help="BM25 + citation search over the corpus")
+  sub.add_parser("eval", parents=[common], help="evaluate the trained model on the gold set")
+  search_cmd = sub.add_parser(
+    "search", parents=[common], help="BM25 + citation search over the corpus"
+  )
   search_cmd.add_argument("query")
   search_cmd.add_argument("--limit", type=int, default=5)
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.pergunta is not None:
-    return _run_ask(settings, args.pergunta)
+    return _run_ask(settings, args.pergunta, args.explain, args.as_json)
   handlers = {
     "ingest": lambda: _run_ingest(settings, args.source, args.limit, args),
     "label": lambda: _run_label(settings),
     "train": lambda: _run_train(settings),
-    "classify": lambda: _run_classify(settings, args.text),
-    "eval": lambda: _run_eval(settings),
-    "search": lambda: _run_search(settings, args.query, args.limit),
+    "classify": lambda: _run_classify(settings, args.text, args.explain, args.as_json),
+    "eval": lambda: _run_eval(settings, args.as_json),
+    "search": lambda: _run_search(settings, args.query, args.limit, args.as_json),
   }
   handler = handlers.get(args.command)
   if handler is not None:

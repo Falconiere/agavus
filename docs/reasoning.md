@@ -21,10 +21,8 @@ verifiable, broken chains defer. Companion: [tiny-llm.md](tiny-llm.md).
 
 ## Known limitations (honest list)
 
-1. **Revoked text not flagged**: compilado pages include struck-through
-   (revoked) penalties; extraction is text-level, so old and current penalty
-   appear together with amendment notes. Fix: HTML-aware extraction that
-   drops/excludes `text-decoration:line-through` spans.
+1. ~~Revoked text not flagged~~ **resolved**: extraction now drops
+   `line-through`/`s`/`strike`/`del` content; only current text is quoted.
 2. Rule coverage is tiny (2 rules); growth is human-reviewed curation.
 3. Citation graph / temporal reasoning / analogy retrieval: not yet built.
 

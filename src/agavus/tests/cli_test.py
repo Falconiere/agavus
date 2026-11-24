@@ -1,5 +1,6 @@
 """Tests for the CLI (tests folder; ingestion mocked, no network)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,20 @@ import pytest
 from agavus import cli
 from agavus.answer.compose import Answer
 from agavus.corpus.fetch import FetchError
+
+
+class FakeModel:
+  classes = ("F", "M", "O")
+
+
+class FakeClassifier:
+  model = FakeModel()
+
+  def predict_proba(self, texts: list[str]) -> list[list[float]]:
+    return [[0.3, 0.3, 0.4]]
+
+  def top_features(self, text: str, k: int = 5) -> list[tuple[str, float]]:
+    return [("protetiva", 1.0)]
 
 
 def test_default_greets(capsys: pytest.CaptureFixture[str]) -> None:
@@ -66,20 +81,14 @@ def test_classify_without_model_fails(tmp_path: Path, monkeypatch: pytest.Monkey
   assert _run_with_data_dir(monkeypatch, tmp_path, ["classify", "texto"]) == 1
 
 
-def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _prepare_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
   (tmp_path / "models").mkdir()
   (tmp_path / "models" / "models.db").touch()
-
-  class FakeModel:
-    classes = ("F", "M", "O")
-
-  class FakeClassifier:
-    model = FakeModel()
-
-    def predict_proba(self, texts: list[str]) -> list[list[float]]:
-      return [[0.3, 0.3, 0.4]]
-
   monkeypatch.setattr(cli, "load_model", lambda path, name: FakeClassifier())
+
+
+def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _prepare_model(tmp_path, monkeypatch)
   answers = {
     "accept-M": Answer("accept-M", "resposta", ("fonte",)),
     "defer": Answer("defer", "clarify", ()),
@@ -88,3 +97,19 @@ def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
   for decision, expected_code in (("accept-M", 0), ("defer", 10), ("reject", 20)):
     monkeypatch.setattr(cli, "compose", lambda q, p, s, a=answers[decision]: a)
     assert _run_with_data_dir(monkeypatch, tmp_path, ["-p", "pergunta"]) == expected_code
+
+
+def test_ask_json_output(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+  _prepare_model(tmp_path, monkeypatch)
+  monkeypatch.setattr(
+    cli, "compose", lambda q, p, s: Answer("accept-M", "resposta", ("Lei 11.340/2006, art. 22",))
+  )
+  code = _run_with_data_dir(monkeypatch, tmp_path, ["-p", "pergunta", "--json", "--explain"])
+  assert code == 0
+  payload = json.loads(capsys.readouterr().out)
+  assert payload["decision"] == "accept-M"
+  assert payload["area"] == "M"
+  assert payload["sources"] == [{"ref": "Lei 11.340/2006, art. 22"}]
+  assert "trace" in payload

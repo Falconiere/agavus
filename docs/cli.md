@@ -1,7 +1,9 @@
 # CLI usage — how to use agavus
 
-Status: **MVP implemented** — `-p`, `classify`, `search`, `train`, `eval`,
-`ingest`, `label` are live. `--explain` / `--json` remain planned.
+Status: **implemented** — `-p`, `classify`, `search`, `train`, `eval`,
+`ingest`, `label` are live, with `--explain` (decision trace: probabilities,
+expected losses, top features) and `--json` (typed output) accepted before
+or after subcommands.
 The CLI is the product surface for both goals: asking questions and
 classifying documents. User-facing I/O is **pt-BR**; code and docs stay
 English.

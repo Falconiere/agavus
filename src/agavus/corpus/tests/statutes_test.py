@@ -89,3 +89,22 @@ def test_decode_cp1252_fallback() -> None:
 def test_decode_utf16_bom() -> None:
   payload = "Art. 24-A. Descumprir medida protetiva.".encode("utf-16")
   assert "Art. 24-A" in decode_html(payload)
+
+
+def test_revoked_text_excluded() -> None:
+  html = (
+    "<p>Art. 24-A. Texto atual.</p>"
+    '<p><span style="text-decoration:line-through">Pena revogada antiga.</span></p>'
+    "<p><s>Riscado também.</s></p>"
+  )
+  text = html_to_text(html)
+  assert "Texto atual" in text
+  assert "revogada" not in text
+  assert "Riscado" not in text
+
+
+def test_ordinal_joined_and_cr_stripped() -> None:
+  html = "<p>Art. 2</p><p>o</p><p>Texto\r\nda lei.</p>"
+  text = html_to_text(html)
+  assert "Art. 2o" in text
+  assert "\r" not in text
