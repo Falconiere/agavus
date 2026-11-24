@@ -8,7 +8,7 @@ All case sources are filtered to **TJDFT** and to the
 | DataJud API (CNJ) | case metadata + TPU classe/assuntos | labels, features | public API, filter `tribunal = TJDFT` |
 | DJEN | full-text decisions, national diary | training text, retrieval | filter by tribunal + date |
 | TJDFT jurisprudence portal | acórdãos/decisões search | retrieval supplement | public web search |
-| Planalto / LexML | statutes (CP, CC Livro IV, Lei 11.340/2006…) | retrieval backbone | public, **not windowed** |
+| Planalto / LexML | statutes (CC Livro IV, Lei 11.340/2006, Lei 12.318/2010 — alienação parental…) | retrieval backbone | public, **not windowed** |
 
 ## What each contributes
 

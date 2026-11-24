@@ -242,3 +242,11 @@ storage, area-parameterized pipelines.
 
 All modules follow repo rules: strict types, co-located tests, 2 spaces,
 size limits, zero duplication, `make check` green.
+
+## 10. CLI usage contract
+
+The product surface is defined in **[docs/cli.md](cli.md)**:
+`agavus -p "pergunta"` (ask → classify → decide → retrieve → cited excerpt),
+`agavus classify` for documents, `--explain` auditability trace, `--json`
+typed output, scriptable exit codes (0 accept / 10 defer / 20 reject).
+pt-BR user I/O; fixed no-legal-advice disclaimer; sources never empty.

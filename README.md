@@ -119,6 +119,14 @@ uv run agavus       # -> Hello, world!
 AGAVUS_NAME=Brasil uv run agavus   # -> Hello, Brasil!
 ```
 
+Planned product CLI (contract in [docs/cli.md](docs/cli.md)):
+
+```sh
+agavus -p "Qual é o artigo da lei de alienação parental?"
+# → cited excerpt of Lei 12.318/2010, art. 2º + source + disclaimer
+agavus classify --file peticao.txt --explain
+```
+
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).
 Run them manually with `make hooks`.
 
