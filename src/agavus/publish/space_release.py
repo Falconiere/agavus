@@ -17,6 +17,7 @@ AGAVUS_REPO = "https://github.com/Falconiere/agavus.git"
 SPACE_FILES = ("app.py", "README.md")
 REVISION_RE = re.compile(r"[A-Za-z0-9._/-]+")
 IGNORE_PATTERNS = ["__pycache__", "*.pyc", ".pytest_cache", "tests"]
+DELETE_PATTERNS = ["*.pyc", "__pycache__", "__pycache__/*", "tests", "tests/*", "__init__.py"]
 
 
 def stage_space(space_dir: Path, staging: Path, revision: str) -> Path:
@@ -45,5 +46,6 @@ def upload_space(staging: Path, repo: str) -> str:
     folder_path=str(staging),
     repo_type="space",
     ignore_patterns=IGNORE_PATTERNS,
+    delete_patterns=DELETE_PATTERNS,
   )
   return f"https://huggingface.co/spaces/{repo}"

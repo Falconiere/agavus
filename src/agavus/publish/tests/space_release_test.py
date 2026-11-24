@@ -13,7 +13,7 @@ class FakeApi:
 
   def __init__(self) -> None:
     self.created: list[tuple[str, str, str | None]] = []
-    self.uploaded: list[tuple[str, str, list[str]]] = []
+    self.uploaded: list[tuple[str, str, str, dict[str, object]]] = []
 
   def create_repo(
     self, repo: str, *, repo_type: str, space_sdk: str | None = None, exist_ok: bool = False
@@ -21,9 +21,9 @@ class FakeApi:
     self.created.append((repo, repo_type, space_sdk))
 
   def upload_folder(
-    self, *, repo_id: str, folder_path: str, repo_type: str, ignore_patterns: list[str]
+    self, *, repo_id: str, folder_path: str, repo_type: str, **kwargs: object
   ) -> None:
-    self.uploaded.append((repo_id, folder_path, ignore_patterns))
+    self.uploaded.append((repo_id, folder_path, repo_type, kwargs))
 
 
 def _demo(tmp_path: Path) -> Path:
@@ -58,4 +58,14 @@ def test_upload_space_creates_gradio_repo(tmp_path: Path, monkeypatch: pytest.Mo
   url = upload_space(staging, "Falconiere/agavus")
   assert url == "https://huggingface.co/spaces/Falconiere/agavus"
   assert fake.created == [("Falconiere/agavus", "space", "gradio")]
-  assert fake.uploaded == [("Falconiere/agavus", str(staging), space_release.IGNORE_PATTERNS)]
+  assert fake.uploaded == [
+    (
+      "Falconiere/agavus",
+      str(staging),
+      "space",
+      {
+        "ignore_patterns": space_release.IGNORE_PATTERNS,
+        "delete_patterns": space_release.DELETE_PATTERNS,
+      },
+    )
+  ]
