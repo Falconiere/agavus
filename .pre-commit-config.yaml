@@ -4,46 +4,46 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: uv run ruff check --fix src scripts
+        entry: uv run ruff check --fix src scripts space
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format src scripts
+        entry: uv run ruff format src scripts space
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: mypy
         name: mypy (strict)
         entry: uv run mypy
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: duplication
         name: duplication check
-        entry: uv run python scripts/check_duplication.py src scripts
+        entry: uv run python scripts/check_duplication.py src scripts space
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: sizes
         name: function/file size limits
-        entry: uv run python scripts/check_sizes.py src scripts
+        entry: uv run python scripts/check_sizes.py src scripts space
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: depcheck
         name: unused dependencies
-        entry: uv run deptry src
+        entry: uv run deptry src space
         language: system
         pass_filenames: false
-        files: ^(src/.*\.py|pyproject\.toml)$
+        files: ^(src/.*\.py|space/.*\.py|pyproject\.toml)$
       - id: pytest
         name: pytest
         entry: uv run pytest
         language: system
         pass_filenames: false
-        files: ^(src|scripts)/.*\.py$
+        files: ^(src|scripts|space)/.*\.py$
       - id: commit-msg
         name: commit message convention
         entry: uv run python scripts/check_commit_msg.py

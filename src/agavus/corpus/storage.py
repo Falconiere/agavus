@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 from agavus.corpus import db
 from agavus.corpus.db import RunEntry
 from agavus.corpus.records import CaseRecord, TextDocument
-from agavus.taxonomy.labeling import LabelDecision
+from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
 
 class Manifest(TypedDict):
@@ -135,6 +135,13 @@ class CorpusStorage:
     """All derived label decisions."""
     with closing(db.connect(self.root)) as conn:
       return db.select_labels(conn)
+
+  def run_labeling(self) -> list[LabelDecision]:
+    """Label all stored records and persist the derived decisions."""
+    decisions = [label_case(record) for record in self.load_cases()]
+    decisions += [label_text(document) for document in self.load_texts()]
+    self.save_labels(decisions)
+    return decisions
 
   def search_texts(self, query: str, limit: int = 10) -> list[tuple[str, float]]:
     """BM25-ranked text ids (FTS5)."""

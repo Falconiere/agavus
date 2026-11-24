@@ -18,6 +18,8 @@ from agavus.classify.calibrate import (
 )
 from agavus.classify.features import TfidfVectorizer, VectorizerConfig
 from agavus.classify.model import LogRegModel, TrainConfig, softmax, train_logreg
+from agavus.classify.seed import SEED_QUERIES
+from agavus.corpus.storage import CorpusStorage
 from agavus.evals.metrics import accuracy, macro_f1
 
 FloatArray = NDArray[np.float64]
@@ -64,6 +66,21 @@ class TrainedClassifier:
     ]
     contributions.sort(key=lambda pair: -abs(pair[1]))
     return contributions[:k]
+
+
+def training_set(storage: CorpusStorage) -> tuple[list[str], list[str]]:
+  """Labeled corpus texts + authored seeds (shared by CLI and Space)."""
+  labels = {decision.record_id: decision for decision in storage.load_labels()}
+  texts: list[str] = []
+  targets: list[str] = []
+  for document in storage.load_texts():
+    decision = labels.get(document.id)
+    if decision is not None and decision.domain_label is not None:
+      texts.append(document.text)
+      targets.append(decision.domain_label)
+  texts += [text for text, _ in SEED_QUERIES]
+  targets += [label for _, label in SEED_QUERIES]
+  return texts, targets
 
 
 def train_classifier(

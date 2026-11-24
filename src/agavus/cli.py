@@ -11,8 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from agavus.answer.compose import compose
-from agavus.classify.pipeline import TrainedClassifier, train_classifier
-from agavus.classify.seed import SEED_QUERIES
+from agavus.classify.pipeline import TrainedClassifier, train_classifier, training_set
 from agavus.classify.store import load_model, save_model
 from agavus.config.settings import Settings, load_settings
 from agavus.corpus.fetch import FetchError
@@ -24,7 +23,6 @@ from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
 from agavus.publish.export import stage_release, upload
 from agavus.retrieve.search import search
-from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
 DEFAULT_LIMIT = 500
 
@@ -82,9 +80,7 @@ def _run_ingest(settings: Settings, source: str, limit: int, args: argparse.Name
 
 def _run_label(settings: Settings) -> int:
   storage = CorpusStorage(settings.data_dir)
-  decisions: list[LabelDecision] = [label_case(record) for record in storage.load_cases()]
-  decisions += [label_text(document) for document in storage.load_texts()]
-  storage.save_labels(decisions)
+  decisions = storage.run_labeling()
   review = sum(decision.needs_review for decision in decisions)
   print(f"label: {len(decisions)} records, {review} to review")
   return 0
@@ -92,16 +88,7 @@ def _run_label(settings: Settings) -> int:
 
 def _run_train(settings: Settings) -> int:
   storage = CorpusStorage(settings.data_dir)
-  labels = {decision.record_id: decision for decision in storage.load_labels()}
-  texts: list[str] = []
-  targets: list[str] = []
-  for document in storage.load_texts():
-    decision = labels.get(document.id)
-    if decision is not None and decision.domain_label is not None:
-      texts.append(document.text)
-      targets.append(decision.domain_label)
-  texts += [text for text, _ in SEED_QUERIES]
-  targets += [label for _, label in SEED_QUERIES]
+  texts, targets = training_set(storage)
   if not texts:
     print("train: no labeled texts — run ingest + label first")
     return 1

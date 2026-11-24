@@ -1,0 +1,2 @@
+agavus @ git+https://github.com/Falconiere/agavus.git
+gradio

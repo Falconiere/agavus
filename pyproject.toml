@@ -18,7 +18,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.8", "mypy>=1.13", "deptry>=0.20", "pre-commit>=4.0"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "deptry>=0.20",
+    "pre-commit>=4.0",
+    "gradio>=6.32.0",
+]
 
 [project.scripts]
 agavus = "agavus.cli:main"
@@ -30,7 +37,7 @@ packages = ["src/agavus"]
 line-length = 100
 indent-width = 2
 target-version = "py312"
-src = ["src", "scripts"]
+src = ["src", "scripts", "space"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "ANN", "B", "C4", "SIM", "PL", "RUF"]
@@ -40,17 +47,18 @@ indent-style = "space"
 
 [tool.mypy]
 strict = true
-files = ["src", "scripts"]
+files = ["src", "scripts", "space"]
 mypy_path = "src:scripts"
 
 [tool.pytest.ini_options]
-testpaths = ["src", "scripts"]
+testpaths = ["src", "scripts", "space"]
 pythonpath = ["scripts"]
 addopts = "-q"
 
 [tool.deptry]
 known_first_party = [
   "agavus",
+  "space",
   "check_sizes",
   "check_duplication",
   "check_commit_msg",

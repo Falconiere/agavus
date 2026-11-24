@@ -6,24 +6,24 @@ install:
 	uv run pre-commit install
 
 lint:
-	uv run ruff check src scripts
-	uv run ruff format --check src scripts
+	uv run ruff check src scripts space
+	uv run ruff format --check src scripts space
 
 format:
-	uv run ruff format src scripts
-	uv run ruff check --fix src scripts
+	uv run ruff format src scripts space
+	uv run ruff check --fix src scripts space
 
 typecheck:
 	uv run mypy
 
 dupcheck:
-	uv run python scripts/check_duplication.py src scripts
+	uv run python scripts/check_duplication.py src scripts space
 
 depcheck:
-	uv run deptry src
+	uv run deptry src space
 
 sizes:
-	uv run python scripts/check_sizes.py src scripts
+	uv run python scripts/check_sizes.py src scripts space
 
 test:
 	uv run pytest
