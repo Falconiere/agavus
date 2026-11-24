@@ -144,6 +144,7 @@ uv run agavus ingest --source statutes              # Planalto articles → data
 uv run agavus label                                 # TPU + organ labeling → labels.json
 uv run agavus train                                 # TF-IDF + logreg + calibration
 uv run agavus classify "ele descumpriu a medida protetiva"
+uv run agavus eval                                  # gold set + three-way decisions
 ```
 
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).

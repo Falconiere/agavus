@@ -110,6 +110,19 @@ Interpretation: low-confidence and ambiguous cases are **exactly what the
 three-way decide gate must defer** — the probabilities are now meaningful
 inputs for it. Next: `decide/` + gold-set evaluation (`agavus eval`).
 
+## First decision-layer eval (2026-11-24, routing-v1)
+
+`agavus eval` with the three-way gate active:
+
+- acc 0.90 · macro-F1 0.85 · **M-recall 1.00** (safety target ≥ 0.98 ✓)
+- decisions: 1 accepted (1 correct) · 9 deferred · 0 rejected
+- **precision-on-accepted 1.00 · coverage 0.10**
+
+Interpretation: the gate is doing its job — with a statute+seed-trained
+model, almost everything is honestly deferred instead of guessed. The
+accuracy/coverage dial is visible: coverage grows with training data
+(DJEN decisions) and features, **never by weakening safety thresholds**.
+
 ## Investment decisions are eval-triggered
 
 LoRA/fine-tuning and tier upgrades are considered **only when a measured

@@ -11,6 +11,9 @@ from agavus.config.settings import Settings, load_settings
 from agavus.corpus.fetch import FetchError
 from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
 from agavus.corpus.storage import CorpusStorage
+from agavus.decide.rule import decide
+from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
+from agavus.evals.run import evaluate
 from agavus.greeting.greet import greet
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
@@ -79,7 +82,32 @@ def _run_classify(settings: Settings, text: str) -> int:
   probs = classifier.predict_proba([text])[0]
   pairs = sorted(zip(classifier.model.classes, probs, strict=True), key=lambda p: -p[1])
   rendered = " · ".join(f"{label} {prob:.3f}" for label, prob in pairs)
+  decision = decide({label: float(prob) for label, prob in pairs})
   print(f"classify: {rendered}")
+  print(f"decision: {decision.action}")
+  return 0
+
+
+def _run_eval(settings: Settings) -> int:
+  db_path = settings.data_dir / "models" / "models.db"
+  if not db_path.exists():
+    print("eval: no trained model — run `agavus train` first")
+    return 1
+  classifier = load_model(db_path, "classifier")
+  probs = classifier.predict_proba([item.text for item in ROUTING_V1])
+  mappings = [
+    {label: float(value) for label, value in zip(classifier.model.classes, row, strict=True)}
+    for row in probs
+  ]
+  report = evaluate(mappings, ROUTING_V1)
+  print(
+    f"eval ({GOLD_VERSION}, {len(ROUTING_V1)} items): "
+    f"acc {report.accuracy:.2f} · F1 {report.macro_f1:.2f} · M-recall {report.m_recall:.2f}\n"
+    f"decisions: {report.accepted} accepted ({report.accepted_correct} correct) · "
+    f"{report.deferred} deferred · {report.rejected} rejected\n"
+    f"precision-on-accepted {report.precision_on_accepted:.2f} · "
+    f"coverage {report.coverage:.2f}"
+  )
   return 0
 
 
@@ -96,6 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
   sub.add_parser("train", help="train the classifier on labeled texts")
   classify = sub.add_parser("classify", help="classify a text with the trained model")
   classify.add_argument("text")
+  sub.add_parser("eval", help="evaluate the trained model on the gold set")
   args = parser.parse_args(argv)
   settings = load_settings()
   if args.command == "ingest":
@@ -106,5 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return _run_train(settings)
   if args.command == "classify":
     return _run_classify(settings, args.text)
+  if args.command == "eval":
+    return _run_eval(settings)
   print(greet(settings.name))
   return 0
