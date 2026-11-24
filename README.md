@@ -144,6 +144,12 @@ src/agavus/
   greeting/              # greeting domain (hello world)
     greet.py
     greet_test.py
+  corpus/                # placeholders — design complete, no implementation yet
+  taxonomy/              #   TPU mapping + weak labels
+  classify/              #   TF-IDF + calibrated logreg
+  decide/                #   three-way decision gates
+  retrieve/              #   BM25 + citations
+  answer/                #   extractive, cited answers
 scripts/
   pyutils.py             # shared tokenization helpers for quality scripts
   check_sizes.py         # size-limit enforcement
