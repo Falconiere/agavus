@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS raw_payloads (
   ref TEXT PRIMARY KEY, source TEXT NOT NULL, run TEXT NOT NULL,
   url TEXT, method TEXT, payload_json TEXT, fetched_at TEXT NOT NULL
 );
-CREATE VIRTUAL TABLE IF NOT EXISTS texts_fts USING fts5(doc_id UNINDEXED, text);
+CREATE VIRTUAL TABLE IF NOT EXISTS texts_fts USING fts5(doc_id UNINDEXED, origin_ref, text);
 CREATE TABLE IF NOT EXISTS embeddings (
   doc_id TEXT NOT NULL, model_version TEXT NOT NULL, dim INTEGER NOT NULL,
   vector BLOB NOT NULL, PRIMARY KEY (doc_id, model_version)
@@ -83,8 +83,18 @@ def connect(root: Path) -> sqlite3.Connection:
   conn.row_factory = sqlite3.Row
   conn.execute("PRAGMA journal_mode=WAL")
   conn.executescript(_SCHEMA)
+  _migrate_fts(conn)
   conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
   return conn
+
+
+def _migrate_fts(conn: sqlite3.Connection) -> None:
+  """FTS index is rebuildable: recreate when the column layout changed."""
+  columns = {row[1] for row in conn.execute("PRAGMA table_info(texts_fts)")}
+  if "origin_ref" not in columns:
+    conn.execute("DROP TABLE texts_fts")
+    conn.execute("CREATE VIRTUAL TABLE texts_fts USING fts5(doc_id UNINDEXED, origin_ref, text)")
+    conn.commit()
 
 
 def _insert(conn: sqlite3.Connection, table: str, values: tuple[object, ...]) -> bool:
@@ -132,16 +142,19 @@ def insert_text(conn: sqlite3.Connection, record: TextDocument) -> bool:
     ),
   )
   if inserted:
-    conn.execute("INSERT INTO texts_fts (doc_id, text) VALUES (?,?)", (record.id, record.text))
+    conn.execute(
+      "INSERT INTO texts_fts (doc_id, origin_ref, text) VALUES (?,?,?)",
+      (record.id, record.origin_ref, record.text),
+    )
     conn.commit()
   return inserted
 
 
 def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tuple[str, float]]:
-  """BM25-ranked document ids via FTS5 (native, zero-dep)."""
+  """BM25-ranked ids; origin_ref weighted 10x (article numbers are decisive)."""
   rows = conn.execute(
-    "SELECT doc_id, bm25(texts_fts) AS score FROM texts_fts WHERE texts_fts MATCH ? "
-    "ORDER BY score LIMIT ?",
+    "SELECT doc_id, bm25(texts_fts, 0.0, 10.0, 1.0) AS score FROM texts_fts "
+    "WHERE texts_fts MATCH ? ORDER BY score LIMIT ?",
     (query, limit),
   ).fetchall()
   return [(str(row["doc_id"]), float(row["score"])) for row in rows]
@@ -150,7 +163,9 @@ def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tu
 def rebuild_fts(conn: sqlite3.Connection) -> int:
   """Rebuild the FTS index from the texts table (idempotent maintenance)."""
   conn.execute("DELETE FROM texts_fts")
-  conn.execute("INSERT INTO texts_fts (doc_id, text) SELECT id, text FROM texts")
+  conn.execute(
+    "INSERT INTO texts_fts (doc_id, origin_ref, text) SELECT id, origin_ref, text FROM texts"
+  )
   conn.commit()
   return int(conn.execute("SELECT count(*) FROM texts_fts").fetchone()[0])
 

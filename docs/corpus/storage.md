@@ -22,7 +22,10 @@ labels, manifests, raw metadata, model artifacts, indexes — is SQLite.
 ## Retrieval-ready indexes (inside corpus.db)
 
 - **`texts_fts`** — FTS5 virtual table with native `bm25()`: lexical
-  retrieval, zero deps. Kept in sync on insert; `rebuild_index()` backfills.
+  retrieval, zero deps. Columns: `doc_id` (unindexed), `origin_ref`
+  (**10x weight** — article numbers are decisive in legal queries), `text`.
+  Kept in sync on insert; `rebuild_index()` backfills; schema migrations
+  drop/recreate the rebuildable index automatically.
 - **`embeddings(doc_id, model_version, dim, vector BLOB)`** — float32
   vectors keyed by doc + model version (upgrade = re-embed, never mix).
   Brute-force cosine KNN (`search_similar`) — fine at corpus scale;

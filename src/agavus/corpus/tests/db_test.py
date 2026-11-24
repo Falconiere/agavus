@@ -92,3 +92,13 @@ def test_rebuild_fts_backfills(tmp_path: Path) -> None:
     assert db.search_fts(conn, "guarda") == []
     assert db.rebuild_fts(conn) == 1
     assert db.search_fts(conn, "guarda")[0][0] == "t9"
+
+
+def test_origin_ref_weighted(tmp_path: Path) -> None:
+  with closing(db.connect(tmp_path)) as conn:
+    db.insert_text(conn, sample_text(doc_id="a22", origin_ref="Lei X, art. 22", text="texto comum"))
+    db.insert_text(
+      conn, sample_text(doc_id="a10", origin_ref="Lei X, art. 10", text="texto comum 22 22 22")
+    )
+    hits = db.search_fts(conn, "22")
+    assert hits[0][0] == "a22"

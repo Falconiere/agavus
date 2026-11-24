@@ -145,6 +145,7 @@ uv run agavus label                                 # TPU + organ labeling → l
 uv run agavus train                                 # TF-IDF + logreg + calibration
 uv run agavus classify "ele descumpriu a medida protetiva"
 uv run agavus eval                                  # gold set + three-way decisions
+uv run agavus search "medida protetiva art. 22"       # BM25 + citation-weighted retrieval
 ```
 
 Every commit runs all gates via **pre-commit** (local hooks through `uv`).

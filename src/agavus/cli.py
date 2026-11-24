@@ -15,6 +15,7 @@ from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
 from agavus.evals.run import evaluate
 from agavus.greeting.greet import greet
+from agavus.retrieve.search import search
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
 DEFAULT_LIMIT = 500
@@ -111,6 +112,18 @@ def _run_eval(settings: Settings) -> int:
   return 0
 
 
+def _run_search(settings: Settings, query: str, limit: int) -> int:
+  storage = CorpusStorage(settings.data_dir)
+  hits = search(storage, query, limit=limit)
+  if not hits:
+    print("search: no hits — ingest + label + rebuild the corpus first")
+    return 0
+  for hit in hits:
+    print(f"{hit.score:6.2f}  {hit.origin_ref}")
+    print(f"        {hit.snippet[:120]}…")
+  return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
   """Entry point: no args greets; subcommands run corpus pipelines."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
@@ -125,17 +138,21 @@ def main(argv: Sequence[str] | None = None) -> int:
   classify = sub.add_parser("classify", help="classify a text with the trained model")
   classify.add_argument("text")
   sub.add_parser("eval", help="evaluate the trained model on the gold set")
+  search_cmd = sub.add_parser("search", help="BM25 + citation search over the corpus")
+  search_cmd.add_argument("query")
+  search_cmd.add_argument("--limit", type=int, default=5)
   args = parser.parse_args(argv)
   settings = load_settings()
-  if args.command == "ingest":
-    return _run_ingest(settings, args.source, args.limit, args)
-  if args.command == "label":
-    return _run_label(settings)
-  if args.command == "train":
-    return _run_train(settings)
-  if args.command == "classify":
-    return _run_classify(settings, args.text)
-  if args.command == "eval":
-    return _run_eval(settings)
+  handlers = {
+    "ingest": lambda: _run_ingest(settings, args.source, args.limit, args),
+    "label": lambda: _run_label(settings),
+    "train": lambda: _run_train(settings),
+    "classify": lambda: _run_classify(settings, args.text),
+    "eval": lambda: _run_eval(settings),
+    "search": lambda: _run_search(settings, args.query, args.limit),
+  }
+  handler = handlers.get(args.command)
+  if handler is not None:
+    return handler()
   print(greet(settings.name))
   return 0
