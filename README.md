@@ -4,6 +4,9 @@
 retrieval, no GPU, no Node. Built on a domain-organized Python scaffold with
 strict, machine-enforced quality gates.
 
+**[▶ Live demo](https://huggingface.co/spaces/Falconiere/agavus)** ·
+[Model on HF](https://huggingface.co/Falconiere/agavus-classifier)
+
 ![Python](https://img.shields.io/badge/python-%3E%3D3.12-blue)
 ![uv](https://img.shields.io/badge/managed-uv-6f42c1)
 ![Ruff](https://img.shields.io/badge/lint%20%2B%20format-ruff-d7ff64)

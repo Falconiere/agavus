@@ -1,7 +1,11 @@
 # Publishing — agavus on Hugging Face
 
-Status: **model repo LIVE** — https://huggingface.co/Falconiere/agavus-classifier
-(first release 2026-11-24, eval-gated: precision 1.00, M-recall 1.00).
+Status: **model repo + Space LIVE**
+- Model: https://huggingface.co/Falconiere/agavus-classifier
+  (first release 2026-11-24, eval-gated: precision 1.00, M-recall 1.00)
+- Demo: https://huggingface.co/spaces/Falconiere/agavus
+  (Gradio, cpu-basic; offline bootstrap from bundled public-domain statutes
+  in `space/assets/` — UTF-8 transcriptions, LGPD-safe, no network at startup)
 Pipeline: `agavus publish` (dry run) / `agavus publish --repo OWNER/NAME`.
 HF bucket `Falconiere/agavus` available for private artifacts (corpus
 snapshots, future datasets). The **privacy policy governs everything**
