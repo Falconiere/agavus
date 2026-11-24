@@ -58,3 +58,26 @@ def test_irrelevant_hit_degrades(tmp_path: Path) -> None:
   answer = compose("alienação parental", CONFIDENT_M, _corpus(tmp_path))
   assert answer.decision == "defer"
   assert answer.sources == ()
+
+
+def test_verified_chain_answer(tmp_path: Path) -> None:
+  storage = _corpus(tmp_path)
+  storage.save_text(
+    sample_text(
+      doc_id="p24a",
+      origin_ref="Lei 11.340/2006, art. 24-A",
+      text="Descumprir decisão judicial que defere medidas protetivas de urgência.",
+    )
+  )
+  answer = compose("ele descumpriu a medida protetiva", CONFIDENT_M, storage)
+  assert answer.decision == "accept-M"
+  assert "cadeia verificada" in answer.text
+  assert "R-24A" in answer.text
+  assert answer.sources == ("Lei 11.340/2006, art. 24-A",)
+  assert DISCLAIMER in answer.text
+
+
+def test_broken_chain_defers(tmp_path: Path) -> None:
+  answer = compose("ele descumpriu a medida protetiva", CONFIDENT_M, _corpus(tmp_path))
+  assert answer.decision == "defer"
+  assert answer.sources == ()

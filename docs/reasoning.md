@@ -1,8 +1,32 @@
 # Reasoning — verified chains, not generated opinions
 
-Status: design. A `reason/` layer between `retrieve` and `answer`.
+Status: **Level 1 MVP implemented** (`reason/facts.py`, `reason/rules.py`,
+`reason/chain.py`, wired into `answer/compose.py`). Levels 2–3 remain design.
 Principle: **reasoning is only as good as its cited premises** — every hop
 verifiable, broken chains defer. Companion: [tiny-llm.md](tiny-llm.md).
+
+## Implemented (Level 1 MVP)
+
+- **Extractive facts**: conservative patterns + negation guard; every fact
+  carries its verbatim query span (`medida_vigente`, `descumprimento`,
+  `violencia_domestica`, `contexto_familiar`, `urgencia`).
+- **Rule pack v1**: R-24A (protetiva vigente + descumprimento → art. 24-A),
+  R-22 (violência + contexto familiar + urgência → art. 22). Versioned data.
+- **Verified chains**: a chain is complete only when the conclusion's
+  provision exists verbatim in the corpus; broken chains defer. Answer
+  renders conclusion + grounded facts + verbatim premise + disclaimer.
+- Live example: *"ele descumpriu a medida protetiva"* → R-24A chain citing
+  the current art. 24-A text (incl. Lei 14.994/2024 and Lei 15.383/2026
+  amendments).
+
+## Known limitations (honest list)
+
+1. **Revoked text not flagged**: compilado pages include struck-through
+   (revoked) penalties; extraction is text-level, so old and current penalty
+   appear together with amendment notes. Fix: HTML-aware extraction that
+   drops/excludes `text-decoration:line-through` spans.
+2. Rule coverage is tiny (2 rules); growth is human-reviewed curation.
+3. Citation graph / temporal reasoning / analogy retrieval: not yet built.
 
 ## Three levels (build in this order)
 

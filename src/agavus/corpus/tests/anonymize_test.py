@@ -37,3 +37,8 @@ def test_clean_text_untouched() -> None:
   text = "Considera-se ato de alienação parental a interferência na formação psicológica."
   assert anonymize(text) == text
   assert not contains_personal_data(text)
+
+
+def test_urls_protected() -> None:
+  text = "Ver http://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/Lei/L13641.htm#art2"
+  assert anonymize(text) == text

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from agavus.corpus.anonymize import anonymize
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
+from agavus.reason.chain import Chain, build_chain
 from agavus.retrieve.search import WORD_RE, Hit, search
 from agavus.taxonomy.lexicon import normalize
 
@@ -51,13 +52,37 @@ def _render_accept(hit: Hit, context: list[Hit]) -> str:
   return "\n".join(lines)
 
 
+def _render_chain(chain: Chain) -> str:
+  premise = chain.premises[0]
+  facts = "; ".join(f'{fact.field}="{fact.span}"' for fact in chain.facts)
+  lines = [
+    f"Conclusão (cadeia verificada, {chain.rule_id}): {chain.conclusion}",
+    f"Fatos: {facts}",
+    "",
+    f"{premise.ref}:",
+    anonymize(premise.text),
+    "",
+    DISCLAIMER,
+  ]
+  return "\n".join(lines)
+
+
 def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStorage) -> Answer:
-  """Classify → decide → retrieve → cited excerpt, or degrade honestly."""
+  """Classify → decide → reason/retrieve → cited excerpt, or degrade honestly."""
   decision = decide(probabilities)
   if decision.action == "reject":
     return Answer(decision="reject", text=SCOPE_MESSAGE, sources=())
   if decision.action == "defer":
     return Answer(decision="defer", text=CLARIFY_MESSAGE, sources=())
+  chain = build_chain(query, storage)
+  if chain is not None:
+    if not chain.complete:
+      return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
+    return Answer(
+      decision=decision.action,
+      text=_render_chain(chain),
+      sources=(chain.conclusion_ref,),
+    )
   hits = search(storage, query, limit=CONTEXT_HITS + 1)
   if not hits or not _relevant(query, hits[0]):
     return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())

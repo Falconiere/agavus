@@ -34,6 +34,19 @@ def test_duplicate_article_first_wins() -> None:
   assert "Primeiro texto" in articles[0][1]
 
 
+def test_letter_suffix_article() -> None:
+  text = "Art. 24-A. Descumprir medida protetiva.\nArt. 25. Outro."
+  articles = segment_articles(text)
+  assert [number for number, _ in articles] == ["24-A", "25"]
+
+
+def test_body_trimmed_at_chapter_heading() -> None:
+  text = "Art. 24-A. Texto do artigo.\nCAPÍTULO III\nDA ATUAÇÃO\nArt. 25. Outro."
+  articles = segment_articles(text)
+  assert "CAPÍTULO" not in articles[0][1]
+  assert "Texto do artigo" in articles[0][1]
+
+
 def test_parse_statute_documents() -> None:
   expected_articles = 3
   docs = parse_statute("Lei 12.318/2010", FIXTURE_HTML, "raw/statutes/x.html")
@@ -53,3 +66,8 @@ def test_decode_cp1252_fallback() -> None:
   payload = "Considera-se alienação parental".encode("cp1252")
   assert "alienação" in decode_html(payload)
   assert decode_html(b"texto utf-8") == "texto utf-8"
+
+
+def test_decode_utf16_bom() -> None:
+  payload = "Art. 24-A. Descumprir medida protetiva.".encode("utf-16")
+  assert "Art. 24-A" in decode_html(payload)

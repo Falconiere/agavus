@@ -12,8 +12,9 @@ from bs4 import BeautifulSoup
 from agavus.corpus.records import LabelSource, TextDocument, TextSource, text_document_id
 
 SOURCE = "statutes"
-ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+)\s*[ºo°]?", re.IGNORECASE)
-ART_REF = re.compile(r"\bart\.?\s*(\d+)\s*[ºo°]?", re.IGNORECASE)
+ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
+ART_REF = re.compile(r"\bart\.?\s*(\d+(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
+HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
 
 
@@ -38,9 +39,11 @@ STATUTES: tuple[StatuteRef, ...] = (
 
 
 def decode_html(payload: bytes) -> str:
-  """Planalto serves windows-1252; prefer UTF-8 when valid."""
+  """Planalto serves cp1252, UTF-8, and UTF-16 (Word pages); detect BOMs."""
+  if payload.startswith((b"\xff\xfe", b"\xfe\xff")):
+    return payload.decode("utf-16", errors="replace")
   try:
-    return payload.decode("utf-8")
+    return payload.decode("utf-8-sig")
   except UnicodeDecodeError:
     return payload.decode("cp1252", errors="replace")
 
@@ -61,7 +64,11 @@ def segment_articles(text: str) -> list[tuple[str, str]]:
       continue
     seen.add(number)
     end = markers[index + 1].start() if index + 1 < len(markers) else len(text)
-    articles.append((number, text[marker.start() : end].strip()))
+    body = text[marker.start() : end]
+    heading = HEADING.search(body)
+    if heading:
+      body = body[: heading.start()]
+    articles.append((number, body.strip()))
   return articles
 
 

@@ -132,6 +132,15 @@ before them the query sat at F 0.888 vs α_F 0.889 and was honestly deferred
 — the gate working as designed. Eval after: M-recall 1.00,
 precision-on-accepted 1.00, coverage 0.20.
 
+## Corpus encoding findings (2026-11-24)
+
+Planalto serves mixed encodings: cp1252, UTF-8, and **UTF-16** (Word-generated
+compilado pages, sometimes with a truncated trailing byte). `decode_html`
+detects BOMs and tolerates truncation. Firecrawl-rendered copies of these
+pages lose bytes irreversibly (U+FFFD in tag regions) — **always import raw
+payloads, never rendered copies**. Article segmentation captures letter
+suffixes (art. 24-A) and trims bodies at chapter headings.
+
 ## Investment decisions are eval-triggered
 
 LoRA/fine-tuning and tier upgrades are considered **only when a measured

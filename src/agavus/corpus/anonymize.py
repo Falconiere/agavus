@@ -27,11 +27,27 @@ _REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+_URL = re.compile(r"https?://\S+")
+_URL_TOKEN = "\x00URL{}\x00"
+
+
 def anonymize(text: str) -> str:
-  """Return text with personal data replaced by neutral tokens."""
+  """Return text with personal data replaced by neutral tokens.
+
+  URLs are protected first (digit sequences inside them are not phones).
+  """
+  urls: list[str] = []
+
+  def protect(match: re.Match[str]) -> str:
+    urls.append(match.group(0))
+    return _URL_TOKEN.format(len(urls) - 1)
+
+  protected = _URL.sub(protect, text)
   for pattern, replacement in _REPLACEMENTS:
-    text = pattern.sub(replacement, text)
-  return text
+    protected = pattern.sub(replacement, protected)
+  for index, url in enumerate(urls):
+    protected = protected.replace(_URL_TOKEN.format(index), url)
+  return protected
 
 
 def contains_personal_data(text: str) -> bool:
