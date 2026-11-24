@@ -42,7 +42,7 @@ pythonpath = ["scripts"]
 addopts = "-q"
 
 [tool.deptry]
-known_first_party = ["agavus", "check_sizes", "check_duplication", "pyutils"]
+known_first_party = ["agavus", "check_sizes", "check_duplication", "check_commit_msg", "pyutils"]
 
 [tool.deptry.per_rule_ignores]
 # CLI tools invoked via Makefile/pre-commit, never imported in code.

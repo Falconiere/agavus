@@ -195,6 +195,8 @@ Planned (see design doc): `AGAVUS_DATA_DIR` for the gitignored corpus location.
 - **Tests co-located**: `foo.py` is tested by `foo_test.py` in the same directory.
 - **Domain-first layout**: group by business domain, not by technical layer.
 - **All gates run on every commit** via pre-commit local hooks.
+- **Commits are semantic and concise** (`type(scope): subject`, body only
+  when needed) — the project's decision memory. See `docs/commits.md`.
 - **No real case data in git, ever** — synthetic fixtures only; corpus lives
   outside the repo (LGPD).
 

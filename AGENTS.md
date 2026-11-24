@@ -74,6 +74,14 @@ to make a gate pass — fix the code.
 - Train/held-out splits by case (prefer time) — never leak the same case
   across splits.
 
+## Commits — semantic and concise
+
+`type(scope): subject` — imperative, ≤ 72 chars (aim ≤ 60), no trailing
+period. Body **only when the why is not obvious**, a few short lines.
+`design` commits: one-line decision + `Refs:`; safety-related changes state
+"M ceiling preserved". Types, scopes, rules: `docs/commits.md` (enforced by
+the commit-msg hook). One coherent change per commit; no WIP.
+
 ## Workflow
 
 1. Read the relevant design section (table above).
