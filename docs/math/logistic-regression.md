@@ -1,7 +1,7 @@
 # Logistic regression — evidence voting → probabilities
 
-**Role**: domain classifier. Converts a TF-IDF vector into calibrated-class
-probabilities $P(F), P(M), P(P), P(O)$. Future module: `classify/model`.
+**Role**: domain classifier. Converts a TF-IDF vector into class
+probabilities $P(F), P(M), P(O)$. Future module: `classify/model`.
 
 ## Formulas
 
@@ -25,17 +25,16 @@ $$
 
 ## Worked example
 
-Scores for one document: $z_F = 1.0,\; z_M = 2.0,\; z_P = 0.5,\; z_O = 0$.
+Scores for one document: $z_F = 1.0,\; z_M = 2.0,\; z_O = 0$.
 
 | Class | $e^{z_k}$ | $P(k \mid x)$ |
 | --- | ------ | ------ |
-| F | 2.718 | 0.213 |
-| M | 7.389 | **0.579** |
-| P | 1.649 | 0.129 |
-| O | 1.000 | 0.078 |
-| sum | 12.756 | 1.000 |
+| F | 2.718 | 0.245 |
+| M | 7.389 | **0.665** |
+| O | 1.000 | 0.090 |
+| sum | 11.107 | 1.000 |
 
-If the true class is M, the loss is $-\ln 0.579 = 0.55$. Had the model been
+If the true class is M, the loss is $-\ln 0.665 = 0.41$. Had the model been
 confidently wrong ($P(M) = 0.05$), the loss would be $-\ln 0.05 = 3.0$ —
 **confident errors are punished hardest**.
 

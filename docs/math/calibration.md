@@ -33,8 +33,8 @@ Held-out reliability before calibration:
 | 0.60 | 0.55 |
 
 After fitting Platt: raw 0.90 → **0.78**, raw 0.60 → **0.55**. Now a
-threshold of $\alpha = 0.8$ (Maria da Penha accept) genuinely filters for
-~80%-correct decisions, as the loss matrix assumes.
+threshold of $\alpha \approx 0.86$ (Maria da Penha accept) genuinely filters
+for ~86%-correct decisions, as the loss matrix assumes.
 
 ## Isotonic alternative
 

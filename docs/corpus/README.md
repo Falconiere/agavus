@@ -8,7 +8,7 @@ math; **clean labels, honest provenance, and verifiable citations are the moat**
 
 | Role | Feeds | Needs |
 | ------------------ | ------------------------------ | ---------------------------------------- |
-| Training corpus | classifier (TF-IDF + logreg) | texts **with labels** (F/M/P/O) |
+| Training corpus | classifier (TF-IDF + logreg) | texts **with labels** (F/M/O) |
 | Retrieval corpus | BM25 index → cited answers | statutes + decisions, **searchable**, with source references |
 
 A document can serve both: a labeled acórdão trains the classifier *and* gets
@@ -22,7 +22,7 @@ indexed for answers.
 | [sources.md](sources.md) | Where does data come from, and how do we fetch? |
 | [schema.md](schema.md) | What does a record look like, field by field? |
 | [ingestion.md](ingestion.md) | How does raw data become processed records? |
-| [labeling.md](labeling.md) | Where do F/M/P/O labels come from? |
+| [labeling.md](labeling.md) | Where do F/M/O labels come from? |
 | [privacy.md](privacy.md) | LGPD, anonymization, segredo de justiça |
 | [storage.md](storage.md) | Where does it live, and why never in git? |
 

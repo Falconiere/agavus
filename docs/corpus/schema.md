@@ -15,7 +15,7 @@ from. Synthetic examples only — real data never enters git.
 | `assuntos_tpu` | list[str] | TPU subject codes |
 | `data_ajuizamento` | date | filing date (window filter) |
 | `movimentos` | list[Movement] | dated procedural events |
-| `domain_label` | F \| M \| P \| O | routing label |
+| `domain_label` | F \| M \| O | routing label |
 | `label_source` | enum | `tpu` \| `organ` \| `manual` \| `weak` |
 | `raw_ref` | str | pointer to the raw payload |
 
@@ -29,7 +29,7 @@ from. Synthetic examples only — real data never enters git.
 | `published_at` | date | publication date (window filter) |
 | `text` | str | anonymized, normalized full text |
 | `citations` | list[str] | regex-extracted ("art. 22, III, Lei 11.340/2006") |
-| `domain_label` | F \| M \| P \| O | routing label |
+| `domain_label` | F \| M \| O | routing label |
 | `label_source` | enum | same provenance enum |
 | `raw_ref` | str | pointer to the raw payload |
 

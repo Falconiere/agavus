@@ -2,7 +2,7 @@
 
 Status: **design only, no implementation yet**.
 Scope: CPU-only legal classification + retrieval/answer engine for Brazilian law,
-restricted to **TJDFT** data and three domains.
+restricted to **TJDFT** data and two domains.
 
 ## 1. Goals
 
@@ -21,30 +21,32 @@ Constraints:
 ## 2. Domain scope
 
 | Code | Domain | Examples |
-| ---- | ------------------ | ------------------------------------------------ |
+| ---- | ------------------------------------ | ------------------------------------------------ |
 | F | Direito de família | divórcio, guarda, alimentos, união estável |
-| M | Maria da Penha | Lei 11.340/2006, medidas protetivas, violência doméstica |
-| P | Direito penal | crimes em geral, dosimetria, execução penal |
-| O | Out of scope | everything else → reject |
+| M | Maria da Penha / violência doméstica | medidas protetivas **and** DV criminal prosecutions: lesão corporal, ameaça, feminicídio, art. 24-A |
+| O | Out of scope | everything else, **including general criminal law** → reject |
 
 Subtopics come from CNJ's **TPU** (Tabelas Processuais Unificadas) taxonomy,
-filtered to these domains.
+filtered to these domains. Inside M, TPU subtopics preserve the distinction
+between protective measures (civil/autonomous) and criminal prosecutions —
+routing is binary, detail is not lost.
 
 ### Taxonomy nature: routing, not legal branches
 
-F/M/P is a **routing taxonomy** (which procedure, urgency, and corpus), not a
+F/M is a **routing taxonomy** (which procedure, urgency, and corpus), not a
 taxonomy of legal branches:
 
-- *Direito penal* and *direito criminal* are synonyms — one domain (P).
 - **Maria da Penha (Lei 11.340/2006) is a hybrid special law**: penal facet
   (art. 24-A, CP art. 129 §13, CPP art. 313 III), civil/família facet
   (protective measures: removal from home, no-contact, temporary custody and
   alimentos), and procedural autonomy (protective measures independent of any
   criminal case — STJ case law, Lei 14.550/2023). TJDFT's specialized Varas de
   Violência Doméstica e Familiar handle both facets.
+- **M deliberately absorbs the whole DV picture** — both facets route to M.
+  General criminal law (crimes outside the DV context) is out of scope (O).
 
-**Real overlap**: M↔F (guarda/alimentos inside protective measures) and M↔P
-(lesão corporal, ameaça, feminicídio) genuinely co-occur. Consequences:
+**Real overlap**: M↔F (guarda/alimentos inside protective measures) genuinely
+co-occurs. Consequences:
 
 - Single-label routing resolves ambiguity through the **boundary region**:
   mixed M/F matters are deferred (clarify/escalate), never forced into one class.
@@ -82,12 +84,14 @@ Caveats:
 ## 4. Labeling strategy
 
 1. **Free labels**: DataJud records carry TPU classe/assunto codes → map to
-   F/M/P/O via a curated code table (`taxonomy` domain).
+   F/M/O via a curated code table (`taxonomy` domain).
 2. **Weak labels from órgão julgador**: TJDFT specialized organs are strong
    domain signals:
    - Vara de Violência Doméstica e Familiar contra a Mulher → M
    - Vara de Família → F
-   - Vara Criminal / Tribunal do Júri → P
+   - Vara Criminal → O (general criminal is out of scope)
+   - Tribunal do Júri → O, unless TPU subjects confirm feminicídio/DV
+     context → M
    Rules are versioned and auditable; conflicts with TPU codes go to a review
    queue, never silently resolved.
 3. **Manual gold set**: small curated set (queries + documents) for calibration
@@ -111,7 +115,7 @@ anonymized (re-identification risk). Split:
 | In the repo | Outside git |
 | ------------------------------------------ | -------------------------------------- |
 | ingestion code + typed schema | `data/raw/` (as fetched) |
-| TPU code table → F/M/P mapping | `data/processed/` (cleaned, labeled) |
+| TPU code table → F/M/O mapping | `data/processed/` (cleaned, labeled) |
 | tiny **synthetic** test fixtures | anything derived from real cases |
 
 - Corpus lives in `data/` (gitignored), location configurable via
@@ -170,13 +174,12 @@ Actions: **accept** (classify/answer), **reject** (out of scope), **defer**
 
 Loss matrix (units: 1 = cost of one deferral round; placeholders to calibrate):
 
-| Action ↓ / True state → | F | M | P | O |
-| ----------------------- | --- | --- | --- | --- |
-| Accept as F | 0 | 10 | 4 | 8 |
-| Accept as M | 6 | 0 | 3 | 8 |
-| Accept as P | 4 | 3 | 0 | 8 |
-| Reject (out of scope) | 4 | 8 | 4 | 0 |
-| Defer | 1 | 1 | 1 | 1 |
+| Action ↓ / True state → | F | M | O |
+| ----------------------- | --- | --- | --- |
+| Accept as F | 0 | 10 | 8 |
+| Accept as M | 6 | 0 | 8 |
+| Reject (out of scope) | 4 | 8 | 0 |
+| Defer | 1 | 1 | 1 |
 
 Rationale:
 
@@ -184,7 +187,8 @@ Rationale:
   family dispute can delay protective measures (safety-critical).
 - Reject|M = 8: never silently drop a possible Maria da Penha case.
 - F→M = 6: false violence framing is serious but less urgent than the reverse.
-- Accept|O = 8: answering out of scope = hallucinated authority.
+- Accept|O = 8: answering out of scope (incl. general criminal) =
+  hallucinated authority.
 
 Decision rule: pick the action minimizing expected loss
 `Σ λ(action|state) · P(state|x)` over calibrated probabilities.
@@ -195,9 +199,8 @@ Interpretable thresholds (binary reduction per domain,
 
 | Domain | α (accept ≥) | β (reject ≤) | Behavior |
 | --------------- | ------------ | ------------ | -------------------------------------- |
-| Família | ~0.86 | ~0.25 | strictest acceptance (M→F catastrophic) |
-| Maria da Penha | ~0.80 | ~0.12 | hardest to reject; weak signals defer |
-| Penal | ~0.80 | ~0.25 | balanced |
+| Família | ~0.89 | ~0.25 | strictest acceptance (M→F catastrophic) |
+| Maria da Penha | ~0.86 | ~0.12 | hardest to reject; weak signals defer |
 
 Applied at two gates: routing (classify) and answering (answer/abstain/escalate).
 
@@ -219,7 +222,7 @@ Applied at two gates: routing (classify) and answering (answer/abstain/escalate)
 
 1. `corpus/` — DataJud + DJEN ingestion for TJDFT, anonymization, schema;
    gitignored `data/` + `AGAVUS_DATA_DIR` setting + staged-data guard hook.
-2. `taxonomy/` — TPU code table → F/M/P/O; weak-label rules; gold set;
+2. `taxonomy/` — TPU code table → F/M/O; weak-label rules; gold set;
    synonym/abbreviation normalization lexicon (§6.1 #2).
 3. `classify/` — TF-IDF + calibrated logreg; negation-aware features and
    feature crosses (§6.1 #1, #3); baselines; evaluation.

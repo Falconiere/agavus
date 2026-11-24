@@ -1,4 +1,4 @@
-# Labeling — where F/M/P/O comes from
+# Labeling — where F/M/O comes from
 
 Three label sources, in priority order. Every label records its source
 (`label_source`) — provenance is mandatory, not optional.
@@ -6,13 +6,14 @@ Three label sources, in priority order. Every label records its source
 ## 1. TPU codes (primary, `label_source: tpu`)
 
 DataJud records carry CNJ TPU classe/assunto codes. A curated, versioned
-mapping table converts codes → F/M/P/O:
+mapping table converts codes → F/M/O:
 
 | TPU signal (illustrative) | Label |
-| ------------------------------------------- | ----- |
+| -------------------------------------------------- | ----- |
 | violência doméstica / medida protetiva | M |
+| feminicídio / lesão corporal em contexto DV | M |
 | divórcio, guarda, alimentos, união estável | F |
-| crimes contra a pessoa, tráfico, dosimetria | P |
+| general criminal (tráfico, roubo, estelionato…) | O |
 | anything else | O |
 
 The table lives in git (small, public taxonomy — not case data), in the
@@ -26,7 +27,8 @@ TJDFT specialized organs are strong signals for full texts without TPU codes:
 | -------------------------------------------------------- | ----- |
 | Vara de Violência Doméstica e Familiar contra a Mulher | M |
 | Vara de Família | F |
-| Vara Criminal / Tribunal do Júri | P |
+| Vara Criminal | O (general criminal is out of scope) |
+| Tribunal do Júri | O, unless TPU subjects confirm feminicídio/DV → M |
 
 Rules are versioned and auditable. A document from a violência doméstica
 vara is *almost certainly* M — "almost" is why these are **weak** labels.

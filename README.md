@@ -16,13 +16,15 @@ strict, machine-enforced quality gates.
 ## 🎯 Vision
 
 A legal **classifier + search/answer engine** restricted, for now, to **TJDFT**
-data and three routing domains:
+data and two routing domains:
 
 | Code | Domain | Examples |
-| :--: | ------------------ | ---------------------------------------------- |
+| :--: | ------------------------------------ | ---------------------------------------------- |
 | **F** | Direito de família | divórcio, guarda, alimentos, união estável |
-| **M** | Maria da Penha | Lei 11.340/2006, medidas protetivas |
-| **P** | Direito penal | crimes em geral, dosimetria, execução penal |
+| **M** | Maria da Penha / violência doméstica | medidas protetivas **and** DV criminal prosecutions (lesão corporal, ameaça, feminicídio, art. 24-A) |
+
+General criminal law is **out of scope** — M absorbs the whole domestic-violence
+picture, both its civil and criminal facets.
 
 Answers are **cited excerpts from statutes and decisions — never generated
 opinions**. When uncertain, the system *defers*; it does not guess.
@@ -80,7 +82,7 @@ ordinary family law (loss 10) or silently dropping it (loss 8).
 
 ```mermaid
 flowchart TD
-  X["calibrated probabilities<br/>P(F), P(M), P(P), P(O)"] --> L["expected loss per action<br/>Σ λ(action | state) · P(state | x)"]
+  X["calibrated probabilities<br/>P(F), P(M), P(O)"] --> L["expected loss per action<br/>Σ λ(action | state) · P(state | x)"]
   L --> A{"minimum-loss<br/>action"}
   A -->|accept| ACC["✅ classify / answer<br/>with citations"]
   A -->|reject| REJ["🚫 out of scope — say so"]
@@ -90,9 +92,8 @@ flowchart TD
 
 | Domain | α (accept ≥) | β (reject ≤) | Behavior |
 | -------------- | :----------: | :----------: | ------------------------------------- |
-| Família | ~0.86 | ~0.25 | strictest acceptance (M→F catastrophic) |
-| Maria da Penha | ~0.80 | **~0.12** | hardest to reject; weak signals defer |
-| Penal | ~0.80 | ~0.25 | balanced |
+| Família | ~0.89 | ~0.25 | strictest acceptance (M→F catastrophic) |
+| Maria da Penha | ~0.86 | **~0.12** | hardest to reject; weak signals defer |
 
 ## 🗺️ Roadmap
 

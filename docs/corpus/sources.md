@@ -12,7 +12,7 @@ All case sources are filtered to **TJDFT** and to the
 
 ## What each contributes
 
-- **DataJud**: the label backbone. TPU codes + órgão julgador give F/M/P
+- **DataJud**: the label backbone. TPU codes + órgão julgador give F/M
   labels without reading a single full text. Also dates and movements for
   features and time splits. No full text — and that is fine.
 - **DJEN**: the language backbone. Published decisions are the text the
@@ -39,10 +39,13 @@ All case sources are filtered to **TJDFT** and to the
 Family (F) and Maria da Penha (M) full texts are mostly sealed:
 
 | Domain | Metadata (DataJud) | Full text (DJEN/portal) |
-| ------ | ------------------ | ----------------------- |
+| ------ | ------------------ | ------------------------------------------ |
 | F | available | scarce |
 | M | available | scarce (published acórdãos exist) |
-| P | available | abundant |
+
+General criminal full texts are abundant but **out of scope**. M's criminal
+facet (lesão corporal, ameaça, feminicídio, art. 24-A) is covered by published
+acórdãos from criminal turmas and the specialized varas.
 
 Consequence: F/M classification leans on metadata + citation patterns;
 F/M retrieval leans on statutes + published acórdãos. This is a design
