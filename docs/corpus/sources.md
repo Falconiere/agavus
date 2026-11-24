@@ -1,7 +1,7 @@
 # Sources — where the data comes from
 
-All case sources are filtered to **TJDFT** and to the
-[2020 → current-date window](data-range.md).
+All case sources are filtered to **TJDFT** and to the F/M subject, with
+no start date ([data-range.md](data-range.md)): today backward until empty.
 
 | Source | Content | Role | Access |
 | -------------------------- | -------------------------------------- | ---------------------- | ---------------------------- |
@@ -38,17 +38,27 @@ All case sources are filtered to **TJDFT** and to the
 
 - **DataJud**: public APIKey auth works; the cluster is frequently
   overloaded — HTTP 429 (`es_rejected_execution_exception`), queries up to
-  ~45s, partial shard failures, and 200 responses with **empty hits**.
-  Consequences implemented in `corpus/fetch.py`: 2s minimum interval
-  (0.5 req/s), `Retry-After` honored, exponential backoff capped at 60s,
-  90s timeout, max 4 retries; empty responses never advance the watermark;
-  CLI fails friendly with nothing saved. One bounded page per run.
+  ~60s, and 200 responses with **empty hits**. An ISO range on
+  `dataAjuizamento` returned `hits.total = 0` (shards skipped). A compact
+  `YYYYMMDDHHmmss` bound reaches the index. Sorting on `numeroProcesso`
+  is HTTP 400 (text field, fielddata disabled); the tie-break is `_id`.
+  A `match_phrase` subject query was accepted far enough to hit the search
+  pool (429, not 400) on 2026-11-24; the cluster was too busy to return
+  hits. Consequences in `corpus/fetch.py` and `corpus/datajud.py`: 2s
+  minimum interval, `Retry-After`, backoff capped at 60s, 90s timeout,
+  4 retries; `lte` is end of today in compact form; no `gte`; subject
+  `match_phrase` on órgão, assunto, and classe; `search_after` cursor
+  committed per page; a genuine empty tail (`total = 0`, `relation = eq`)
+  finishes the walk; a body without that total does not.
 - **Planalto**: reachable via normal networks; direct egress from the dev
   sandbox timed out (parser validated against real pages fetched via
   firecrawl). Statute ingestion is implemented and fixture-tested; live runs
   depend on network egress.
-- **DJEN**: deferred (DNS/access not verified from the sandbox); metadata +
-  statutes carry the MVP, per plan.
+- **DJEN**: `GET https://comunicaapi.pje.jus.br/api/v1/comunicacao` returns
+  HTTP 403 from this host (CloudFront country block). The client is
+  implemented and fixture-tested. Page 1 is treated as the newest page.
+  `itensPorPagina` is capped at 50. Intimações, citações, editais, and
+  pautas are not stored. A live walk needs a Brazilian IP.
 
 ## Known coverage asymmetry (segredo de justiça)
 

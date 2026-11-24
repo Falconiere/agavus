@@ -14,9 +14,10 @@ flowchart LR
 
 ## Stages
 
-1. **Fetch**: query each source for the window (2020-01-01 → today),
-   incremental since the last watermark. Store responses verbatim in
-   `data/raw/` with fetch timestamp + query parameters.
+1. **Fetch**: from the current date backward until the source returns no
+   more subject rows (F/M, TJDFT). No start date. Store responses verbatim in
+   `data/raw/` with fetch timestamp + query parameters. The cursor advances
+   after each saved page and is a `search_after` position, not a filing date.
 2. **Anonymize**: strip party names, CPF/RG, addresses, minors' identifiers
    before anything else touches the text ([privacy.md](privacy.md)).
 3. **Normalize**: apply the taxonomy lexicon (abbreviations → canonical

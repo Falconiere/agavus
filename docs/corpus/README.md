@@ -29,7 +29,7 @@ indexed for answers.
 ## Invariants (never violated)
 
 1. **TJDFT only** for now; other tribunals are a later domain-shift phase.
-2. **Window**: 2020-01-01 → current date at ingestion (rolling).
+2. **Window**: no start date. Today backward until the source is empty, subject F/M.
 3. Every label carries `label_source`; every text carries `origin_ref`.
 4. Party names and personal data stripped at ingestion (LGPD).
 5. Real data **never in git**; corpus is a rebuildable cache, not an asset.

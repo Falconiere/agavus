@@ -146,7 +146,8 @@ Available today (MVP — full chain live):
 ```sh
 uv run agavus -p "Qual é o artigo da lei de alienação parental?"
 # → cited excerpt of Lei 12.318/2010 + context + disclaimer (exit 0)
-uv run agavus ingest --source datajud --limit 500   # TJDFT metadata → data/
+uv run agavus ingest --source datajud --limit 500   # F/M metadata, today → oldest
+uv run agavus ingest --source djen                  # published F/M decisions
 uv run agavus ingest --source statutes              # Planalto articles → data/
 uv run agavus label                                 # TPU + organ labeling
 uv run agavus train                                 # TF-IDF + logreg + calibration

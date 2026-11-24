@@ -15,7 +15,8 @@ agavus -p "Qual é o artigo da lei de alienação parental?"   # ask (primary UX
 agavus classify "texto…"                                  # classify inline text
 agavus search "medida protetiva art. 22"                  # BM25 + citation retrieval
 agavus ingest --source statutes                           # corpus ingestion
-agavus ingest --source datajud --limit 500                # TJDFT metadata
+agavus ingest --source datajud --limit 500                # F/M metadata, today → oldest
+agavus ingest --source djen                               # published F/M decisions
 agavus label                                              # TPU + organ labeling
 agavus train                                              # fit + calibrate + report
 agavus eval                                               # gold-set evaluation

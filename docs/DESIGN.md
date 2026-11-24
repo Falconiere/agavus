@@ -61,12 +61,11 @@ co-occurs. Consequences:
 Deep-dive documentation: **[docs/corpus/](corpus/README.md)** (range, sources,
 schema, ingestion, labeling, privacy, storage).
 
-**Time window**: case metadata and decisions from **2020-01-01 → current
-date at ingestion** (rolling end, incremental runs; `AGAVUS_DATA_START`
-configurable). Rationale: captures Lei 14.550/2023 and Lei 14.994/2024
-reforms, born-digital records, manageable volume. Statutes are the exception:
-current consolidated text, not windowed. Train/held-out split by case,
-preferably by time.
+**Time window**: no start date. Ingestion starts at the current date and
+walks backward until the source has no more rows for the subject (F and M,
+TJDFT). `AGAVUS_DATA_START` still loads so older env files do not break;
+fetches ignore it. Statutes stay the current consolidated text. Train/held-out
+split by case, preferably by time, on whatever span was stored.
 
 | Source | Content | Use |
 | ------------------------- | -------------------------------------------- | ------------------------------ |
@@ -233,7 +232,7 @@ storage, area-parameterized pipelines.
 
 1. `corpus/` — ✅ DataJud + statute ingestion (offline import), anonymization,
    schema, SQLite store; gitignored `data/` + `AGAVUS_DATA_DIR` + guard hook.
-   ⬜ DJEN full-text decisions (network-blocked in dev sandbox).
+   ✅ DJEN client (live pull needs a Brazilian IP; this sandbox gets HTTP 403).
 2. `taxonomy/` — ✅ area registry, organ weak-label rules, statute map,
    lexicon, gold-set seed; ⬜ TPU code table populated from real DataJud codes.
 3. `classify/` — ✅ TF-IDF (word-internal char n-grams) + balanced, calibrated

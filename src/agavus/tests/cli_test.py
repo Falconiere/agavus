@@ -7,6 +7,7 @@ import pytest
 
 from agavus import cli
 from agavus.answer.compose import Answer
+from agavus.corpus.batch import IngestBatch
 from agavus.corpus.fetch import FetchError
 from agavus.evals.run import EvalReport
 
@@ -33,9 +34,10 @@ def test_default_greets(capsys: pytest.CaptureFixture[str]) -> None:
 def test_ingest_datajud_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
   called: list[int] = []
 
-  def fake(settings: object, limit: int) -> int:
+  def fake(settings: object, limit: int, pages: int | None = None) -> IngestBatch:
     called.append(limit)
-    return 3
+    assert pages is None
+    return IngestBatch(3, False, "start")
 
   monkeypatch.setattr(cli, "ingest_datajud", fake)
   assert cli.main(["ingest", "--source", "datajud", "--limit", "7"]) == 0
@@ -55,7 +57,7 @@ def test_ingest_requires_source() -> None:
 def test_ingest_fetch_error_is_friendly(
   monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-  def failing(settings: object, limit: int) -> int:
+  def failing(settings: object, limit: int, pages: int | None = None) -> IngestBatch:
     raise FetchError("HTTP 429")
 
   monkeypatch.setattr(cli, "ingest_datajud", failing)

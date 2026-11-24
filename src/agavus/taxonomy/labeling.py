@@ -48,8 +48,13 @@ def label_case(record: CaseRecord) -> LabelDecision:
 
 
 def label_text(document: TextDocument) -> LabelDecision:
-  """Label a text document via the curated statute map; else review."""
+  """Label a text: statute map, then organ name carried in origin_ref."""
   for name, area in STATUTE_AREA.items():
     if document.origin_ref.startswith(name):
       return LabelDecision(document.id, area, LabelSource.MANUAL, False, f"statute map: {name}")
+  organ = organs.organ_label(document.origin_ref)
+  if organ is not None:
+    return LabelDecision(document.id, organ, LabelSource.ORGAN, False, "organ in origin_ref")
+  if "tribunal do júri" in document.origin_ref.casefold():
+    return LabelDecision(document.id, None, LabelSource.PENDING, True, "júri without tpu")
   return LabelDecision(document.id, None, LabelSource.PENDING, True, "no signal")

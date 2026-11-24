@@ -24,12 +24,25 @@ def as_int(value: object) -> int:
   return value if isinstance(value, int) else 0
 
 
+_COMPACT_DATE = 8
+_ISO_DATE = 10
+
+
 def parse_date(value: object) -> date | None:
-  """Parse an ISO date or datetime string; None when absent/invalid."""
+  """Parse an ISO date or compact YYYYMMDD[HHMMSS]; None when absent or invalid.
+
+  DataJud stores `dataAjuizamento` as 14 digits (`YYYYMMDDHHmmss`) and, on
+  some rows, as ISO. The first eight digits are the Brasília calendar date.
+  """
   text = as_str(value)
-  if not text:
+  if len(text) >= _COMPACT_DATE and text[:_COMPACT_DATE].isdigit():
+    try:
+      return date(int(text[0:4]), int(text[4:6]), int(text[6:_COMPACT_DATE]))
+    except ValueError:
+      return None
+  if len(text) < _ISO_DATE:
     return None
   try:
-    return date.fromisoformat(text[:10])
+    return date.fromisoformat(text[:_ISO_DATE])
   except ValueError:
     return None

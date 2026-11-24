@@ -63,7 +63,8 @@ to make a gate pass — fix the code.
 - **Config only in `agavus.config.settings`** (frozen typed `Settings`).
   New config = env var + field + `.env.example` entry. Never read
   `os.environ` elsewhere.
-- **Scope**: TJDFT, window 2020-01-01 → current date, domains F + M only
+- **Scope**: TJDFT, all dates the source holds (today backward until empty),
+  domains F + M only
   (general criminal is out of scope). Do not widen scope without a design
   doc change first.
 

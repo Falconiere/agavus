@@ -27,6 +27,8 @@ def test_as_str_and_int() -> None:
 def test_parse_date_variants() -> None:
   assert parse_date("2024-05-10") == date(2024, 5, 10)
   assert parse_date("2024-05-10T14:30:00.000Z") == date(2024, 5, 10)
+  assert parse_date("20240510143000") == date(2024, 5, 10)
+  assert parse_date("20241301000000") is None
   assert parse_date("") is None
   assert parse_date("not-a-date") is None
   assert parse_date(None) is None

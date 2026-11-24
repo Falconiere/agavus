@@ -1,31 +1,30 @@
-# Data range — 2020-01-01 → current date
+# Data range — current date back to the oldest available row
 
 ## The window
 
-- **Start**: `2020-01-01` (fixed, configurable via `AGAVUS_DATA_START`).
-- **End**: the **current date at ingestion time** — rolling, not fixed.
-  Example: an ingestion run on 2026-11-24 covers 2020-01-01 → 2026-11-24.
-- Applied to case metadata (DataJud) and decisions (DJEN/portal) by their
-  distribution/decision dates.
+There is no start date. Ingestion starts at the current date and walks
+backward, newest first, until the source returns nothing more for the
+subject (família and Maria da Penha at the TJDFT).
 
-## Why 2020
+`AGAVUS_DATA_START` remains in settings so older environment files still
+load. Fetches do not read it.
 
-1. **Legal currency**: the window captures the recent reforms that define
-   current practice — Lei 14.550/2023 (autonomous protective measures),
-   Lei 14.994/2024 (feminicídio as autonomous crime, art. 24-A crime of
-   violating protective measures). Older data would teach outdated procedure.
-2. **Digital maturity**: post-2020 records are consistently born-digital
-   (PJe/DJEN), with stable metadata and TPU coding.
-3. **Volume control**: a single court × ~7 years is CPU-manageable for
-   training and indexing; measure actual counts at first ingestion.
-4. **Vocabulary stability**: less terminological drift for the classifier.
+## Why there is no floor
 
-## Rolling end: incremental ingestion
+The subject is the area, not a reform year. Older F/M metadata and published
+decisions stay in scope. Lei 14.550/2023 and Lei 14.994/2024 still matter;
+they are not a reason to drop earlier cases. Volume is bounded by the
+subject filter and by the 2s request throttle, not by a calendar cutoff.
 
-- Each run fetches only what is **new since the last successful run**
-  (watermark stored with the processed data), then re-labels/re-indexes
-  affected records. Idempotent: re-running a day changes nothing.
-- The corpus is always "2020 → today"; there is no frozen end date.
+## Walk
+
+- Sort newest → oldest. A short page, or an empty continuation after a
+  saved cursor, finishes that source.
+- The cursor is committed after every saved page. A 429, a 504, or a
+  timed-out empty body does not move it.
+- A finished walk only asks for rows newer than the newest hit already
+  stored, still bounded by the end of today.
+- Re-running a finished day adds only that new head. Ids are deterministic.
 
 ## Exception: statutes are NOT windowed
 
@@ -39,7 +38,8 @@ keep their original wording with their date visible — never silently
 
 ## Splits and snapshots
 
-- **Train/held-out split by case, preferably by time** (e.g. train ≤ 2025,
-  held-out 2026+) so evaluation mimics "future cases" and prevents leakage.
+- **Train/held-out split by case, preferably by time** (latest year held
+  out) so evaluation mimics "future cases" and prevents leakage. The split
+  is not a fetch cutoff.
 - Each ingestion run records a **manifest** (run date, window, counts per
   source, watermark) so any corpus state is explainable and reproducible.

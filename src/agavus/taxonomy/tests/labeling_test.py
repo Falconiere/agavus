@@ -59,3 +59,32 @@ def test_statute_map() -> None:
   decision = label_text(doc)
   assert decision.domain_label == "F"
   assert decision.label_source is LabelSource.MANUAL
+
+
+def _djen(doc_id: str, origin: str, text: str) -> TextDocument:
+  return TextDocument(
+    id=doc_id,
+    source=TextSource.DJEN,
+    origin_ref=origin,
+    published_at=None,
+    text=text,
+    citations=(),
+    domain_label=None,
+    label_source=LabelSource.PENDING,
+    raw_ref="raw/djen.json",
+  )
+
+
+def test_djen_origin_uses_organ() -> None:
+  doc = _djen("djen-1", "Decisão, 1ª Vara de Família, processo 1, DJEN 2024-05-10, id 9", "guarda")
+  decision = label_text(doc)
+  assert decision.domain_label == "F"
+  assert decision.label_source is LabelSource.ORGAN
+
+
+def test_jury_origin_stays_in_review() -> None:
+  doc = _djen("djen-2", "Acórdão, Tribunal do Júri, processo 1, DJEN 2024-05-10, id 8", "trecho")
+  decision = label_text(doc)
+  assert decision.domain_label is None
+  assert decision.needs_review
+  assert decision.reason == "júri without tpu"

@@ -14,6 +14,8 @@ from agavus.answer.compose import compose
 from agavus.classify.pipeline import TrainedClassifier, train_classifier, training_set
 from agavus.classify.store import load_model, save_model
 from agavus.config.settings import Settings, load_settings
+from agavus.corpus.batch import IngestBatch
+from agavus.corpus.djen import ingest_djen
 from agavus.corpus.fetch import FetchError
 from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_statutes
 from agavus.corpus.storage import CorpusStorage
@@ -64,7 +66,17 @@ def _print_trace(classifier: TrainedClassifier, text: str, mapping: dict[str, fl
     print(f"top features: {rendered}")
 
 
+def _print_batch(source: str, batch: IngestBatch) -> None:
+  status = "done" if batch.done else "partial"
+  print(f"ingest {source}: {batch.new} new records; {status}; cursor {batch.cursor}")
+  for line in batch.unknown:
+    print(f"unknown tpu: {line}")
+
+
 def _run_ingest(settings: Settings, source: str, limit: int, args: argparse.Namespace) -> int:
+  if args.pages is not None and args.pages < 1:
+    print("--pages must be >= 1")
+    return 1
   if source == "statutes" and args.raw_file is not None:
     if not args.statute_name:
       print("--raw-file requires --statute-name")
@@ -73,11 +85,18 @@ def _run_ingest(settings: Settings, source: str, limit: int, args: argparse.Name
     print(f"import {args.statute_name}: {new} new records")
     return 0
   try:
-    new = ingest_datajud(settings, limit) if source == "datajud" else ingest_statutes(settings)
+    if source == "datajud":
+      batch = ingest_datajud(settings, limit, pages=args.pages)
+    elif source == "djen":
+      batch = ingest_djen(settings, pages=args.pages)
+    else:
+      new = ingest_statutes(settings)
+      print(f"ingest statutes: {new} new records")
+      return 0
   except FetchError as exc:
     print(f"ingest {source} failed (source unavailable, nothing saved): {exc}")
     return 1
-  print(f"ingest {source}: {new} new records")
+  _print_batch(source, batch)
   return 0
 
 
@@ -253,8 +272,11 @@ def main(argv: Sequence[str] | None = None) -> int:
   ingest = sub.add_parser(
     "ingest", parents=[common], help="ingest corpus sources into the data dir"
   )
-  ingest.add_argument("--source", choices=("datajud", "statutes"), required=True)
+  ingest.add_argument("--source", choices=("datajud", "statutes", "djen"), required=True)
   ingest.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
+  ingest.add_argument(
+    "--pages", type=int, default=None, help="cap pages this run; default walks until empty"
+  )
   ingest.add_argument("--raw-file", default=None, help="offline statute payload path")
   ingest.add_argument("--statute-name", default=None, help="e.g. 'Lei 12.318/2010'")
   sub.add_parser("label", parents=[common], help="label stored records (TPU + organ rules)")
