@@ -13,6 +13,9 @@ preprocessing (tokenization, n-grams, citation regexes), one layer below.
 | [BM25](bm25.md) | rank documents for a query | `retrieve/search` | §6 |
 | [Three-way decisions](three-way-decisions.md) | accept / reject / defer | `decide/rule` | §7 |
 
+End-to-end view: **[classification-pipeline.md](classification-pipeline.md)**
+— how records become feature vectors become predictions.
+
 Reading order: TF-IDF → logistic regression → calibration → BM25 →
 three-way decisions. Cosine can be read any time after TF-IDF.
 

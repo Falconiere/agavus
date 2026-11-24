@@ -131,6 +131,7 @@ anonymized (re-identification risk). Split:
 ## 6. Model stack
 
 Formula-by-formula explanations with worked examples: **[docs/math/](math/README.md)**.
+End-to-end data-to-prediction flow: **[math/classification-pipeline.md](math/classification-pipeline.md)**.
 
 | Tier | Component | Math | Role |
 | ---- | ------------------------- | ------------------------------------------------ | ------------------------- |
