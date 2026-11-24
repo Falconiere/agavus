@@ -1,7 +1,39 @@
 # agavus
 
-Domain-organized Python scaffold (hello world) with strict, enforced quality gates.
-Groundwork for a Brazilian legal LLM project. **Pure Python tooling — no Node.**
+CPU-only legal intelligence for Brazilian law — starting as a domain-organized
+Python scaffold (hello world) with strict, enforced quality gates.
+**Pure Python tooling — no Node, no GPU required.**
+
+## Vision
+
+A legal **classifier + search/answer engine** restricted, for now, to **TJDFT**
+data and three routing domains:
+
+| Code | Domain |
+| ---- | ---------------------------------------------- |
+| F | Direito de família (divórcio, guarda, alimentos) |
+| M | Maria da Penha (Lei 11.340/2006, medidas protetivas) |
+| P | Direito penal / criminal |
+
+Core ideas (full details in **[docs/DESIGN.md](docs/DESIGN.md)**):
+
+- **Mathematical core, CPU-trainable**: TF-IDF + calibrated logistic
+  regression for classification; BM25 + statute-citation features for
+  retrieval. Answers are *cited excerpts*, never generated opinions.
+- **Free labels**: CNJ TPU taxonomy + DataJud metadata; TJDFT specialized
+  organs (varas) as weak labels.
+- **Three-way decisions** (accept / reject / defer) with a cost-sensitive loss
+  matrix — safety-critical errors (e.g. misrouting Maria da Penha as ordinary
+  family law) are priced highest; ambiguous cases are deferred, never forced.
+- **Routing taxonomy, not legal branches**: Maria da Penha is a hybrid statute
+  (penal + civil/família); M↔F overlap is expected and handled by the boundary
+  region, with multi-label as a documented evolution path.
+- **Corpus never in git** (public repo + LGPD): real data lives in a
+  gitignored, configurable `data/` dir (`AGAVUS_DATA_DIR`); the repo holds
+  only code, schema, taxonomy tables, and synthetic test fixtures.
+
+Roadmap: `corpus → taxonomy → classify → decide → retrieve → answer`.
+Status: **design complete, implementation not started.**
 
 ## Requirements
 
@@ -38,6 +70,8 @@ through `uv`, see `.pre-commit-config.yaml`). Run them manually with
 ## Structure (by domain)
 
 ```
+docs/
+  DESIGN.md              # architecture, data, models, loss matrix, evaluation
 src/agavus/
   __main__.py            # CLI entry point
   config/                # configuration domain (isolated, env-driven)
@@ -53,8 +87,9 @@ scripts/
   *_test.py              # co-located tests for each script
 ```
 
-Each domain is a package under `src/agavus/`. New domains (e.g. `corpus`, `training`)
-follow the same pattern: module + co-located `*_test.py`.
+Each domain is a package under `src/agavus/`. New domains (`corpus`,
+`taxonomy`, `classify`, `decide`, `retrieve`, `answer`) follow the same
+pattern: module + co-located `*_test.py`.
 
 ## Configuration
 
@@ -65,6 +100,8 @@ variables. Copy `.env.example` to `.env`; never commit `.env`.
 | Variable      | Default | Meaning              |
 | ------------- | ------- | -------------------- |
 | `AGAVUS_NAME` | `world` | Name used in greeting |
+
+Planned (see design doc): `AGAVUS_DATA_DIR` for the gitignored corpus location.
 
 ## Conventions (enforced, not optional)
 
@@ -81,6 +118,8 @@ variables. Copy `.env.example` to `.env`; never commit `.env`.
 - **Tests co-located**: `foo.py` is tested by `foo_test.py` in the same directory.
 - **Domain-first layout**: group by business domain, not by technical layer.
 - **All gates run on every commit** via pre-commit local hooks.
+- **No real case data in git, ever** — synthetic fixtures only; corpus lives
+  outside the repo (LGPD).
 
 ## Tooling notes
 
