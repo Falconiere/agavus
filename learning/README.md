@@ -13,6 +13,8 @@ flowchart LR
   F --> G["7. The math"]
   G --> H["8. Where it<br/>came from"]
   H --> I["9. Finding<br/>the article"]
+  I --> J["10. Meaning as<br/>a position"]
+  J --> K["11. Neural<br/>networks"]
 ```
 
 | Lesson | Question it answers |
@@ -26,6 +28,8 @@ flowchart LR
 | [7. The math](07-the-math.md) | Where does each number come from? |
 | [8. How people got there](08-how-they-got-there.md) | Why is the formula like that? Read before 7 if 7 is hard. |
 | [9. Where the article number comes from](09-where-does-the-number-come-from.md) | How does it know "art. 22"? |
+| [10. Embeddings](10-embeddings.md) | How can numbers carry meaning? |
+| [11. Neural networks](11-neural-networks.md) | How does a machine find its own clues? |
 
 Run the real thing at any time:
 
