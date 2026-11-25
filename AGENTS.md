@@ -46,6 +46,7 @@ to make a gate pass — fix the code.
 ## Project invariants (violating these is a design bug)
 
 - **Pure Python, CPU-only.** Never add Node/npm deps or GPU-required code.
+  The LLM lab (`docs/llm-lab.md`) may *use* a GPU but never require one.
   Everything runs through `uv`.
 - **Corpus never in git.** Public repo + LGPD. Real data only in gitignored
   `data/` (`AGAVUS_DATA_DIR`); git holds code, taxonomy tables, and

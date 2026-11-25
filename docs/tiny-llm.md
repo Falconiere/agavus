@@ -108,6 +108,10 @@ data/feature/threshold fixes are exhausted, and the gap is attributable to
 model weights (e.g. embeddings keep missing legal synonyms). Never invest
 in LoRA as a capability in advance.
 
+**Learning exception**: the isolated [LLM lab](llm-lab.md) may train tiny
+models from scratch, for learning only. Its models never reach users; this
+gate still governs anything that does.
+
 **Risks if triggered**: overfitting to TJDFT vocabulary (hurts area
 expansion), catastrophic forgetting of pt-BR ability, license checks,
 versioning + full eval burden. Adapters are artifacts: checksum-pinned,

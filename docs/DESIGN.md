@@ -278,3 +278,5 @@ evals): **[docs/response-quality.md](response-quality.md)**.
   behind a verifier — transformer, not oracle. Disabled by default,
   shadow-gated, cached; the classical core is complete without it.
   **[docs/tiny-llm.md](tiny-llm.md)**.
+- **LLM lab** (approved, learning only): isolated tiny transformer with LM and
+  area heads; never feeds answers. **[docs/llm-lab.md](llm-lab.md)**.
