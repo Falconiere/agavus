@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agavus"
 version = "0.3.0"
-description = "Domain-organized Python scaffold (hello world) with strict quality gates."
+description = "CPU-only legal classifier and cited statute search for Brazilian family and domestic-violence law (TJDFT)."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
