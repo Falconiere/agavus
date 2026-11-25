@@ -49,8 +49,8 @@ On the real laws:
 
 | | Loss |
 | --- | --- |
-| Knows nothing (98 tokens) | 4.585 |
-| **Our bigram** | **2.296** |
+| Knows nothing (99 tokens) | 4.595 |
+| **Our bigram** | **2.305** |
 
 Only compare losses when the tokens and the test text are the same.
 

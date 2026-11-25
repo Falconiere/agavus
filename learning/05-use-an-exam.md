@@ -7,12 +7,12 @@ So we hide part of the text. The model never trains on it.
 
 ```mermaid
 flowchart TD
-  A["357 law articles"] --> B["285 to study<br/>training"]
-  A --> C["72 hidden<br/>held-out exam"]
+  A["347 law articles"] --> B["277 to study<br/>training"]
+  A --> C["70 hidden<br/>held-out exam"]
   B --> M["Model learns"]
-  M --> T["Training loss<br/>2.305"]
+  M --> T["Training loss<br/>2.310"]
   B --> T
-  M --> H["Held-out loss<br/>2.296"]
+  M --> H["Held-out loss<br/>2.305"]
   C --> H
 ```
 

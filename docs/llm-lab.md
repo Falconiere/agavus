@@ -39,7 +39,7 @@ decision rule are untouched.
 
 | Data | Lab use | GPU rental |
 | --- | --- | --- |
-| Statute articles in the corpus (357; ~148 KB) | yes | yes |
+| Statute articles in the corpus (347; ~150 KB) | yes | yes |
 | Authored seed queries | yes (class head) | yes |
 | Openly licensed pt-BR text | later; license recorded first | yes, if license allows |
 | DJEN decisions, DataJud records, anything derived from them | **no** | **never** |
@@ -149,7 +149,7 @@ Rules:
 
 | Risk | Response |
 | --- | --- |
-| 148 KB of text overfits quickly | expected; early stopping on held-out loss, keep models small |
+| 150 KB of text overfits quickly | expected; early stopping on held-out loss, keep models small |
 | Fluent output mistaken for legal truth | lab samples never reach `answer/` |
 | The gold set becomes training feedback | dev and hidden splits; hidden set opened per milestone |
 | Costs creep | §6 budget and shutdown rules |
