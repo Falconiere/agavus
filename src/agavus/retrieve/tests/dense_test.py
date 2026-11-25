@@ -4,9 +4,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from agavus.corpus.httpfixtures import sample_text
 from agavus.corpus.storage import CorpusStorage
+from agavus.retrieve import dense
 from agavus.retrieve.dense import CHUNK_WORDS, chunk, index_statutes, search_statutes
 from agavus.retrieve.encoder import MODEL_VERSION, FloatArray, load_encoder
 
@@ -63,3 +65,22 @@ def test_chunk_keeps_every_word() -> None:
   text = " ".join(str(number) for number in range(CHUNK_WORDS + 5))
   assert " ".join(chunk(text)) == text
   assert chunk("") == [""]
+
+
+def test_failed_download_leaves_word_search(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+  def unreachable(data_dir: Path) -> Path:
+    raise OSError("no network")
+
+  monkeypatch.setattr(dense, "download_encoder", unreachable)
+  assert dense.prepare_encoder(tmp_path) is None
+
+
+def test_prepared_encoder_indexes_statutes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  storage = _corpus(tmp_path)
+  monkeypatch.setattr(dense, "download_encoder", lambda data_dir: data_dir)
+  monkeypatch.setattr(dense, "load_encoder", lambda data_dir: FakeEncoder())
+  encoder = dense.prepare_encoder(tmp_path)
+  assert encoder is not None
+  assert search_statutes(storage, "pensão", 1, encoder)[0].doc_id == "a"

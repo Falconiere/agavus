@@ -18,6 +18,8 @@ escopado em **direito de família** e **Maria da Penha / violência doméstica**
 
 - Núcleo 100% CPU: TF-IDF + regressão logística calibrada + decisão de três
   vias (aceitar / adiar / rejeitar) com matriz de custos sensível à segurança.
+- Busca por significado: encoder público `multilingual-e5-small` (MIT) só ordena
+  os artigos; o texto citado vem sempre da lei. Pode errar o artigo: confira.
 - Respostas são **trechos verbatim citados**, nunca opiniões geradas.
 - Incerteza é adiada, não chutada. Fora do escopo é dito claramente.
 - Privacidade: apenas leis de domínio público + seeds sintéticos neste Space

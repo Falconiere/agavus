@@ -2,7 +2,8 @@
 
 Privacy by construction: only public-domain statutes (bundled in assets/)
 + synthetic seeds are bootstrapped here; no real case data ever enters this
-Space (LGPD). No network needed at startup.
+Space (LGPD). Startup downloads pinned public encoder weights; without them
+the engine falls back to word search. Questions never leave the Space.
 """
 
 from functools import cache
@@ -16,6 +17,8 @@ from agavus.config.settings import load_settings
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.publish.bootstrap import ensure_model
+from agavus.retrieve.dense import prepare_encoder
+from agavus.retrieve.encoder import Encoder
 
 ASSETS = Path(__file__).parent / "assets"
 EXAMPLES = [
@@ -31,6 +34,12 @@ def _bootstrap(data_dir: Path) -> Path:
   return ensure_model(load_settings(), ASSETS)
 
 
+@cache
+def _encoder(data_dir: Path) -> Encoder | None:
+  """Encoder over the bootstrapped statutes — prepared once per data dir."""
+  return prepare_encoder(data_dir)
+
+
 def answer_question(question: str) -> tuple[str, str, str]:
   """Return (decision header, cited answer, audit trace) for the UI."""
   if not question.strip():
@@ -41,7 +50,7 @@ def answer_question(question: str) -> tuple[str, str, str]:
   mapping = {
     label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)
   }
-  answer = compose(question, mapping, CorpusStorage(settings.data_dir))
+  answer = compose(question, mapping, CorpusStorage(settings.data_dir), _encoder(settings.data_dir))
   decision = decide(mapping)
   header = f"**Decisão:** `{answer.decision}` · confiança {max(mapping.values()):.2f}"
   body = f"```\n{answer.text}\n```"
@@ -83,5 +92,13 @@ def build_demo() -> gr.Blocks:
   return demo
 
 
+def warm_up() -> None:
+  """Do the slow work before serving, so no visitor waits for it."""
+  data_dir = load_settings().data_dir
+  _bootstrap(data_dir)
+  _encoder(data_dir)
+
+
 if __name__ == "__main__":
+  warm_up()
   build_demo().launch()

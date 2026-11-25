@@ -191,3 +191,6 @@ rank fusion with BM25 was worse than meaning alone (dev first 17). Targets are
 not met: recall@5 is 0.73 hidden against 0.90, and wrong answers remain.
 Hidden has now been opened once: the next milestone needs a fresh set. Rerun
 `agavus embed` after statutes change.
+
+Quantized weights (int8, 118 MB) were measured and not adopted: dev first 27,
+top-5 31, with no speed gain against the full model (470 MB: 29, 34).

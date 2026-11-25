@@ -4,10 +4,15 @@ Falls back to BM25 when there is no encoder or no index, so the classical
 core stays complete (docs/DESIGN.md §6, tier 4).
 """
 
+import logging
+from pathlib import Path
+
+import httpx
+
 from agavus.corpus.records import TextDocument, TextSource
 from agavus.corpus.statutes import extract_citations
 from agavus.corpus.storage import CorpusStorage
-from agavus.retrieve.encoder import MODEL_VERSION, Encoder
+from agavus.retrieve.encoder import MODEL_VERSION, Encoder, download_encoder, load_encoder
 from agavus.retrieve.search import Hit, extract_snippet, search
 
 CHUNK_WORDS = 120
@@ -83,3 +88,19 @@ def _by_meaning(storage: CorpusStorage, query: str, limit: int, encoder: Encoder
   return [_hit(texts[doc_id], query, score) for doc_id, score in best.items() if doc_id in texts][
     :limit
   ]
+
+
+def prepare_encoder(data_dir: Path) -> Encoder | None:
+  """Download the pinned weights and index statutes; None when unreachable.
+
+  A failed download leaves the engine on word search: never a failed start.
+  """
+  try:
+    download_encoder(data_dir)
+  except (OSError, httpx.HTTPError) as error:
+    logging.getLogger(__name__).warning("encoder unavailable, using word search: %s", error)
+    return None
+  encoder = load_encoder(data_dir)
+  if encoder is not None:
+    index_statutes(CorpusStorage(data_dir), encoder)
+  return encoder
