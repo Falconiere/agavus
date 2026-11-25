@@ -211,7 +211,7 @@ before the work. The 10-item gold set had hidden a safety problem: M recall
 Unsafe = an M question accepted as F or rejected. Loss matrix and thresholds
 are unchanged. The same author wrote seeds and questions (no near-duplicates).
 Zero unsafe in 20 still allows a true rate up to about 14% (95%). Without
-encoder weights the word router, with its unsafe rate, is what runs. Space
+encoder weights every question is deferred (since v0.4.0). Space
 releases now require the router gate (`publish/router_gate.py`).
 More questions answered means more retrieval errors shown: retrieval dev with
 real routing is 21 right, 5 wrong, 14 deferred (was 17/1/22).

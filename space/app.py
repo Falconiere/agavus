@@ -3,7 +3,7 @@
 Privacy by construction: only public-domain statutes (bundled in assets/)
 + synthetic seeds are bootstrapped here; no real case data ever enters this
 Space (LGPD). Startup downloads pinned public encoder weights; without them
-the engine falls back to word search. Questions never leave the Space.
+every question is deferred. Questions never leave the Space.
 """
 
 from functools import cache
@@ -11,10 +11,8 @@ from pathlib import Path
 
 import gradio as gr
 
-from agavus.answer.compose import compose
-from agavus.classify.pipeline import TrainedClassifier
+from agavus.answer.compose import compose, unavailable
 from agavus.classify.router_store import ensure_router
-from agavus.classify.store import load_model
 from agavus.config.settings import load_settings
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
@@ -42,36 +40,25 @@ def _encoder(data_dir: Path) -> Encoder | None:
   return prepare_encoder(data_dir)
 
 
-def _route(
-  question: str, classifier: TrainedClassifier, encoder: Encoder | None
-) -> dict[str, float]:
-  """Area probabilities: by meaning when possible, else by words."""
-  if encoder is not None:
-    return ensure_router(_bootstrap(load_settings().data_dir), encoder).probabilities([question])[0]
-  return classifier.probabilities(question)
-
-
 def answer_question(question: str) -> tuple[str, str, str]:
   """Return (decision header, cited answer, audit trace) for the UI."""
   if not question.strip():
     return ("", "Digite uma pergunta.", "")
-  settings = load_settings()
-  classifier = load_model(_bootstrap(settings.data_dir), "classifier")
-  encoder = _encoder(settings.data_dir)
-  mapping = _route(question, classifier, encoder)
-  answer = compose(question, mapping, CorpusStorage(settings.data_dir), encoder)
+  data_dir = load_settings().data_dir
+  models = _bootstrap(data_dir)
+  encoder = _encoder(data_dir)
+  if encoder is None:
+    answer = unavailable()
+    return (f"**Decisão:** `{answer.decision}`", f"```\n{answer.text}\n```", "")
+  mapping = ensure_router(models, encoder).probabilities([question])[0]
+  answer = compose(question, mapping, CorpusStorage(data_dir), encoder)
   decision = decide(mapping)
   header = f"**Decisão:** `{answer.decision}` · confiança {max(mapping.values()):.2f}"
   body = f"```\n{answer.text}\n```"
   losses = " · ".join(f"{name} {value:.2f}" for name, value in decision.expected_losses.items())
-  features = (
-    ", ".join(f"{term} ({value:+.2f})" for term, value in classifier.top_features(question))
-    if encoder is None
-    else "roteamento por significado"
-  )
   probabilities = " · ".join(f"{label} {value:.3f}" for label, value in mapping.items())
   trace = (
-    f"probabilidades: {probabilities}\n\nperdas esperadas: {losses}\n\ntop features: {features}"
+    f"probabilidades: {probabilities}\n\nperdas esperadas: {losses}\n\nroteamento por significado"
   )
   return (header, body, trace)
 

@@ -93,12 +93,12 @@ def _by_meaning(storage: CorpusStorage, query: str, limit: int, encoder: Encoder
 def prepare_encoder(data_dir: Path) -> Encoder | None:
   """Download the pinned weights and index statutes; None when unreachable.
 
-  A failed download leaves the engine on word search: never a failed start.
+  A failed download never fails the start; callers then defer every question.
   """
   try:
     download_encoder(data_dir)
   except (OSError, httpx.HTTPError) as error:
-    logging.getLogger(__name__).warning("encoder unavailable, using word search: %s", error)
+    logging.getLogger(__name__).warning("encoder unavailable: %s", error)
     return None
   encoder = load_encoder(data_dir)
   if encoder is not None:

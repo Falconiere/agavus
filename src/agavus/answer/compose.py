@@ -30,6 +30,10 @@ CLARIFY_MESSAGE = (
   "(guarda, visitas, alimentos, divórcio) ou violência doméstica?"
 )
 NO_BASIS_MESSAGE = "Não encontrei base segura no corpus para responder com citação."
+UNAVAILABLE_MESSAGE = (
+  "O modelo de classificação não está disponível agora, então não posso responder com segurança. "
+  "Tente novamente mais tarde."
+)
 CONTEXT_HITS = 2
 DOMAIN_CLEAR_MIN = 0.6
 TOPIC_HINTS = "Ex.: medidas protetivas, descumprimento, guarda, visitas, alimentos, divórcio."
@@ -105,6 +109,11 @@ def _clarification(probabilities: Mapping[str, float]) -> str:
   if top != OUT_OF_SCOPE.code and probabilities[top] >= DOMAIN_CLEAR_MIN:
     return f"Sua pergunta parece ser sobre {AREAS[top].name}. Qual o tema específico? {TOPIC_HINTS}"
   return CLARIFY_MESSAGE
+
+
+def unavailable() -> Answer:
+  """Defer every question when the router cannot load (fail safe)."""
+  return Answer(decision="defer", text=UNAVAILABLE_MESSAGE, sources=())
 
 
 def _lacks_topic(query: str) -> bool:

@@ -6,11 +6,12 @@ per docs/cli.md. Exit codes for -p: 0 accept · 10 defer · 20 reject · 1 error
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
-from agavus.answer.compose import compose
+from agavus.answer.compose import compose, unavailable
 from agavus.classify.pipeline import TrainedClassifier, train_classifier, training_set
 from agavus.classify.router_store import ensure_router
 from agavus.classify.store import load_model, save_model
@@ -225,33 +226,30 @@ def _run_search(settings: Settings, query: str, limit: int, as_json: bool) -> in
 
 
 def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) -> int:
-  classifier = _load_classifier(settings, "ask")
-  if classifier is None:
-    return 1
   encoder = load_encoder(settings.data_dir)
-  mapping = (
-    ensure_router(_models_db(settings), encoder).probabilities([question])[0]
-    if encoder is not None
-    else classifier.probabilities(question)
-  )
-  explained = classifier if encoder is None else None
-  answer = compose(question, mapping, CorpusStorage(settings.data_dir), encoder)
+  mapping: dict[str, float] = {}
+  if encoder is None:
+    answer = unavailable()
+    print("ask: encoder not installed — run `agavus embed`", file=sys.stderr)
+  else:
+    mapping = ensure_router(_models_db(settings), encoder).probabilities([question])[0]
+    answer = compose(question, mapping, CorpusStorage(settings.data_dir), encoder)
   accepted = answer.decision.startswith("accept-")
   if as_json:
     payload: dict[str, object] = {
       "decision": answer.decision,
       "area": answer.decision.removeprefix("accept-") if accepted else None,
-      "confidence": max(mapping.values()),
+      "confidence": max(mapping.values(), default=0.0),
       "text": answer.text,
       "sources": [{"ref": ref} for ref in answer.sources],
     }
-    if explain:
-      payload["trace"] = _trace(explained, question, mapping)
+    if explain and mapping:
+      payload["trace"] = _trace(None, question, mapping)
     _print_json(payload)
   else:
     print(answer.text)
-    if explain:
-      _print_trace(explained, question, mapping)
+    if explain and mapping:
+      _print_trace(None, question, mapping)
   if accepted:
     return 0
   return 10 if answer.decision == "defer" else 20

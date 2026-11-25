@@ -7,6 +7,7 @@ import pytest
 
 from agavus import cli
 from agavus.answer.compose import Answer
+from agavus.classify.fixtures import UnsureRouter
 from agavus.corpus.batch import IngestBatch
 from agavus.corpus.fetch import FetchError
 from agavus.evals.run import EvalReport
@@ -14,6 +15,9 @@ from agavus.evals.run import EvalReport
 
 class FakeModel:
   classes = ("F", "M", "O")
+
+
+DEFER_CODE = 10
 
 
 class FakeClassifier:
@@ -93,8 +97,24 @@ def _prepare_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
   monkeypatch.setattr(cli, "load_model", lambda path, name: FakeClassifier())
 
 
-def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _prepare_router(monkeypatch: pytest.MonkeyPatch) -> None:
+  monkeypatch.setattr(cli, "load_encoder", lambda data_dir: object())
+  monkeypatch.setattr(cli, "ensure_router", lambda path, encoder: UnsureRouter())
+
+
+def test_ask_without_encoder_defers(
+  tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
   _prepare_model(tmp_path, monkeypatch)
+  code = _run_with_data_dir(monkeypatch, tmp_path, ["-p", "ele me bateu", "--json", "--explain"])
+  assert code == DEFER_CODE
+  payload = json.loads(capsys.readouterr().out)
+  assert payload["decision"] == "defer"
+  assert payload["sources"] == []
+
+
+def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _prepare_router(monkeypatch)
   answers = {
     "accept-M": Answer("accept-M", "resposta", ("fonte",)),
     "defer": Answer("defer", "clarify", ()),
@@ -108,7 +128,7 @@ def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 def test_ask_json_output(
   tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-  _prepare_model(tmp_path, monkeypatch)
+  _prepare_router(monkeypatch)
   monkeypatch.setattr(
     cli, "compose", lambda q, p, s, e: Answer("accept-M", "resposta", ("Lei 11.340/2006, art. 22",))
   )

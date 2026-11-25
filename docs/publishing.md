@@ -6,7 +6,7 @@ Status: **model repo + Space LIVE**
 - Demo: https://huggingface.co/spaces/Falconiere/agavus
   (Gradio, cpu-basic; offline bootstrap from bundled public-domain statutes
   in `space/assets/` — UTF-8 transcriptions, LGPD-safe; startup downloads the pinned public
-  encoder, ~470 MB, and falls back to word search when it cannot)
+  encoder, ~470 MB, and defers every question when it cannot)
 Pipeline: `agavus publish` (dry run) /
 `agavus publish --bootstrap space/assets --repo OWNER/NAME --space OWNER/NAME`.
 HF bucket `Falconiere/agavus` available for private artifacts (corpus

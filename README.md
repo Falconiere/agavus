@@ -144,6 +144,7 @@ agavus classify --file peticao.txt --explain
 Available today (MVP — full chain live):
 
 ```sh
+uv run agavus embed                                 # once: encoder + statute index
 uv run agavus -p "Qual é o artigo da lei de alienação parental?"
 # → cited excerpt of Lei 12.318/2010 + context + disclaimer (exit 0)
 uv run agavus ingest --source datajud --limit 500   # F/M metadata, today → oldest

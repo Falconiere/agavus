@@ -21,7 +21,7 @@ agavus label                                              # TPU + organ labeling
 agavus train                                              # fit + calibrate + report
 agavus eval                                               # gold-set evaluation
 agavus eval --retrieval                                   # article retrieval (dev questions)
-agavus embed                                              # download encoder, index statutes
+agavus embed                                              # download encoder (required by -p), index statutes
 agavus publish [--bootstrap ASSETS_DIR] [--repo OWNER/NAME] \
                [--space OWNER/NAME] [--revision REF]   # eval-gated HF release
 ```
