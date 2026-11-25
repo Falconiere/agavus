@@ -3,9 +3,13 @@
 import math
 
 import pytest
+import torch
 
 from agavus.lab.bigram import BOUNDARY, build_vocab, train_bigram, uniform_loss
 from agavus.lab.neural import NeuralConfig, examples, start, train
+
+# Many threads only fight over work this small.
+torch.set_num_threads(1)
 
 TEXTS = ["guarda guarda", "a guarda do filho"]
 CONFIG = NeuralConfig(context=3, vector=8, hidden=32, batch=32, rate=1e-2, check_every=50)

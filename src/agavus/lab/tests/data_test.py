@@ -6,7 +6,7 @@ from pathlib import Path
 import agavus
 from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
-from agavus.lab.bigram import train_bigram
+from agavus.lab.bigram import build_vocab
 from agavus.lab.data import load_articles, split_articles
 
 PACKAGE = Path(agavus.__file__).parent
@@ -49,7 +49,7 @@ def test_split_holds_out_whole_articles() -> None:
 
 def test_holdout_characters_never_enter_vocabulary() -> None:
   split = split_articles(["zzz", "a", "b", "c", "d"])
-  assert "z" not in train_bigram(split.train).vocab.chars
+  assert "z" not in build_vocab(split.train).chars
 
 
 def _imports_lab(path: Path) -> bool:

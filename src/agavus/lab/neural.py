@@ -12,7 +12,7 @@ import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy
 
-from agavus.lab.bigram import BOUNDARY, CharVocab
+from agavus.lab.bigram import BOUNDARY, Vocab
 
 EVAL_BATCH = 8192
 
@@ -37,7 +37,7 @@ class NeuralModel:
   """Weights: character vectors, hidden layer, output layer."""
 
   config: NeuralConfig
-  vocab: CharVocab
+  vocab: Vocab
   vectors: Tensor
   hidden_weights: Tensor
   hidden_bias: Tensor
@@ -87,7 +87,7 @@ class NeuralModel:
     return self.vocab.decode(ids)
 
 
-def examples(texts: Sequence[str], vocab: CharVocab, config: NeuralConfig) -> tuple[Tensor, Tensor]:
+def examples(texts: Sequence[str], vocab: Vocab, config: NeuralConfig) -> tuple[Tensor, Tensor]:
   """(previous characters, next character) for every position of every text."""
   contexts: list[list[int]] = []
   answers: list[int] = []
@@ -103,7 +103,7 @@ def examples(texts: Sequence[str], vocab: CharVocab, config: NeuralConfig) -> tu
   )
 
 
-def start(vocab: CharVocab, config: NeuralConfig) -> NeuralModel:
+def start(vocab: Vocab, config: NeuralConfig) -> NeuralModel:
   """Random small weights, reproducible by seed."""
   generator = torch.Generator().manual_seed(config.seed)
 
@@ -128,7 +128,7 @@ def start(vocab: CharVocab, config: NeuralConfig) -> NeuralModel:
 
 def train(
   texts: Sequence[str],
-  vocab: CharVocab,
+  vocab: Vocab,
   config: NeuralConfig,
   *,
   steps: int,

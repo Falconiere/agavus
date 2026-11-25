@@ -1,11 +1,18 @@
-"""Run the lab: `uv run python -m agavus.lab [bigram|network|neural]`."""
+"""Run the lab: `uv run python -m agavus.lab [bigram|network|neural|bpe]`."""
 
 import sys
 
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.lab.bigram import BigramModel, build_vocab, train_bigram, uniform_loss
+from agavus.lab.bigram import (
+  BigramModel,
+  build_vocab,
+  loss_per_character,
+  train_bigram,
+  uniform_loss,
+)
+from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
 from agavus.lab.data import Split, load_articles, split_articles
 from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
 from agavus.lab.neural import NeuralConfig, NeuralModel
@@ -20,6 +27,12 @@ STEPS = 2000
 THREADS = 4
 NEURAL_STEPS = 4000
 SHOWN_CHECKS = 8
+# Chosen on validation articles (learning/14-word-pieces.md).
+BIGRAM_MERGES = 1000
+NEURAL_MERGES = 100
+BPE_NEURAL_STEPS = 3000
+SHOWN_PIECES = 20
+EXAMPLE_WORDS = ("guarda", "guardar", "medida protetiva", "descumprimento")
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
 
@@ -87,9 +100,29 @@ def run_neural() -> int:
   return 0
 
 
+def run_bpe() -> int:
+  """Word pieces: what they look like, and the exam per character."""
+  split = _statutes()
+  if split is None:
+    return 1
+  torch.set_num_threads(THREADS)
+  full = train_bpe(split.train, BIGRAM_MERGES)
+  print("first pieces:", [full.piece(FIRST_MERGE + rank) for rank in range(SHOWN_PIECES)])
+  for word in EXAMPLE_WORDS:
+    print(f"{word}: {[full.piece(token) for token in full.encode(word)[1:-1]]}")
+  bigram = train_bigram(split.train, vocab=full)
+  small = BpeVocab(full.merges[:NEURAL_MERGES])
+  neural, _ = train_neural(split.train, small, NeuralConfig(), steps=BPE_NEURAL_STEPS)
+  for name, model in (("bigram", bigram), ("neural", neural)):
+    loss = loss_per_character(model.loss(split.holdout), split.holdout, model.vocab)
+    print(f"{name} + BPE holdout, per character: {loss:.4f}")
+  print(f"sample: {neural.sample(seed=SAMPLE_SEED, max_chars=SAMPLE_CHARS)}")
+  return 0
+
+
 def main(arguments: list[str]) -> int:
   """Choose the experiment; the bigram is the default."""
-  experiments = {"bigram": run_bigram, "network": run_network, "neural": run_neural}
+  experiments = {"bigram": run_bigram, "network": run_network, "neural": run_neural, "bpe": run_bpe}
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:
     print(f"lab: unknown experiment {name!r}; choose from {', '.join(experiments)}")

@@ -7,6 +7,7 @@ the loss is the mean of -ln P(true next character).
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,6 +16,23 @@ BOUNDARY = 0
 UNKNOWN = 1
 RESERVED = 2
 SMOOTHING = 1.0
+
+
+class Vocab(Protocol):
+  """Anything that turns text into token ids and back."""
+
+  @property
+  def size(self) -> int:
+    """Number of tokens (V)."""
+    ...
+
+  def encode(self, text: str) -> list[int]:
+    """Text to ids, wrapped in boundary tokens."""
+    ...
+
+  def decode(self, ids: Sequence[int]) -> str:
+    """Ids to text."""
+    ...
 
 
 @dataclass(frozen=True)
@@ -48,7 +66,7 @@ class CharVocab:
 class BigramModel:
   """One probability row per current token; every row sums to 1."""
 
-  vocab: CharVocab
+  vocab: Vocab
   probs: NDArray[np.float64]
 
   def probability(self, current: str, following: str) -> float:
@@ -80,7 +98,7 @@ def build_vocab(texts: Sequence[str]) -> CharVocab:
   return CharVocab(chars=tuple(sorted(set().union(*texts))))
 
 
-def count_pairs(texts: Sequence[str], vocab: CharVocab) -> NDArray[np.float64]:
+def count_pairs(texts: Sequence[str], vocab: Vocab) -> NDArray[np.float64]:
   """counts[current, next] over all texts; pairs never cross two texts."""
   counts = np.zeros((vocab.size, vocab.size), dtype=np.float64)
   for text in texts:
@@ -89,17 +107,25 @@ def count_pairs(texts: Sequence[str], vocab: CharVocab) -> NDArray[np.float64]:
   return counts
 
 
-def train_bigram(texts: Sequence[str], *, smoothing: float = SMOOTHING) -> BigramModel:
+def train_bigram(
+  texts: Sequence[str], *, smoothing: float = SMOOTHING, vocab: Vocab | None = None
+) -> BigramModel:
   """Count, add smoothing, normalize each row."""
   if not texts:
     raise ValueError("need at least one training text")
   if smoothing <= 0:
     raise ValueError("smoothing must be positive: unseen pairs need P > 0")
-  vocab = build_vocab(texts)
+  vocab = build_vocab(texts) if vocab is None else vocab
   counts = count_pairs(texts, vocab) + smoothing
   return BigramModel(vocab=vocab, probs=counts / counts.sum(axis=1, keepdims=True))
 
 
-def uniform_loss(vocab: CharVocab) -> float:
+def uniform_loss(vocab: Vocab) -> float:
   """Loss of guessing every token equally: ln V, the floor to beat."""
   return math.log(vocab.size)
+
+
+def loss_per_character(loss: float, texts: Sequence[str], vocab: Vocab) -> float:
+  """Loss spread over characters, so different tokenizers can be compared."""
+  predicted = sum(len(vocab.encode(text)) - 1 for text in texts)
+  return loss * predicted / sum(len(text) + 1 for text in texts)
