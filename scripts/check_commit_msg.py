@@ -21,6 +21,7 @@ SCOPES = (
   "evals",
   "config",
   "greeting",
+  "lab",
   "docs",
   "scripts",
   "tooling",
