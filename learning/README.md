@@ -15,6 +15,7 @@ flowchart LR
   H --> I["9. Finding<br/>the article"]
   I --> J["10. Meaning as<br/>a position"]
   J --> K["11. Neural<br/>networks"]
+  K --> L["12. Watch<br/>it learn"]
 ```
 
 | Lesson | Question it answers |
@@ -30,6 +31,7 @@ flowchart LR
 | [9. Where the article number comes from](09-where-does-the-number-come-from.md) | How does it know "art. 22"? |
 | [10. Embeddings](10-embeddings.md) | How can numbers carry meaning? |
 | [11. Neural networks](11-neural-networks.md) | How does a machine find its own clues? |
+| [12. Watch it learn](12-watch-it-learn.md) | What does training look like? |
 
 Run the real thing at any time:
 
