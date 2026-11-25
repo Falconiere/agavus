@@ -13,7 +13,8 @@ from agavus.corpus.records import LabelSource, TextDocument, TextSource, text_do
 from agavus.taxonomy.lexicon import normalize
 
 SOURCE = "statutes"
-ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
+# Case-sensitive: articles open with "Art."; a line starting "art. 129 do ..." is a reference.
+ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?")
 ART_REF = re.compile(r"\bart\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
@@ -107,9 +108,22 @@ def html_to_text(html: str) -> str:
   return re.sub(r"(?m)^(Art\.?\s*[\d.\-A-Za-z]+)\n([ºo°])$", r"\1\2", text)
 
 
+def _own_markers(text: str) -> list[re.Match[str]]:
+  """Article markers of this law; ones inside “…” belong to a law it amends."""
+  own: list[re.Match[str]] = []
+  start = 0
+  for marker in ART_MARKER.finditer(text):
+    since = text[start : marker.start()]
+    if since.count("“") > since.count("”"):
+      continue
+    own.append(marker)
+    start = marker.start()
+  return own
+
+
 def segment_articles(text: str) -> list[tuple[str, str]]:
   """Split into (article number, body); first occurrence per number wins."""
-  markers = list(ART_MARKER.finditer(text))
+  markers = _own_markers(text)
   seen: set[str] = set()
   articles: list[tuple[str, str]] = []
   for index, marker in enumerate(markers):

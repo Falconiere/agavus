@@ -132,3 +132,17 @@ def test_article_body_lines_joined() -> None:
   docs = parse_statute("Lei X", html, "raw/x.html")
   assert "Esta Lei dispõe sobre o tema." in docs[0].text
   assert "\n§ 1º" in docs[0].text
+
+
+def test_lowercase_reference_is_not_an_article() -> None:
+  text = "Art. 44. O\nart. 129 do Código Penal passa a vigorar assim.\nArt. 45. Fim."
+  articles = dict(segment_articles(text))
+  assert list(articles) == ["44", "45"]
+  assert "art. 129 do Código Penal" in articles["44"]
+
+
+def test_quoted_articles_belong_to_the_amended_law() -> None:
+  text = "Art. 1º Altera:\n“Art. 92. Um.\nArt. 129. Dois.” (NR)\nArt. 2º Vigência."
+  articles = dict(segment_articles(text))
+  assert list(articles) == ["1", "2"]
+  assert "Art. 129. Dois." in articles["1"]
