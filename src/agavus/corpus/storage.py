@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 from agavus.corpus import db
 from agavus.corpus.db import RunEntry
-from agavus.corpus.records import CaseRecord, TextDocument
+from agavus.corpus.records import CaseRecord, TextDocument, TextSource
 from agavus.taxonomy.labeling import LabelDecision, label_case, label_text
 
 
@@ -164,10 +164,12 @@ class CorpusStorage:
     self.save_labels(decisions)
     return decisions
 
-  def search_texts(self, query: str, limit: int = 10) -> list[tuple[str, float]]:
-    """BM25-ranked text ids (FTS5)."""
+  def search_texts(
+    self, query: str, limit: int = 10, source: TextSource | None = None
+  ) -> list[tuple[str, float]]:
+    """BM25-ranked (doc_id, score), optionally restricted to one source."""
     with closing(db.connect(self.root)) as conn:
-      return db.search_fts(conn, query, limit)
+      return db.search_fts(conn, query, limit, source)
 
   def rebuild_index(self) -> int:
     """Rebuild the FTS index from stored texts; returns indexed count."""

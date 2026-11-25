@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from agavus.corpus.anonymize import anonymize, contains_personal_data
+from agavus.corpus.records import TextSource
 from agavus.corpus.statutes import extract_citations
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
@@ -122,7 +123,9 @@ def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStora
       _render_chain(chain),
       (chain.conclusion_ref,),
     )
-  hits = search(storage, query, limit=CONTEXT_HITS + 1)
+  # Statutes answer; decisions are used only when no statute matches.
+  limit = CONTEXT_HITS + 1
+  hits = search(storage, query, limit, TextSource.STATUTE) or search(storage, query, limit)
   if not hits or not _relevant(query, hits[0]):
     return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
   top, context = hits[0], hits[1 : CONTEXT_HITS + 1]

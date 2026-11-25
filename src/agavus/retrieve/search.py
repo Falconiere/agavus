@@ -8,6 +8,7 @@ query-centered snippet — answers quote these, never generate.
 
 from dataclasses import dataclass
 
+from agavus.corpus.records import TextSource
 from agavus.corpus.statutes import extract_citations
 from agavus.corpus.storage import CorpusStorage
 from agavus.taxonomy.lexicon import WORD_RE, content_tokens, normalize
@@ -63,12 +64,14 @@ def extract_snippet(text: str, query: str, max_len: int = SNIPPET_LEN) -> str:
   return _whole_words(text, 0, max_len)
 
 
-def search(storage: CorpusStorage, query: str, limit: int = 5) -> list[Hit]:
-  """Ranked hits: BM25 + citation boost; empty query yields no hits."""
+def search(
+  storage: CorpusStorage, query: str, limit: int = 5, source: TextSource | None = None
+) -> list[Hit]:
+  """Ranked hits: BM25 + citation boost, optionally from one source only."""
   expression = match_expression(query)
   if not expression:
     return []
-  raw = storage.search_texts(expression, limit=limit * OVERFETCH)
+  raw = storage.search_texts(expression, limit=limit * OVERFETCH, source=source)
   texts = storage.load_texts_by_ids([doc_id for doc_id, _ in raw])
   query_citations = set(extract_citations(query))
   hits: list[Hit] = []

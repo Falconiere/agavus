@@ -1,9 +1,11 @@
 """Tests for answer composition (tests folder, synthetic corpus)."""
 
+from dataclasses import replace
 from pathlib import Path
 
 from agavus.answer.compose import DISCLAIMER, compose, verify_deliverable
 from agavus.corpus.httpfixtures import sample_text
+from agavus.corpus.records import TextSource
 from agavus.corpus.storage import CorpusStorage
 
 CONFIDENT_M = {"F": 0.01, "M": 0.98, "O": 0.01}
@@ -102,3 +104,22 @@ def test_verify_deliverable_checks_advice_and_disclaimer() -> None:
   assert not verify_deliverable(f"Você deve processar.\n{DISCLAIMER}", ("Lei X, art. 1",))
   assert not verify_deliverable("Trecho sem aviso.", ("Lei X, art. 1",))
   assert not verify_deliverable(f"Trecho.\n{DISCLAIMER}", ())
+
+
+def _add_decision(storage: CorpusStorage, text: str) -> None:
+  decision = sample_text(doc_id="dec", origin_ref="Decisão sintética", text=text)
+  storage.save_text(replace(decision, source=TextSource.DJEN))
+
+
+def test_statutes_answer_before_decisions(tmp_path: Path) -> None:
+  storage = _corpus(tmp_path)
+  _add_decision(storage, "medida protetiva medida protetiva medida protetiva")
+  answer = compose("medida protetiva", CONFIDENT_M, storage)
+  assert answer.sources == ("Lei 11.340/2006, art. 22",)
+
+
+def test_decisions_answer_when_no_statute_matches(tmp_path: Path) -> None:
+  storage = CorpusStorage(tmp_path)
+  _add_decision(storage, "medida protetiva")
+  answer = compose("medida protetiva", CONFIDENT_M, storage)
+  assert answer.sources == ("Decisão sintética",)

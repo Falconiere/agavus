@@ -21,6 +21,7 @@ from agavus.corpus.records import (
   CaseRecord,
   LabelSource,
   TextDocument,
+  TextSource,
   case_from_dict,
   text_from_dict,
 )
@@ -178,12 +179,17 @@ def insert_texts(conn: sqlite3.Connection, records: Sequence[TextDocument]) -> i
   return new
 
 
-def search_fts(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[tuple[str, float]]:
+def search_fts(
+  conn: sqlite3.Connection, query: str, limit: int, source: TextSource | None
+) -> list[tuple[str, float]]:
   """BM25-ranked ids; origin_ref 10x, law_name 8x (names/numbers decisive)."""
+  wanted = source.value if source is not None else None
   rows = conn.execute(
     "SELECT doc_id, bm25(texts_fts, 0.0, 10.0, 8.0, 1.0) AS score FROM texts_fts "
-    "WHERE texts_fts MATCH ? ORDER BY score LIMIT ?",
-    (query, limit),
+    "WHERE texts_fts MATCH ? "
+    "AND (? IS NULL OR doc_id IN (SELECT id FROM texts WHERE source = ?)) "
+    "ORDER BY score LIMIT ?",
+    (query, wanted, wanted, limit),
   ).fetchall()
   return [(str(row["doc_id"]), float(row["score"])) for row in rows]
 

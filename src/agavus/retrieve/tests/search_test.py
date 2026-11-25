@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from agavus.corpus.httpfixtures import sample_text
+from agavus.corpus.records import TextSource
 from agavus.corpus.storage import CorpusStorage
 from agavus.retrieve.search import extract_snippet, match_expression, search
 
@@ -66,3 +67,9 @@ def test_snippet_never_starts_or_ends_mid_word() -> None:
   snippet = extract_snippet(text, "descumprimento")
   assert snippet in text
   assert set(snippet.split()) <= set(text.split())
+
+
+def test_source_filter_returns_only_that_source(tmp_path: Path) -> None:
+  storage = _corpus(tmp_path)
+  assert search(storage, "medida protetiva", source=TextSource.STATUTE)
+  assert search(storage, "medida protetiva", source=TextSource.PORTAL) == []

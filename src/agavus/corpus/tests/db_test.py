@@ -65,10 +65,10 @@ def test_fts_bm25_search(tmp_path: Path) -> None:
   doc = sample_text(text="medida protetiva de urgência para mulher em situação de violência")
   with closing(db.connect(tmp_path)) as conn:
     assert db.insert_text(conn, doc) is True
-    hits = db.search_fts(conn, "protetiva")
+    hits = db.search_fts(conn, "protetiva", 10, None)
     assert hits and hits[0][0] == "t1"
     assert db.insert_text(conn, doc) is False
-    assert len(db.search_fts(conn, "protetiva")) == 1
+    assert len(db.search_fts(conn, "protetiva", 10, None)) == 1
 
 
 def test_embeddings_knn(tmp_path: Path) -> None:
@@ -89,9 +89,9 @@ def test_rebuild_fts_backfills(tmp_path: Path) -> None:
       ("t9", "statute", "ref", None, "guarda compartilhada", "[]", None, "pending", "r"),
     )
     conn.commit()
-    assert db.search_fts(conn, "guarda") == []
+    assert db.search_fts(conn, "guarda", 10, None) == []
     assert db.rebuild_fts(conn) == 1
-    assert db.search_fts(conn, "guarda")[0][0] == "t9"
+    assert db.search_fts(conn, "guarda", 10, None)[0][0] == "t9"
 
 
 def test_origin_ref_weighted(tmp_path: Path) -> None:
@@ -100,7 +100,7 @@ def test_origin_ref_weighted(tmp_path: Path) -> None:
     db.insert_text(
       conn, sample_text(doc_id="a10", origin_ref="Lei X, art. 10", text="texto comum 22 22 22")
     )
-    hits = db.search_fts(conn, "22")
+    hits = db.search_fts(conn, "22", 10, None)
     assert hits[0][0] == "a22"
 
 
