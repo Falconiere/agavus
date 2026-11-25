@@ -17,6 +17,8 @@ ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[º
 ART_REF = re.compile(r"\bart\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
+# Planalto pads some UTF-16 pages with single-byte spaces: each pair decodes to a dagger.
+MISDECODED_PADDING = re.compile(r"\u2020{2,}\ufffd?\s*\Z")
 LAW_ALIASES = {
   "lei maria da penha": "Lei 11.340/2006",
   "alienação parental": "Lei 12.318/2010",
@@ -77,14 +79,21 @@ STATUTES: tuple[StatuteRef, ...] = (
 )
 
 
-def decode_html(payload: bytes) -> str:
-  """Planalto serves cp1252, UTF-8, and UTF-16 (Word pages); detect BOMs."""
+def _decode(payload: bytes) -> str:
   if payload.startswith((b"\xff\xfe", b"\xfe\xff")):
     return payload.decode("utf-16", errors="replace")
   try:
     return payload.decode("utf-8-sig")
   except UnicodeDecodeError:
     return payload.decode("cp1252", errors="replace")
+
+
+def decode_html(payload: bytes) -> str:
+  """Planalto serves cp1252, UTF-8, and UTF-16 (Word pages); detect BOMs.
+
+  Trailing padding is dropped, also from transcriptions that already carry it.
+  """
+  return MISDECODED_PADDING.sub("", _decode(payload))
 
 
 def html_to_text(html: str) -> str:

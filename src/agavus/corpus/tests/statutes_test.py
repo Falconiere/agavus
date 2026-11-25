@@ -97,6 +97,17 @@ def test_decode_utf16_bom() -> None:
   assert "Art. 24-A" in decode_html(payload)
 
 
+def test_decode_drops_misdecoded_padding() -> None:
+  body = "<p>Art. 46. Esta Lei entra em vigor.</p>"
+  assert decode_html(body.encode("utf-16") + b" " * 7) == body
+  assert decode_html((body + "\u2020" * 3 + "\ufffd\n").encode()) == body
+
+
+def test_decode_keeps_real_daggers() -> None:
+  assert decode_html("nota\u2020 e\u2020\u2020 fim".encode()) == "nota\u2020 e\u2020\u2020 fim"
+  assert decode_html("nota\u2020".encode()) == "nota\u2020"
+
+
 def test_revoked_text_excluded() -> None:
   html = (
     "<p>Art. 24-A. Texto atual.</p>"
