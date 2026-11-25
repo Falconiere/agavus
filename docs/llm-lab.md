@@ -143,7 +143,7 @@ Rules:
 - [x] `docs/commits.md` / commit hook: add the `lab` scope.
 - [x] `docs/tiny-llm.md`: note this lab as an exception to "never invest in
       training in advance", for learning only.
-- [ ] `pyproject.toml`: add the `lab` extra, at step 3 and not earlier.
+- [x] `pyproject.toml`: add the `lab` extra, at step 3 and not earlier.
 
 ## 8. Risks
 

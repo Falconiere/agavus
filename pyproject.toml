@@ -20,7 +20,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+lab = [
+    "torch>=2.7",
+]
 dev = [
+    "torch>=2.7",
     "pytest>=8.0",
     "ruff>=0.8",
     "mypy>=1.13",
@@ -72,3 +76,12 @@ known_first_party = [
 [tool.deptry.per_rule_ignores]
 # CLI tools invoked via Makefile/pre-commit, never imported in code.
 DEP002 = ["ruff", "mypy", "deptry", "pre-commit"]
+
+# The lab runs on CPU by default; a rented GPU machine installs its own build.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]

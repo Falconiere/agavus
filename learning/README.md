@@ -16,6 +16,7 @@ flowchart LR
   I --> J["10. Meaning as<br/>a position"]
   J --> K["11. Neural<br/>networks"]
   K --> L["12. Watch<br/>it learn"]
+  L --> M["13. Neural<br/>language model"]
 ```
 
 | Lesson | Question it answers |
@@ -32,6 +33,7 @@ flowchart LR
 | [10. Embeddings](10-embeddings.md) | How can numbers carry meaning? |
 | [11. Neural networks](11-neural-networks.md) | How does a machine find its own clues? |
 | [12. Watch it learn](12-watch-it-learn.md) | What does training look like? |
+| [13. A neural language model](13-a-neural-language-model.md) | What if it remembers more than one letter? |
 
 Run the real thing at any time:
 
