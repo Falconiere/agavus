@@ -13,6 +13,8 @@ Implement against the design docs, not from scratch ideas.
 | corpus / ingestion / data | `docs/corpus/` (range, schema, labeling, privacy, storage) |
 | models / features / decisions | `docs/math/` (formulas + worked examples) |
 | labels, areas, loss matrix | `docs/extensibility.md` (areas are data packs) |
+| GPU rental, machines, disks | `docs/gpu-brasil.md` (read freely; ask before every change) |
+| LLM lab | `docs/llm-lab.md` (isolation and data rules) |
 
 ## Commands
 
@@ -64,6 +66,10 @@ to make a gate pass — fix the code.
 - **Config only in `agavus.config.settings`** (frozen typed `Settings`).
   New config = env var + field + `.env.example` entry. Never read
   `os.environ` elsewhere.
+- **GPU Brasil**: approval before every create, start, stop, rename or delete;
+  never print keys or `disk_token`; always attach disk `agavus-training` and
+  save all lab work to it; no case-derived data on rented machines
+  (`docs/gpu-brasil.md`).
 - **Scope**: TJDFT, all dates the source holds (today backward until empty),
   domains F + M only
   (general criminal is out of scope). Do not widen scope without a design

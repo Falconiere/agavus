@@ -107,6 +107,8 @@ report counts and intervals, not just percentages.
 
 ## 6. GPU rental (gpubrasil.com.br)
 
+Operations, disks and safety: **[gpu-brasil.md](gpu-brasil.md)**.
+
 Page checked 2026-11-25; confirm before paying. Prices are per hour:
 
 | GPU | VRAM | R$/h | Use |
@@ -124,11 +126,14 @@ Rules:
 
 1. No rental before step 4 runs on CPU and the GPU script has passed there.
 2. First budget: **R$ 100 deposit, at most 5 GPU-hours**. More needs a note
-   explaining what was learned. The user pays and creates the machine.
+   explaining what was learned. The user pays; agents act only with approval
+   for each action ([gpu-brasil.md](gpu-brasil.md)).
 3. Upload only lab code and allowlisted data. No repo tokens, `.env`,
    `corpus.db` or `data/raw/` on the machine; use a dedicated SSH key.
 4. Export allowlisted text to a file locally, inspect it, then upload that.
-5. Assume the disk can vanish: checkpoint, download, verify checksums.
+5. Save every run to the `agavus-training` disk (`/workspace/disco/agavus/`).
+   It is synced storage, not a backup: also download important checkpoints and
+   verify checksums.
 6. Destroy the machine after each session and confirm billing stopped.
 7. Record GPU, hours, cost, seed, config, data hash and losses per run.
 
