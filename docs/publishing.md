@@ -100,6 +100,8 @@ report**. A card without its eval report is incomplete and must not ship.
 - **Pinned Space**: staging writes
   `agavus @ git+<repo>@<tag>` into the Space requirements, so the app, the
   installed engine, and the model artifact always match the release.
+- **Router gate**: a Space release also needs the encoder and a passing
+  router (gold gate, zero unsafe M decisions and M recall >= 0.90 on DEV).
 - **Privacy scan**: every model and Space staging tree is scanned before
   upload; the upload is blocked on any hit.
 - **No gate weakening**: the gold-set release gate runs in the same code

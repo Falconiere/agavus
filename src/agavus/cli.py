@@ -12,6 +12,7 @@ from pathlib import Path
 
 from agavus.answer.compose import compose
 from agavus.classify.pipeline import TrainedClassifier, train_classifier, training_set
+from agavus.classify.router_store import ensure_router
 from agavus.classify.store import load_model, save_model
 from agavus.config.settings import Settings, load_settings
 from agavus.corpus.batch import IngestBatch
@@ -27,6 +28,7 @@ from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
 from agavus.publish.bootstrap import bootstrap_corpus
 from agavus.publish.export import stage_release, upload
+from agavus.publish.router_gate import ensure_router_passes
 from agavus.publish.space_release import stage_space, upload_space
 from agavus.retrieve.dense import index_statutes, search_statutes
 from agavus.retrieve.encoder import download_encoder, load_encoder
@@ -41,24 +43,25 @@ def _print_json(payload: dict[str, object]) -> None:
   print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-def _probabilities(classifier: TrainedClassifier, text: str) -> dict[str, float]:
-  probs = classifier.predict_proba([text])[0]
-  return {label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)}
-
-
 def _trace(
-  classifier: TrainedClassifier, text: str, mapping: dict[str, float]
+  classifier: TrainedClassifier | None, text: str, mapping: dict[str, float]
 ) -> dict[str, object]:
+  features = classifier.top_features(text) if classifier is not None else []
   return {
     "probabilities": mapping,
     "expected_losses": decide(mapping).expected_losses,
-    "top_features": [
-      {"term": term, "contribution": value} for term, value in classifier.top_features(text)
-    ],
+    "routing": "words" if classifier is not None else "meaning",
+    "top_features": [{"term": term, "contribution": value} for term, value in features],
   }
 
 
-def _print_trace(classifier: TrainedClassifier, text: str, mapping: dict[str, float]) -> None:
+def _models_db(settings: Settings) -> Path:
+  return settings.data_dir / "models" / "models.db"
+
+
+def _print_trace(
+  classifier: TrainedClassifier | None, text: str, mapping: dict[str, float]
+) -> None:
   trace = _trace(classifier, text, mapping)
   losses = trace["expected_losses"]
   features = trace["top_features"]
@@ -66,7 +69,8 @@ def _print_trace(classifier: TrainedClassifier, text: str, mapping: dict[str, fl
   print("probabilities: " + " · ".join(f"{k} {v:.3f}" for k, v in mapping.items()))
   if isinstance(losses, dict):
     print("expected losses: " + " · ".join(f"{k} {v:.2f}" for k, v in losses.items()))
-  if isinstance(features, list):
+  print(f"routing: by {trace['routing']}")
+  if isinstance(features, list) and features:
     rendered = ", ".join(f"{f['term']} ({f['contribution']:+.2f})" for f in features)
     print(f"top features: {rendered}")
 
@@ -142,7 +146,7 @@ def _run_classify(settings: Settings, text: str, explain: bool, as_json: bool) -
   classifier = _load_classifier(settings, "classify")
   if classifier is None:
     return 1
-  mapping = _probabilities(classifier, text)
+  mapping = classifier.probabilities(text)
   decision = decide(mapping)
   if as_json:
     payload: dict[str, object] = {"probabilities": mapping, "decision": decision.action}
@@ -224,9 +228,14 @@ def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) ->
   classifier = _load_classifier(settings, "ask")
   if classifier is None:
     return 1
-  mapping = _probabilities(classifier, question)
-  storage = CorpusStorage(settings.data_dir)
-  answer = compose(question, mapping, storage, load_encoder(settings.data_dir))
+  encoder = load_encoder(settings.data_dir)
+  mapping = (
+    ensure_router(_models_db(settings), encoder).probabilities([question])[0]
+    if encoder is not None
+    else classifier.probabilities(question)
+  )
+  explained = classifier if encoder is None else None
+  answer = compose(question, mapping, CorpusStorage(settings.data_dir), encoder)
   accepted = answer.decision.startswith("accept-")
   if as_json:
     payload: dict[str, object] = {
@@ -237,12 +246,12 @@ def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) ->
       "sources": [{"ref": ref} for ref in answer.sources],
     }
     if explain:
-      payload["trace"] = _trace(classifier, question, mapping)
+      payload["trace"] = _trace(explained, question, mapping)
     _print_json(payload)
   else:
     print(answer.text)
     if explain:
-      _print_trace(classifier, question, mapping)
+      _print_trace(explained, question, mapping)
   if accepted:
     return 0
   return 10 if answer.decision == "defer" else 20
@@ -264,6 +273,9 @@ def _run_publish(
   staging = settings.data_dir / "hf-staging"
   try:
     report = stage_release(settings, staging)
+    if space_repo is not None:
+      routed = ensure_router_passes(settings)
+      print(f"publish: router gate passed · M {routed.m_hits}/{routed.m_total} · 0 unsafe")
   except (KeyError, ValueError) as exc:
     print(f"publish: blocked — {exc}")
     return 1

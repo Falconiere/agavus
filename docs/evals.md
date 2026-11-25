@@ -194,3 +194,24 @@ Hidden has now been opened once: the next milestone needs a fresh set. Rerun
 
 Quantized weights (int8, 118 MB) were measured and not adopted: dev first 27,
 top-5 31, with no speed gain against the full model (470 MB: 29, 34).
+
+## Question router by meaning (2026-11-25, routing-v2)
+
+100 authored questions (50 dev, 50 hidden; not reviewed by a lawyer), committed
+before the work. The 10-item gold set had hidden a safety problem: M recall
+1.00 there was 5/20 and 2/20 here.
+
+| Router | Set | Right | Wrong | Deferred | M recall | Unsafe |
+| --- | --- | --- | --- | --- | --- | --- |
+| words (v0.3.0) | dev | 8 | 1 | 41 | 5/20 | 1 |
+| **meaning** | dev | **36** | 2 | **12** | **19/20** | **0** |
+| words (v0.3.0) | hidden | 5 | 4 | 41 | 2/20 | 1 |
+| **meaning** | hidden | **36** | 1 | **13** | **19/20** | **0** |
+
+Unsafe = an M question accepted as F or rejected. Loss matrix and thresholds
+are unchanged. The same author wrote seeds and questions (no near-duplicates).
+Zero unsafe in 20 still allows a true rate up to about 14% (95%). Without
+encoder weights the word router, with its unsafe rate, is what runs. Space
+releases now require the router gate (`publish/router_gate.py`).
+More questions answered means more retrieval errors shown: retrieval dev with
+real routing is 21 right, 5 wrong, 14 deferred (was 17/1/22).

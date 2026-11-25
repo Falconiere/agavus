@@ -55,6 +55,11 @@ class TrainedClassifier:
     rows = self.vectorizer.transform(texts)
     return softmax(apply_temperature(self.model.logits(rows), self.temperature))
 
+  def probabilities(self, text: str) -> dict[str, float]:
+    """Calibrated {class: probability} for one text."""
+    row = self.predict_proba([text])[0]
+    return {label: float(value) for label, value in zip(self.model.classes, row, strict=True)}
+
   def top_features(self, text: str, k: int = 5) -> list[tuple[str, float]]:
     """Largest logit contributions to the winning class (auditability)."""
     row = self.vectorizer.transform([text])[0]

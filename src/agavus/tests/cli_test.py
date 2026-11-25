@@ -25,6 +25,9 @@ class FakeClassifier:
   def top_features(self, text: str, k: int = 5) -> list[tuple[str, float]]:
     return [("protetiva", 1.0)]
 
+  def probabilities(self, text: str) -> dict[str, float]:
+    return {"F": 0.0, "M": 1.0, "O": 0.0}
+
 
 def test_default_greets(capsys: pytest.CaptureFixture[str]) -> None:
   assert cli.main([]) == 0

@@ -1,6 +1,7 @@
 """Routing set integrity: size, uniqueness, firewall against training seeds."""
 
 from agavus.classify.seed import SEED_QUERIES
+from agavus.classify.seed_everyday import EVERYDAY_QUERIES
 from agavus.evals.goldset import ROUTING_V1
 from agavus.evals.routingset import DEV, HIDDEN
 from agavus.taxonomy.areas import is_area
@@ -16,5 +17,5 @@ def test_sets_are_complete_and_disjoint() -> None:
 
 
 def test_seeds_never_contain_evaluation_questions() -> None:
-  seeds = {text.casefold().strip(" ?.") for text, _ in SEED_QUERIES}
-  assert not seeds & {item.text.casefold().strip(" ?.") for item in (*DEV, *HIDDEN)}
+  seeds = {text.casefold().strip(" ?.") for text, _ in SEED_QUERIES + EVERYDAY_QUERIES}
+  assert not seeds & {item.text.casefold().strip(" ?.") for item in (*DEV, *HIDDEN, *ROUTING_V1)}

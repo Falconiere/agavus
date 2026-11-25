@@ -12,6 +12,8 @@ from pathlib import Path
 import gradio as gr
 
 from agavus.answer.compose import compose
+from agavus.classify.pipeline import TrainedClassifier
+from agavus.classify.router_store import ensure_router
 from agavus.classify.store import load_model
 from agavus.config.settings import load_settings
 from agavus.corpus.storage import CorpusStorage
@@ -40,23 +42,32 @@ def _encoder(data_dir: Path) -> Encoder | None:
   return prepare_encoder(data_dir)
 
 
+def _route(
+  question: str, classifier: TrainedClassifier, encoder: Encoder | None
+) -> dict[str, float]:
+  """Area probabilities: by meaning when possible, else by words."""
+  if encoder is not None:
+    return ensure_router(_bootstrap(load_settings().data_dir), encoder).probabilities([question])[0]
+  return classifier.probabilities(question)
+
+
 def answer_question(question: str) -> tuple[str, str, str]:
   """Return (decision header, cited answer, audit trace) for the UI."""
   if not question.strip():
     return ("", "Digite uma pergunta.", "")
   settings = load_settings()
   classifier = load_model(_bootstrap(settings.data_dir), "classifier")
-  probs = classifier.predict_proba([question])[0]
-  mapping = {
-    label: float(value) for label, value in zip(classifier.model.classes, probs, strict=True)
-  }
-  answer = compose(question, mapping, CorpusStorage(settings.data_dir), _encoder(settings.data_dir))
+  encoder = _encoder(settings.data_dir)
+  mapping = _route(question, classifier, encoder)
+  answer = compose(question, mapping, CorpusStorage(settings.data_dir), encoder)
   decision = decide(mapping)
   header = f"**Decisão:** `{answer.decision}` · confiança {max(mapping.values()):.2f}"
   body = f"```\n{answer.text}\n```"
   losses = " · ".join(f"{name} {value:.2f}" for name, value in decision.expected_losses.items())
-  features = ", ".join(
-    f"{term} ({value:+.2f})" for term, value in classifier.top_features(question)
+  features = (
+    ", ".join(f"{term} ({value:+.2f})" for term, value in classifier.top_features(question))
+    if encoder is None
+    else "roteamento por significado"
   )
   probabilities = " · ".join(f"{label} {value:.3f}" for label, value in mapping.items())
   trace = (
@@ -95,8 +106,10 @@ def build_demo() -> gr.Blocks:
 def warm_up() -> None:
   """Do the slow work before serving, so no visitor waits for it."""
   data_dir = load_settings().data_dir
-  _bootstrap(data_dir)
-  _encoder(data_dir)
+  models = _bootstrap(data_dir)
+  encoder = _encoder(data_dir)
+  if encoder is not None:
+    ensure_router(models, encoder)
 
 
 if __name__ == "__main__":
