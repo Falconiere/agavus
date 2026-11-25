@@ -79,6 +79,10 @@ STOPWORDS: frozenset[str] = frozenset(
     "umas",
   }
 )
+# Words that frame a question without naming its subject.
+QUERY_FRAMING: frozenset[str] = frozenset(
+  {"art", "artigo", "artigos", "diz", "existe", "lei", "leis", "número", "tem", "trata"}
+)
 SYNONYMS: dict[str, str] = {
   "lmp": "lei maria da penha",
   "lei da maria da penha": "lei maria da penha",

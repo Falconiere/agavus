@@ -21,14 +21,19 @@ from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_sta
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
+from agavus.evals.retrieval import TOP_K, evaluate_retrieval
+from agavus.evals.retrievalset import DEV, RETRIEVAL_VERSION
 from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
 from agavus.publish.bootstrap import bootstrap_corpus
 from agavus.publish.export import stage_release, upload
 from agavus.publish.space_release import stage_space, upload_space
+from agavus.retrieve.dense import index_statutes, search_statutes
+from agavus.retrieve.encoder import download_encoder, load_encoder
 from agavus.retrieve.search import search
 
 DEFAULT_LIMIT = 500
+RETRIEVAL_DEPTH = 10
 SPACE_DIR = Path("space")
 
 
@@ -172,6 +177,34 @@ def _run_eval(settings: Settings, as_json: bool) -> int:
   return 0
 
 
+def _run_embed(settings: Settings) -> int:
+  download_encoder(settings.data_dir)
+  encoder = load_encoder(settings.data_dir)
+  if encoder is None:
+    print("embed: encoder weights not found after download")
+    return 1
+  count = index_statutes(CorpusStorage(settings.data_dir), encoder)
+  print(f"embed: {count} statute articles indexed")
+  return 0
+
+
+def _run_retrieval_eval(settings: Settings) -> int:
+  storage = CorpusStorage(settings.data_dir)
+  encoder = load_encoder(settings.data_dir)
+  report = evaluate_retrieval(
+    DEV,
+    lambda question: [
+      hit.origin_ref for hit in search_statutes(storage, question, RETRIEVAL_DEPTH, encoder)
+    ],
+  )
+  mode = "meaning" if encoder is not None else "words"
+  print(
+    f"retrieval ({RETRIEVAL_VERSION} dev, {len(DEV)} items, by {mode}): "
+    f"first {report.first} · top-{TOP_K} {report.in_top_k} · MRR {report.mrr:.3f}"
+  )
+  return 0
+
+
 def _run_search(settings: Settings, query: str, limit: int, as_json: bool) -> int:
   storage = CorpusStorage(settings.data_dir)
   hits = search(storage, query, limit=limit)
@@ -192,7 +225,8 @@ def _run_ask(settings: Settings, question: str, explain: bool, as_json: bool) ->
   if classifier is None:
     return 1
   mapping = _probabilities(classifier, question)
-  answer = compose(question, mapping, CorpusStorage(settings.data_dir))
+  storage = CorpusStorage(settings.data_dir)
+  answer = compose(question, mapping, storage, load_encoder(settings.data_dir))
   accepted = answer.decision.startswith("accept-")
   if as_json:
     payload: dict[str, object] = {
@@ -285,7 +319,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     "classify", parents=[common], help="classify a text with the trained model"
   )
   classify.add_argument("text")
-  sub.add_parser("eval", parents=[common], help="evaluate the trained model on the gold set")
+  evaluation = sub.add_parser(
+    "eval", parents=[common], help="evaluate the trained model on the gold set"
+  )
+  evaluation.add_argument(
+    "--retrieval", action="store_true", help="evaluate article retrieval (dev questions)"
+  )
+  sub.add_parser("embed", parents=[common], help="download the encoder and index statutes")
   search_cmd = sub.add_parser(
     "search", parents=[common], help="BM25 + citation search over the corpus"
   )
@@ -315,7 +355,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     "label": lambda: _run_label(settings),
     "train": lambda: _run_train(settings),
     "classify": lambda: _run_classify(settings, args.text, args.explain, args.as_json),
-    "eval": lambda: _run_eval(settings, args.as_json),
+    "eval": lambda: (
+      _run_retrieval_eval(settings) if args.retrieval else _run_eval(settings, args.as_json)
+    ),
+    "embed": lambda: _run_embed(settings),
     "search": lambda: _run_search(settings, args.query, args.limit, args.as_json),
     "publish": lambda: _run_publish(
       settings, args.repo, args.space_repo, args.revision, args.bootstrap

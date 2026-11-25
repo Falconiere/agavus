@@ -14,7 +14,9 @@ dependencies = [
     "httpx>=0.28.1",
     "huggingface-hub>=2.4.0",
     "numpy>=2.5.5",
+    "onnxruntime>=1.22",
     "python-dotenv>=1.0",
+    "tokenizers>=0.21",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +50,7 @@ indent-style = "space"
 [tool.mypy]
 strict = true
 files = ["src", "scripts", "space"]
-mypy_path = "src:scripts"
+mypy_path = "src:scripts:stubs"
 
 [tool.pytest.ini_options]
 testpaths = ["src", "scripts", "space"]

@@ -34,6 +34,10 @@ LAW_POPULAR_NAMES = {
 }
 
 
+# Names that say which law, not which subject: asking for "the article" needs a topic.
+TOPICLESS_NAMES = ("lei maria da penha", "código civil")
+
+
 def popular_name(origin_ref: str) -> str:
   """Searchable popular name for a law (index-only; citations stay verbatim)."""
   for prefix, name in LAW_POPULAR_NAMES.items():

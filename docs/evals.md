@@ -172,3 +172,22 @@ LoRA/fine-tuning and tier upgrades are considered **only when a measured
 bottleneck survives data/feature/threshold fixes** — see
 [tiny-llm.md](tiny-llm.md) "Fine-tuning (LoRA)". Evals first, investment
 second.
+
+## Retrieval by meaning (2026-11-25, retrieval-v1)
+
+80 authored questions (40 dev, 40 hidden; not reviewed by a lawyer), on the
+347 statute articles. The hidden half was committed before the ranking work
+and not tuned against; its per-question results were never inspected.
+
+| Ranking | Dev first | Dev top-5 | Hidden first | Hidden top-5 |
+| --- | --- | --- | --- | --- |
+| words (BM25) | 10 | 21 | 19 | 27 |
+| **meaning (e5-small)** | **29** | **34** | **25** | **29** |
+| bge-m3 (2+ GB, not adopted) | 32 | 38 | – | – |
+
+Answers, with routing assumed correct (right / wrong / deferred): dev 27/6/7
+by meaning against 10/26/4 by words; hidden 22/9/9 against 18/19/3. Reciprocal
+rank fusion with BM25 was worse than meaning alone (dev first 17). Targets are
+not met: recall@5 is 0.73 hidden against 0.90, and wrong answers remain.
+Hidden has now been opened once: the next milestone needs a fresh set. Rerun
+`agavus embed` after statutes change.

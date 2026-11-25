@@ -11,14 +11,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from agavus.corpus.anonymize import anonymize, contains_personal_data
-from agavus.corpus.records import TextSource
-from agavus.corpus.statutes import extract_citations
+from agavus.corpus.statutes import TOPICLESS_NAMES, extract_citations
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.reason.chain import Chain, build_chain
+from agavus.retrieve.dense import search_statutes
+from agavus.retrieve.encoder import Encoder
 from agavus.retrieve.search import Hit, search
 from agavus.taxonomy.areas import AREAS, OUT_OF_SCOPE
-from agavus.taxonomy.lexicon import content_tokens
+from agavus.taxonomy.lexicon import QUERY_FRAMING, content_tokens
 
 DISCLAIMER = "Isto não é aconselhamento jurídico; consulte um advogado."
 SCOPE_MESSAGE = (
@@ -106,12 +107,25 @@ def _clarification(probabilities: Mapping[str, float]) -> str:
   return CLARIFY_MESSAGE
 
 
-def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStorage) -> Answer:
+def _lacks_topic(query: str) -> bool:
+  """True when the question names a law but no subject or article number."""
+  if any(ref.startswith("art. ") for ref in extract_citations(query)):
+    return False
+  words = set(content_tokens(query)) - QUERY_FRAMING
+  return any(words and words <= set(content_tokens(name)) for name in TOPICLESS_NAMES)
+
+
+def compose(
+  query: str,
+  probabilities: Mapping[str, float],
+  storage: CorpusStorage,
+  encoder: Encoder | None = None,
+) -> Answer:
   """Classify → decide → reason/retrieve → cited excerpt, or degrade honestly."""
   decision = decide(probabilities)
   if decision.action == "reject":
     return Answer(decision="reject", text=SCOPE_MESSAGE, sources=())
-  if decision.action == "defer":
+  if decision.action == "defer" or _lacks_topic(query):
     return Answer(decision="defer", text=_clarification(probabilities), sources=())
   area = decision.action.removeprefix("accept-")
   chain = build_chain(query, storage, area=area)
@@ -125,7 +139,7 @@ def compose(query: str, probabilities: Mapping[str, float], storage: CorpusStora
     )
   # Statutes answer; decisions are used only when no statute matches.
   limit = CONTEXT_HITS + 1
-  hits = search(storage, query, limit, TextSource.STATUTE) or search(storage, query, limit)
+  hits = search_statutes(storage, query, limit, encoder) or search(storage, query, limit)
   if not hits or not _relevant(query, hits[0]):
     return Answer(decision="defer", text=NO_BASIS_MESSAGE, sources=())
   top, context = hits[0], hits[1 : CONTEXT_HITS + 1]

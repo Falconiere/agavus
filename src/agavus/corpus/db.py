@@ -255,6 +255,21 @@ def insert_embedding(
   conn.commit()
 
 
+def replace_embeddings(
+  conn: sqlite3.Connection, model_version: str, vectors: Sequence[tuple[str, NDArray[np.float64]]]
+) -> None:
+  """Swap every vector of one model version in a single transaction."""
+  with conn:
+    conn.execute("DELETE FROM embeddings WHERE model_version = ?", (model_version,))
+    conn.executemany(
+      "INSERT INTO embeddings VALUES (?,?,?,?)",
+      [
+        (key, model_version, vector.size, np.asarray(vector, dtype=np.float32).tobytes())
+        for key, vector in vectors
+      ],
+    )
+
+
 def knn_embeddings(
   conn: sqlite3.Connection,
   query: NDArray[np.float64],
@@ -294,6 +309,14 @@ def select_cases(conn: sqlite3.Connection) -> list[CaseRecord]:
 def select_texts(conn: sqlite3.Connection) -> list[TextDocument]:
   """All text documents in stable id order."""
   rows = conn.execute("SELECT * FROM texts ORDER BY id").fetchall()
+  return [text_from_dict(_row_dict(row, ("citations",))) for row in rows]
+
+
+def select_texts_by_source(conn: sqlite3.Connection, source: TextSource) -> list[TextDocument]:
+  """Text documents of one source in stable id order."""
+  rows = conn.execute(
+    "SELECT * FROM texts WHERE source = ? ORDER BY id", (source.value,)
+  ).fetchall()
   return [text_from_dict(_row_dict(row, ("citations",))) for row in rows]
 
 

@@ -139,7 +139,7 @@ End-to-end data-to-prediction flow: **[math/classification-pipeline.md](math/cla
 | 1 | Linear SVM / Naive Bayes | max-margin hinge / multinomial NB | baselines to beat |
 | 2 | BM25 + cosine + citation features | saturating TF, length normalization; regex citations | retrieval |
 | 3 | NMF/LDA, HDBSCAN, PageRank | matrix factorization; density clustering; citation graph | subtopic discovery, authority ranking |
-| 4 | Small CPU embeddings (MiniLM-class) | cosine over dense vectors | semantic retrieval upgrade (later) |
+| 4 | Small CPU embeddings (MiniLM-class) | cosine over dense vectors | statute ranking; optional weights, BM25 fallback |
 | 5 | Quantized 0.5–4B via llama.cpp | CPU inference | optional bounded proposer behind a verifier (later, [tiny-llm.md](tiny-llm.md)) |
 
 - Word + char n-grams (Portuguese morphology/typos); binary citation features.
@@ -241,7 +241,8 @@ storage, area-parameterized pipelines.
 4. `decide/` — ✅ loss matrix, expected-loss rule, three-way gates, safety
    ceiling; ⬜ boundary queue feeding the gold set automatically.
 5. `retrieve/` — ✅ FTS5 BM25 + law-name column + citation boost + stopword
-   filtering + query-centered verbatim snippets; ⬜ hybrid dense upgrade (tier 4).
+   filtering + query-centered verbatim snippets; ✅ statute ranking by meaning
+   (tier 4, multilingual-e5-small, optional weights; plain fusion with BM25 lost).
 6. `reason/` — ✅ facts + area-scoped rule pack + verified chains (R-24A, R-22,
    R-AP); ⬜ citation graph, temporal reasoning, more rules.
 7. `answer/` — ✅ extractive cited answers, degradation ladder, topic-targeted

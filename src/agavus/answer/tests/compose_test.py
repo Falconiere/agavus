@@ -123,3 +123,14 @@ def test_decisions_answer_when_no_statute_matches(tmp_path: Path) -> None:
   _add_decision(storage, "medida protetiva")
   answer = compose("medida protetiva", CONFIDENT_M, storage)
   assert answer.sources == ("Decisão sintética",)
+
+
+def test_law_without_topic_asks_for_topic(tmp_path: Path) -> None:
+  answer = compose("Qual o artigo da lei maria da penha?", CONFIDENT_M, _corpus(tmp_path))
+  assert answer.decision == "defer"
+  assert "tema específico" in answer.text
+
+
+def test_law_with_topic_is_answered(tmp_path: Path) -> None:
+  query = "Qual artigo da lei maria da penha trata da medida protetiva?"
+  assert compose(query, CONFIDENT_M, _corpus(tmp_path)).decision == "accept-M"

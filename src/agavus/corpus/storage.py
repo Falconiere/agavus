@@ -93,6 +93,11 @@ class CorpusStorage:
     with closing(db.connect(self.root)) as conn:
       return db.select_texts(conn)
 
+  def load_texts_by_source(self, source: TextSource) -> list[TextDocument]:
+    """Stored text documents of one source."""
+    with closing(db.connect(self.root)) as conn:
+      return db.select_texts_by_source(conn, source)
+
   def load_texts_by_ids(self, doc_ids: Sequence[str]) -> dict[str, TextDocument]:
     """Fetch a subset of text documents by id without scanning the table."""
     with closing(db.connect(self.root)) as conn:
@@ -180,6 +185,13 @@ class CorpusStorage:
     """Store a dense vector for a document (tier-4 retrieval)."""
     with closing(db.connect(self.root)) as conn:
       db.insert_embedding(conn, doc_id, model_version, vector)
+
+  def replace_embeddings(
+    self, model_version: str, vectors: Sequence[tuple[str, NDArray[np.float64]]]
+  ) -> None:
+    """Swap all vectors of one model version."""
+    with closing(db.connect(self.root)) as conn:
+      db.replace_embeddings(conn, model_version, vectors)
 
   def search_similar(
     self, query: NDArray[np.float64], model_version: str, k: int = 5

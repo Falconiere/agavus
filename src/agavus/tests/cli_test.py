@@ -98,7 +98,7 @@ def test_ask_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     "reject": Answer("reject", "fora", ()),
   }
   for decision, expected_code in (("accept-M", 0), ("defer", 10), ("reject", 20)):
-    monkeypatch.setattr(cli, "compose", lambda q, p, s, a=answers[decision]: a)
+    monkeypatch.setattr(cli, "compose", lambda q, p, s, e, a=answers[decision]: a)
     assert _run_with_data_dir(monkeypatch, tmp_path, ["-p", "pergunta"]) == expected_code
 
 
@@ -107,7 +107,7 @@ def test_ask_json_output(
 ) -> None:
   _prepare_model(tmp_path, monkeypatch)
   monkeypatch.setattr(
-    cli, "compose", lambda q, p, s: Answer("accept-M", "resposta", ("Lei 11.340/2006, art. 22",))
+    cli, "compose", lambda q, p, s, e: Answer("accept-M", "resposta", ("Lei 11.340/2006, art. 22",))
   )
   code = _run_with_data_dir(monkeypatch, tmp_path, ["-p", "pergunta", "--json", "--explain"])
   assert code == 0
