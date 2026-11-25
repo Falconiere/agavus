@@ -38,6 +38,18 @@ def match_expression(query: str) -> str:
   return " OR ".join(f'"{token}"' for token in unique)
 
 
+def _whole_words(text: str, start: int, end: int) -> str:
+  """Verbatim slice narrowed so it neither starts nor ends mid-word."""
+  if start > 0 and not text[start - 1].isspace():
+    while start < end and not text[start].isspace():
+      start += 1
+  cut = end
+  if end < len(text) and not text[end].isspace():
+    while cut > start and not text[cut - 1].isspace():
+      cut -= 1
+  return text[start:cut].strip() or text[start:end]
+
+
 def extract_snippet(text: str, query: str, max_len: int = SNIPPET_LEN) -> str:
   """Verbatim substring of text up to max_len, shifted to cover query terms."""
   if len(text) <= max_len:
@@ -47,8 +59,8 @@ def extract_snippet(text: str, query: str, max_len: int = SNIPPET_LEN) -> str:
     pos = lowered.find(token)
     if pos >= max_len // 2:
       start = min(max(0, pos - max_len // 4), len(text) - max_len)
-      return text[start : start + max_len]
-  return text[:max_len]
+      return _whole_words(text, start, start + max_len)
+  return _whole_words(text, 0, max_len)
 
 
 def search(storage: CorpusStorage, query: str, limit: int = 5) -> list[Hit]:

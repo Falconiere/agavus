@@ -59,3 +59,10 @@ def test_extract_snippet_centers_on_late_match() -> None:
   snippet = extract_snippet(long_text, "afastamento do lar")
   assert "afastamento do lar" in snippet
   assert snippet in long_text
+
+
+def test_snippet_never_starts_or_ends_mid_word() -> None:
+  text = ("conhecimento da autoridade " * 12) + "descumprimento de medida " + ("fim longo " * 30)
+  snippet = extract_snippet(text, "descumprimento")
+  assert snippet in text
+  assert set(snippet.split()) <= set(text.split())
