@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agavus"
-version = "0.4.0"
+version = "0.5.0"
 description = "CPU-only legal classifier and cited statute search for Brazilian family and domestic-violence law (TJDFT)."
 readme = "README.md"
 license = "MIT"
