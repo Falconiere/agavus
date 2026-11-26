@@ -1,7 +1,8 @@
 # Cosine similarity — comparing vectors
 
-**Role**: measures how aligned two TF-IDF vectors are; a retrieval and
-clustering signal. Future module: `retrieve`.
+**Role**: measures alignment between two vectors. Agavus uses normalized E5 query and
+passage vectors for semantic statute retrieval. The TF-IDF example below illustrates
+the same operation on non-negative counts.
 
 ## Formula
 
@@ -37,9 +38,9 @@ vector lengths differ. That is exactly what we want for topical similarity.
 
 ## Limitations
 
-- Lexical only: paraphrases with disjoint vocabulary score ~0.
+- For lexical TF-IDF, paraphrases with disjoint vocabularies score zero. Dense embeddings can align such paraphrases.
 - Sensitive to representation choices (n-grams, normalization) — fix those
   upstream, not here.
 
 See also: [BM25](bm25.md), the query–document scorer used for retrieval
-ranking (cosine is the document–document companion).
+ranking over indexed text.

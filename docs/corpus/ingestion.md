@@ -1,54 +1,18 @@
-# Ingestion — raw data → processed records
+# Corpus ingestion
 
-Future module: `corpus/ingestion`. The pipeline is a one-way flow; raw data
-is never mutated.
+`agavus ingest` accepts three sources. DataJud supplies TJDFT metadata, DJEN supplies
+published decision texts and Planalto supplies statutes. Local statute payloads can also
+be imported. Source selection, limits and import flags are documented in the [CLI](../cli.md).
 
-```mermaid
-flowchart LR
-  F["fetch<br/>(incremental, polite)"] --> R[("data/raw/<br/>as fetched + run log")]
-  R --> A["anonymize<br/>(LGPD)"]
-  A --> N["normalize<br/>(synonym/abbreviation lexicon)"]
-  N --> L["label<br/>(TPU → organ → review queue)"]
-  L --> P[("data/processed/<br/>typed records + watermark")]
-```
-
-## Stages
-
-1. **Fetch**: from the current date backward until the source returns no
-   more subject rows (F/M, TJDFT). No start date. Store responses verbatim in
-   `data/raw/` with fetch timestamp + query parameters. The cursor advances
-   after each saved page and is a `search_after` position, not a filing date.
-2. **Anonymize**: strip party names, CPF/RG, addresses, minors' identifiers
-   before anything else touches the text ([privacy.md](privacy.md)).
-3. **Normalize**: apply the taxonomy lexicon (abbreviations → canonical
-   terms), unify citation formats, extract `citations` by regex.
-4. **Label**: TPU mapping first, organ weak labels second, conflicts to the
-   review queue ([labeling.md](labeling.md)).
-5. **Store**: frozen typed records in `data/processed/`, keyed by
-   deterministic `id`; update the watermark only after a successful run.
-
-## Guarantees
-
-- **Idempotent**: re-running the same day produces zero new records
-  (deterministic ids + dedup).
-- **Resumable**: a crash costs a resume from the watermark, not a restart.
-- **Auditable**: every processed record points to its raw payload
-  (`raw_ref`); every run writes a run-log entry (SQLite `meta_runs`: date,
-  window, counts) and advances the watermark only on success.
-- **Versioned, never edited**: reprocessing creates a new processed version;
-  raw stays untouched forever.
-
-## Dedup and splits
-
-- Dedup key: `id` (process number for cases; source + origin_ref hash for
-  texts). The same acórdão published in two places is one record.
-- **Split discipline**: the same case never appears in both train and
-  held-out sets. Split by case, preferably by time (train ≤ 2025,
-  held-out 2026+) so evaluation mimics future cases.
-
-## Failure handling
-
-- Source errors: back off, retry, record the gap in the manifest; a partial
-  run never advances the watermark past unfetched data.
-- Label conflicts: never block ingestion — records land with
-  `label_source: weak` and enter the review queue.
+1. The fetcher stores received payloads under `raw/` and records request metadata in
+   SQLite. Processed records carry a `raw_ref`. Source parsers select fields, extract
+   citations and apply the relevant text redactions. Raw payloads remain private.
+2. The store inserts cases by case identifier and texts by a hash of source and public
+   reference. Replaying the same key does not create a second row. Different references
+   to the same ruling can still produce different records.
+3. DataJud and DJEN save progress as they traverse pages. DataJud walks months and uses
+   a search cursor inside each month. DJEN tracks pages separately for each subject term.
+   A failed request can leave earlier successful pages stored. [Date range and stopping rules](data-range.md)
+4. Run `agavus label` to write derived area labels and review flags. Run `agavus embed`
+   after changing statutes to refresh the semantic index. Lexical indexing is maintained
+   on text insertion. [Labeling](labeling.md) · [Storage](storage.md)

@@ -2,8 +2,7 @@
 
 Status: **approved 2026-11-25; steps 1–4 done (CPU, GPU repeat 2026-11-26).**
 An isolated learning track that builds a tiny transformer with two outputs:
-next token (LM) and area (classifier). Companion: [tiny-llm.md](tiny-llm.md),
-which still governs any LLM that reaches users.
+next token (LM) and a proposed area head (step 5). The lab is isolated from user answers.
 
 ## 1. Goals and non-goals
 
@@ -80,7 +79,7 @@ runs with the same tokenizer and split; after BPE, report bits per character.
 | 5 | Same body + area head | CPU or GPU | compared with TF-IDF (§5) |
 
 Stop and review after step 5. Pretrained encoders, RAG and LoRA are separate
-decisions, governed by tiny-llm.md.
+decisions requiring separate evaluation before any production use.
 
 ### Step 1, precisely
 
@@ -171,8 +170,8 @@ only pays off with more steps.
 
 - [x] `AGENTS.md`: state that the lab may *use* a GPU but never require one.
 - [x] `docs/commits.md` / commit hook: add the `lab` scope.
-- [x] `docs/tiny-llm.md`: note this lab as an exception to "never invest in
-      training in advance", for learning only.
+- The lab may train models from scratch for learning. Production model investments require
+  a measured gap after data, feature and calibration improvements.
 - [x] `pyproject.toml`: add the `lab` extra, at step 3 and not earlier.
 
 ## 8. Risks

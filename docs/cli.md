@@ -1,150 +1,42 @@
-# CLI usage — how to use agavus
+# Agavus CLI
 
-Status: **implemented** — `-p`, `classify`, `search`, `train`, `eval`,
-`ingest`, `label`, `publish` are live, with `--explain` (decision trace:
-probabilities, expected losses, top features) and `--json` (typed output)
-accepted before or after subcommands.
-The CLI is the product surface for both goals: asking questions and
-classifying documents. User-facing I/O is **pt-BR**; code and docs stay
-English.
+Invoke commands from the repository root with `uv run agavus`. Running without arguments
+prints a greeting. The [quickstart](../README.md#run-locally) builds a public demo corpus.
 
-## Command surface
+| Command or option | Behavior |
+| --- | --- |
+| `-p "pergunta"` | Routes a question by meaning. Accepted answers include cited sources. Requires the encoder installed by `embed`. |
+| `classify "texto"` | Runs the stored TF-IDF document classifier on one positional text argument. |
+| `search "consulta" --limit 5` | Returns lexical hits with a score, reference and snippet. |
+| `ingest --source statutes` | Fetches the configured Planalto statutes. For a local copy, add `--raw-file PATH --statute-name NAME`. |
+| `ingest --source datajud --limit 500 --pages 1` | Reads TJDFT case metadata. Limit sets the requested page size and pages bounds work in this invocation. |
+| `ingest --source djen --pages 1` | Reads published decisions by subject, resuming from the saved position. |
+| `label` | Applies the area labeling rules and reports the number needing review. |
+| `train` | Fits the document classifier, calibrates it and saves its holdout report. |
+| `embed` | Downloads the encoder and indexes the statutes in the selected data directory. Rerun after changing them. |
+| `eval` | Evaluates the document classifier on the authored routing gold set. |
+| `eval --retrieval` | Evaluates statute ranking on development questions and prints first-hit, top-k and reciprocal-rank metrics. |
+| `publish` | Evaluates and stages release files locally. See [publishing](publishing.md) for bootstrap and upload options. |
+
+## Reading the output
+
+`classify --json` returns `probabilities` and `decision`. With `--explain` it adds a
+`trace` with probabilities, expected losses, routing mode and the highest-contributing
+terms. A successful classification exits with 0 for every decision.
+
+Pass the question immediately after `-p` when requesting JSON output.
 
 ```sh
-agavus -p "Qual é o artigo da lei de alienação parental?"   # ask (primary UX)
-agavus classify "texto…"                                  # classify inline text
-agavus search "medida protetiva art. 22"                  # BM25 + citation retrieval
-agavus ingest --source statutes                           # corpus ingestion
-agavus ingest --source datajud --limit 500                # F/M metadata, today → oldest
-agavus ingest --source djen                               # published F/M decisions
-agavus label                                              # TPU + organ labeling
-agavus train                                              # fit + calibrate + report
-agavus eval                                               # gold-set evaluation
-agavus eval --retrieval                                   # article retrieval (dev questions)
-agavus embed                                              # download encoder (required by -p), index statutes
-agavus publish [--bootstrap ASSETS_DIR] [--repo OWNER/NAME] \
-               [--space OWNER/NAME] [--revision REF]   # eval-gated HF release
+uv run agavus -p "O que diz o art. 22 da Lei 11.340/2006?" --json --explain
 ```
 
-Flags (ask, classify, eval, search):
+Question JSON contains `decision`, `area`, `confidence`, `text` and `sources`.
+The area is null for defer or reject. Each accepted source has a `ref`.
+Confidence is the largest routing probability, or zero if routing was unavailable.
+With routing available, `--explain` includes the trace with routing mode `meaning`
+and an empty list of lexical contributions. A question exits with 0 for an accepted
+answer, 10 for deferral and 20 for rejection.
 
-| Flag | Effect |
-| ------------ | ------------------------------------------------ |
-| `--json` | machine-readable typed output (schema below) |
-| `--explain` | decision trace: probabilities, expected losses, top features |
-
-Publish flags (CI/CD runs them; [publishing.md](publishing.md)):
-
-| Flag | Effect |
-| ---------------------- | ------------------------------------------------ |
-| `--bootstrap DIR` | offline build from public statutes in DIR + seeds before gating |
-| `--repo OWNER/NAME` | upload the eval-gated model release |
-| `--space OWNER/NAME` | stage + upload the Gradio Space |
-| `--revision REF` | git ref the Space installs agavus from (default `main`) |
-
-## What happens on `-p` (the full flow)
-
-```mermaid
-flowchart LR
-  Q["-p pergunta"] --> C["classify<br/>P(F), P(M), P(O)"]
-  C --> G{"decide"}
-  G -->|accept| R["retrieve<br/>BM25 + citations"]
-  R --> A["answer: verbatim excerpt<br/>+ source + disclaimer"]
-  G -->|defer| CL["clarifying question"]
-  G -->|reject| OS["fora do escopo"]
-```
-
-The answer is **always a cited excerpt**, never generated prose.
-
-## Worked example (the founding query)
-
-```
-$ agavus -p "Qual é o artigo da lei de alienação parental?"
-
-Decisão: accept · área F · confiança 0.93
-
-Trecho relevante:
-  "Considera-se ato de alienação parental a interferência na formação
-   psicológica da criança ou do adolescente promovida ou induzida por
-   um dos genitores, pelos avós ou pelos que tenham a criança ou
-   adolescente sob sua autoridade, guarda ou vigilância…"
-
-Fonte: Lei 12.318/2010, art. 2º, caput — Planalto (texto compilado)
-
-Isto não é aconselhamento jurídico; consulte um advogado.
-```
-
-Behind the scenes: "alienação parental" votes F; citation/statute match
-retrieves Lei 12.318/2010 art. 2º; α_F cleared → accept.
-
-## The other two outcomes
-
-Defer (boundary region — the engine asks, it does not guess):
-
-```
-$ agavus -p "meu ex não deixa eu ver meu filho"
-
-Decisão: defer
-Preciso de um esclarecimento: guarda/visitas ou pensão alimentícia?
-```
-
-Reject (out of scope, said plainly):
-
-```
-$ agavus -p "como funciona o habeas corpus?"
-
-Decisão: reject
-Fora do escopo: agavus cobre direito de família e violência doméstica
-(Maria da Penha) no TJDFT.
-```
-
-## `--explain`: auditability as a feature
-
-```
-$ agavus -p "…" --explain
-
-P(F)=0.93  P(M)=0.04  P(O)=0.03
-Perda esperada: accept-F 0.62 · accept-M 5.7 · reject 3.9 · defer 1.0 → accept-F
-Top features: alienacao_parental (+2.1), lei_12318 (+1.8), artigo (+0.4)
-Retrieval: Lei 12.318/2010 art. 2º (BM25 11.3), art. 4º (8.1)
-```
-
-Every routing decision can be explained to a human — weights, losses,
-scores. This is the auditability payoff of the linear core.
-
-## `--json` output contract (typed)
-
-```json
-{
-  "decision": "accept | defer | reject",
-  "area": "F | M | null",
-  "confidence": 0.93,
-  "excerpt": "…verbatim text…",
-  "sources": [{"ref": "Lei 12.318/2010, art. 2º", "origin": "planalto"}],
-  "clarification": "…question when decision=defer…",
-  "trace": { "probabilities": {}, "expected_losses": {}, "top_features": [] }
-}
-```
-
-`trace` only with `--explain`. Fields are stable; consumers may rely on them.
-
-## Exit codes (scriptable)
-
-| Code | Meaning |
-| ---- | ------------------------------ |
-| 0 | answered (accept) |
-| 10 | deferred — clarification needed |
-| 20 | rejected — out of scope |
-| 1 | internal error |
-
-## Rules
-
-1. **No legal advice, ever**: fixed disclaimer on every answered output.
-2. **No excerpt without a source**: `sources` is never empty on accept.
-3. **Safety gate is not bypassable**: no flag forces acceptance;
-   the M ceiling governs all routing.
-4. **Determinism**: same question + same corpus/index version → same output.
-5. Corpus/index version is reported by `agavus --version` (reproducibility).
-
-Delivery guarantees (pre-delivery checklist, degradation ladder, feedback
-loop): **[response-quality.md](response-quality.md)**.
+`search --json` returns a `hits` array. `eval --json` returns document evaluation
+metrics. Retrieval evaluation uses text output. See the [answer contract](response-quality.md)
+for the evidence required on acceptance.

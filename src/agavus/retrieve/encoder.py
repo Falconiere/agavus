@@ -1,7 +1,7 @@
 """Multilingual sentence encoder on CPU via ONNX (weights are optional).
 
-Off-the-shelf weights, pinned by revision; no training. It only decides which
-article comes first: the quoted text always comes from the corpus.
+Off-the-shelf weights, pinned by revision; no training. Its vectors support question routing
+and statute ranking. The quoted text comes from the corpus.
 """
 
 from collections.abc import Sequence

@@ -1,54 +1,26 @@
-# Evals — guaranteeing and benchmarking quality
+# Evaluation and release gates
 
-Status: **harness live** (`agavus eval`, gold set v1, release gate in
-`publish/export.gate`). Principle: **no change ships without measured evidence.**
-Gold sets are the constitution; the harness is the gate. Future module:
-`evals/` (cross-cutting, active from the `classify` step onward).
+Document model releases require at least one accepted gold example, accepted precision
+of 1.00 and M recall of at least 0.98. Space releases also require the question router
+to pass that gold gate, with zero unsafe M decisions and M recall of at least 0.90 on
+routing DEV. These gates measure authored examples. They do not validate real-case
+outcome prediction. [Model gate](../src/agavus/publish/export.py) ·
+[Space router gate](../src/agavus/publish/router_gate.py)
 
-## Quality dimensions, metrics, targets
+## Evaluation commands
 
-Targets are placeholders to calibrate on first real data — but the **hard**
-rows are non-negotiable from day one.
+- `agavus train` reports accuracy, macro-F1 and ECE on the document holdout.
+- `agavus eval --json` measures document routing and decision coverage on the authored
+  routing gold set.
+- `agavus eval --retrieval` reports first-hit, top-k and mean reciprocal rank for statute
+  retrieval on development questions.
 
-| Dimension | Metric | Target |
-| ------------------ | -------------------------------------- | ---------------------- |
-| Routing | macro-F1 per area (held-out, time split) | ≥ 0.90 |
-| Routing safety | **M recall** | ≥ 0.98 |
-| Routing safety | M→F errors on safety-set | **0 (hard)** |
-| Calibration | ECE + reliability diagram | ≤ 0.05 |
-| Decision | precision on accepted answers | ≥ 0.95 |
-| Decision | coverage (accepted / total) | reported, tuned via α/β |
-| Retrieval | recall@5 on gold questions | ≥ 0.90 |
-| Answers | citation correctness (right law, article, text) | **1.00 (hard)** |
-| Answers | groundedness (every claim span-supported) | **1.00 (hard)** |
-| Scope | OOD rejection rate | ≥ 0.95 |
-| Privacy | party-name leakage scan | **0 (hard)** |
-| Tiny LLM (later) | hallucination on gold set | **0 (hard)** |
-| Tiny LLM (later) | verifier fallback rate, p95 latency | bounded, tracked |
-| Reproducibility | same input → same output | exact (classical core) |
-
-Coverage is always reported **next to** precision — the accuracy/coverage
-dial is a product decision, not a hidden trade-off.
-
-## Gold sets (versioned, firewalled)
-
-| Set | Content | Lives |
-| --------------- | ---------------------------------------------- | -------------- |
-| routing-set | texts/queries + true area, incl. hard M↔F cases | git (authored) |
-| retrieval-set | questions → relevant provisions (article-level judgments) | git (authored) |
-| answer-set | questions → expected decision + citation + spans | git (authored) |
-| safety-set | adversarial: M phrased as family dispute, urgency probes, OOD, injection texts (LLM layer) | git (authored) |
-| calibration-holdout | labeled real cases, time-split | **outside git** |
-
-Rules:
-
-1. **Firewall**: gold data never enters training. Violation invalidates
-   every metric.
-2. Authored sets contain no personal data → safe in the public repo.
-   Case-derived holdouts follow the corpus policy (gitignored).
-3. Sets are versioned; every report names the set versions used.
-4. **Growth loop**: reviewed boundary cases flow into gold sets (active
-   learning, most-uncertain first) — the defer queue funds the benchmark.
+The design targets accepted precision of at least 0.95, ECE at most 0.05 and retrieval
+recall@5 of at least 0.90. The dated evaluations below identify which benchmarks were
+run and the limitations of each sample. Additional design targets include routing macro-F1
+and out-of-scope rejection of at least 0.90 and 0.95 respectively, zero unsafe M decisions
+and zero personal-data leakage. Citation accuracy and grounding are required for accepted
+answers. The automated release gates above cover a subset of these requirements.
 
 ## Splits and leakage
 
@@ -72,43 +44,6 @@ Rules:
   calibration folds, with normalization learned inside each training fold.
   Development questions guide iteration; they are not an untouched test set.
 
-## Harness and regression policy
-
-- `agavus eval` runs the gold dimensions → console report; `--json` for the
-  typed report; `agavus publish` gates releases on it (metrics, set
-  versions, corpus/model versions, confusion matrix, reliability diagram,
-  accuracy/coverage curve).
-- **Baselines committed** (metrics only, no data): a change that regresses
-  any metric beyond tolerance is blocked until explained or fixed.
-- Reports are artifacts of record — the project's quality memory,
-  complementing the commit log.
-
-## Baselines and ablations (prove the math earns its keep)
-
-- Floors: majority-class classifier, keyword rules, BM25-only answers.
-  The engine must beat all of them.
-- **Ablations per §6.1 mitigation**: remove negation features / citation
-  features / lexicon / calibration one at a time and measure the delta.
-  A mitigation that doesn't earn its delta gets revisited — requirements
-  stay honest.
-
-## Human evaluation
-
-- Weekly sample of accepted answers + boundary-queue review.
-- Rubric (binary checks): citation correct? answers the question?
-  abstention appropriate? no legal advice? no personal data?
-- Two raters on a subsample; disagreements refine the gold sets, not the
-  rubric-of-the-week.
-
-## Cadence and triggers
-
-| Event | Action |
-| ---------------------------------------- | ---------------------------- |
-| model / corpus / lexicon / rules / thresholds change | full `agavus eval` |
-| weekly | boundary review → gold growth |
-| monthly | safety-set refresh (new adversarial phrasings) |
-| tiny-LLM layer proposal | shadow eval + ablation with/without |
-
 ## First real training runs (2026-11-24)
 
 Recorded as the project's quality memory (commits-as-memory principle):
@@ -123,9 +58,7 @@ Recorded as the project's quality memory (commits-as-memory principle):
    protetiva" → M 0.90 ✓; "tráfico" → O 0.41 (weak); vague custody query →
    F 0.49 / M 0.41 (ambiguous). Holdout acc 0.79, macro-F1 0.54, ECE 0.069.
 
-Interpretation: low-confidence and ambiguous cases are **exactly what the
-three-way decide gate must defer** — the probabilities are now meaningful
-inputs for it. Next: `decide/` + gold-set evaluation (`agavus eval`).
+These early runs motivated evaluating the three-way decision separately from argmax accuracy.
 
 ## First decision-layer eval (2026-11-24, routing-v1)
 
@@ -180,13 +113,6 @@ modeling fix, never threshold weakening.
 
 OOD gold items now correctly **rejected** (2), ambiguous honestly deferred
 (2), 6 accepted all correct. Founding query answered with citation.
-
-## Investment decisions are eval-triggered
-
-LoRA/fine-tuning and tier upgrades are considered **only when a measured
-bottleneck survives data/feature/threshold fixes** — see
-[tiny-llm.md](tiny-llm.md) "Fine-tuning (LoRA)". Evals first, investment
-second.
 
 ## Retrieval by meaning (2026-11-25, retrieval-v1)
 

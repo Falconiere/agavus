@@ -19,3 +19,6 @@ data/
 
 # Web research cache
 .firecrawl/
+
+# Local Toolu working documents
+/docs/toolu/

@@ -2,7 +2,7 @@
 
 **Role**: the decision layer (Yao's decision-theoretic rough sets). Consumes
 calibrated probabilities and a loss matrix; never forces a guess.
-Future module: `decide/rule`. Design doc §7.
+Implementation in `decide/rule`. Design doc §7.
 
 Domains: **F** (família), **M** (Maria da Penha / violência doméstica —
 protective measures and DV criminal prosecutions), **O** (out of scope,
@@ -90,12 +90,6 @@ Implemented in `decide/losses.py` + `decide/rule.py`: matrix composed from
 the area registry, safety ceiling validated in code, ties prefer defer.
 `agavus classify --explain` prints the full expected-loss table.
 
-## Properties
-
-- Applied at **two gates**: routing (classify) and answering
-  (answer / abstain / escalate).
-- Tunable **accuracy/coverage dial**: raise α → fewer, near-certain answers.
-  Report both numbers (design doc §8).
-- Boundary cases produce clarifying questions or human-review items — never
-  forced labels. This is how real M↔F overlap is handled.
-- Loss values are placeholders to calibrate on held-out TJDFT data.
+The binary reductions illustrate the costs. Production chooses the minimum across
+all actions using the full probability vector. After routing, a question can also
+defer when it lacks a supporting source. [Answer checks](../response-quality.md)

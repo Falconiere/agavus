@@ -1,45 +1,19 @@
-# Privacy — LGPD, anonymization, segredo de justiça
+# Corpus privacy
 
-The repo is **public**. Real case data must never be committed, even
-anonymized (re-identification risk). Privacy is enforced at ingestion,
-before any processing or storage of processed records.
+Real case records, raw fetches, decision excerpts, case-derived labels and research
+artifacts stay in the private data directory, outside Git. Public fixtures must be
+synthetic. The public bootstrap uses bundled statute texts and authored routing examples.
 
-## What is stripped (at ingestion, before anything else)
+Process only material available through authorized sources. Exclude sealed material and
+respect portal access controls. Raw evidence may retain identifying details and needs
+restricted access even when a processed excerpt has been redacted.
 
-| Category | Examples | Action |
-| ------------------------ | ------------------------------------ | ------------------------- |
-| Party names | authors, réus, witnesses, minors | remove / replace with role tokens |
-| Personal documents | CPF, RG, CNH numbers | remove |
-| Contact / location | addresses, phones, emails | remove |
-| Minor identifiers | anything identifying children | remove (heightened protection) |
+The text redactor recognizes CPF, CEP, email, phone numbers, labeled RG/CPF/CNPJ
+identifiers and some names following party-role markers. It preserves URLs. The
+residual-data detector checks CPF, email and phone patterns. Names without markers,
+addresses and other identifying combinations can survive these checks. A clean scan
+does not authorize publication of case-derived material.
+[Redaction code](../../src/agavus/corpus/anonymize.py) · [Publishing policy](../publishing.md)
 
-Role tokens keep text usable: "a autora", "o réu" survive; names do not.
-Automated scans verify no leakage (design doc §8: zero tolerance).
-
-## What stays (public by law)
-
-- Process numbers, classes, TPU codes, órgãos, dates, movements — public
-  metadata via DataJud.
-- Published decision text (acórdãos/decisões in DJEN) — public by
-  publication, after anonymization of any residual personal data.
-- Statutes — fully public.
-
-## Segredo de justiça (sealed cases)
-
-Family (F) and Maria da Penha (M) cases are frequently sealed:
-
-- **Never attempt to access sealed full texts.** No scraping around
-  access controls, no exceptions.
-- Metadata from DataJud is public and sufficient for labeling/features.
-- Retrieval for F/M leans on statutes + *published* acórdãos.
-- Coverage asymmetry (F/M metadata-heavy, P text-heavy) is a design fact —
-  see [sources.md](sources.md).
-
-## Storage consequences
-
-- Real data only in gitignored `data/` ([storage.md](storage.md)), with a
-  pre-commit guard against staged `data/` files.
-- Test fixtures in git are **synthetic** — invented records, never edited
-  real ones.
-- If sharing is ever needed: private object storage / private dataset host,
-  referenced by config — never git, never public.
+The staged-data guard rejects files under `data/`. If you configure another
+`AGAVUS_DATA_DIR`, choose a location outside version control. [Storage](storage.md)

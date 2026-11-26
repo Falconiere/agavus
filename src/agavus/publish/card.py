@@ -42,9 +42,9 @@ with cited, extractive answers. **No GPU, no LLM in the core.**
 
 ## Intended use
 
-Route legal queries/documents to the correct domain with honest confidence;
-defer instead of guessing. Answers in the full engine are verbatim cited
-excerpts, never generated opinions. {DISCLAIMER}
+Use this artifact with `agavus classify` for document routing. Its probabilities
+refer to routing areas. The public Space uses a separate E5 question router and
+returns cited excerpts or rules with supporting statute text. {DISCLAIMER}
 
 ## Architecture
 
@@ -99,15 +99,16 @@ arts. 1.511-1.783 (família book), plus authored synthetic seed queries.
 
 - Safety ceiling enforced in code and tests; no threshold weakening.
 - Eval-gated releases: this card ships only with a passing gold evaluation.
-- LGPD: no personal data in training, artifacts, or outputs.
+- Release builds use bundled statutes and authored examples. Case-derived inputs stay private.
 
 ## How to use
 
 ```sh
 git clone https://github.com/Falconiere/agavus && cd agavus
 make install
-uv run agavus train
-uv run agavus -p "ele descumpriu a medida protetiva, o que acontece?"
+export AGAVUS_DATA_DIR=data/public-demo
+uv run agavus publish --bootstrap space/assets
+uv run agavus classify "ele descumpriu a medida protetiva" --explain
 ```
 
 The artifact `models.db` (SQLite) holds vocabulary, weights, temperature,

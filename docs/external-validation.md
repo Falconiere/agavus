@@ -95,16 +95,3 @@ the tooling practices what we preach: confidence below threshold → review.
    never an authority.
 4. Provider evals elsewhere are English/business-weighted; pt-BR legal
    looked strong here but needs the full gold-set benchmark.
-
-## Planned use (each gated, each approval-bounded)
-
-1. `jev-triage` as **routing comparator** on the gold set when `classify`
-   lands: disagreements → review queue, never auto-correction.
-2. `jev-documents` as **citation auditor** in the eval harness (sampled
-   accepted answers, synthetic/public sources only).
-3. `jev-eval` as **external rubric judge** beside human evaluation.
-4. Optional: frontier-reference probabilities for workflow evals (their
-   evals philosophy), always on synthetic data.
-
-Scaling any of these requires: larger reviewed gold set, explicit budget
-approval, and the regression policy from [evals.md](evals.md).

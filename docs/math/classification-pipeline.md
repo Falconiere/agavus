@@ -1,95 +1,28 @@
-# Classification pipeline — how the engine reads data
+# Classification pipeline
 
-The engine never "reads" text — it **counts symbols through a frozen
-pipeline**. This doc traces the exact path from public data to a classified
-prediction. Future modules: `corpus` → `classify` → `decide`.
+Agavus has two classifiers in production. Their output labels describe family law (F),
+domestic violence (M) and matters outside scope (O). Both feed the same
+[expected-loss rule](three-way-decisions.md).
 
-## The full path
+| | Document command | Questions and Gradio Space |
+| --- | --- | --- |
+| Input | Text passed to `classify` | Question passed to `-p` or the demo |
+| Representation | Normalized words, word bigrams, character trigrams, scoped negation, decision verbs, citations and citation–verb pairs | Pinned multilingual E5 query embeddings, centered and scaled |
+| Estimator | Class-balanced multinomial logistic regression | Linear classifier fitted on authored question examples |
+| Calibration | Temperature chosen on the separate calibration split | Temperature chosen on out-of-fold scores with scenario variants kept together |
+| Explanation | Area probabilities, losses and largest term contributions | Area probabilities and losses |
 
-```mermaid
-flowchart LR
-  S["DataJud / DJEN"] --> R["raw payloads"]
-  R --> A["anonymize + normalize<br/>(lexicon vN)"]
-  A --> REC["typed records<br/>text + metadata + label"]
-  REC --> F["feature extraction<br/>TF-IDF + citations + metadata"]
-  F --> X["sparse matrix X, labels y"]
-  X --> M["logreg + calibration"]
-  M --> P["P(F), P(M), P(O)"]
-  P --> D["decide: accept / reject / defer"]
-```
+The document training set uses resolved labeled texts and authored seeds. Case-derived
+texts require an identifiable case number in their provenance. TPU and court metadata
+help assign labels. The document vectorizer accepts text only. Vocabulary, IDF and
+model weights are fitted on the training partition. Duplicate texts and records from
+the same case stay together across splits. [Split details](../evals.md#splits-and-leakage)
 
-## What the classifier consumes
+For example, a reference to a statute and a decision verb in the same document generate
+features for both and their combination. The classifier transforms these features with
+the stored vocabulary, applies its weights and calibrated temperature, then compares
+the expected loss of each action. The question router instead encodes the whole question.
+A missing encoder causes a question to defer.
 
-Each record becomes **one row of numbers** — a sparse vector assembled from
-three feature groups:
-
-### 1. Text features (from `TextDocument.text`)
-
-- Normalize first: the lexicon maps abbreviations/synonyms to canonical
-  terms ("LMP" → "lei maria da penha").
-- Tokenize → word unigrams + bigrams ("medida protetiva" as one unit) +
-  char n-grams (`prot`, `rotet` — catches protetiva/protetivas).
-- Negation scoping: "indefiro a protetiva" produces `nega_protetiva`, a
-  *different* feature (design doc §6.1 #1).
-- [TF-IDF](tfidf.md) weights each feature; the vocabulary is **fitted once
-  on the training split and frozen**.
-
-### 2. Citation features (binary flags)
-
-- Regex extracts "art. 22, III, Lei 11.340/2006" → `cite:lei_11340_art_22 = 1`.
-- In legal text these are near-decisive: citing Lei 11.340 is a massive M
-  signal.
-
-### 3. Metadata features (from `CaseRecord` — crucial for F/M)
-
-- One-hot TPU classe/assunto codes; organ patterns ("vara violência
-  doméstica" → flag).
-- This is how sealed cases (no full text) still get classified:
-  metadata *is* the input (see [../corpus/sources.md](../corpus/sources.md)).
-
-One row ≈ `[tfidf terms…, citation flags…, metadata flags…]` — mostly zeros,
-a few hundred active entries. Labels `y` come from `label_source`
-(tpu / organ / manual).
-
-## Concrete walkthroughs
-
-**Query**: *"meu ex não deixa eu ver meu filho"*
-
-1. Normalize → tokens `ex`, `não`, `deixa`, `ver`, `filho` (+ bigrams,
-   char n-grams).
-2. Vectorize with the **frozen** vocabulary → known terms get weights;
-   unknown words are ignored (no crash, no understanding).
-3. No citations, no metadata → those groups are all zero.
-4. Model: "filho", "ver" vote F; weak evidence overall → e.g.
-   `P(F) = 0.62, P(M) = 0.05, P(O) = 0.33`.
-5. Decide: 0.62 < α_F (0.89) → **defer** → clarifying question:
-   *"Guarda/visitas ou pensão?"*
-
-**Document**: *"DEFIRO a medida protetiva… art. 22, Lei 11.340/2006"*
-
-Citation flag + "protetiva" + "defiro" → `P(M) = 0.97` → **accept as M**.
-
-## The three rules that make it work
-
-1. **Train/serve symmetry**: inference runs the *identical* pipeline —
-   same lexicon version, same frozen vectorizer, same feature extractors.
-   Drift here silently corrupts probabilities. Artifacts are versioned
-   together.
-2. **Separate learning, confidence and grading**: training fits vocabulary,
-   IDF and model weights; a separate calibration partition fits temperature;
-   final holdout measures quality. Keep each case and duplicate text group
-   together; prefer newer cases for calibration and evaluation. Undated
-   statutes and seeds remain auxiliary training data when dated cases are
-   available (see [../evals.md](../evals.md#splits-and-leakage)).
-3. **Determinism**: same input → same vector → same probabilities. No
-   randomness at inference — this is what makes the safety thresholds
-   trustworthy.
-
-## Summary
-
-"Reading" = normalize → count → weight → vote → calibrate → price the
-decision. The engine's entire "understanding" of Portuguese is the frozen
-vocabulary plus weights learned from TJDFT statistics.
-
-Related: [tfidf.md](tfidf.md), [logistic-regression.md](logistic-regression.md),
-[calibration.md](calibration.md), [three-way-decisions.md](three-way-decisions.md).
+The [private learned-classifier comparison](learned-classifier.md) has its own datasets,
+model weights and evaluation. Its area and statement-relation heads are experimental.

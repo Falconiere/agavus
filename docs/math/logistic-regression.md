@@ -1,7 +1,7 @@
 # Logistic regression — evidence voting → probabilities
 
 **Role**: domain classifier. Converts a TF-IDF vector into class
-probabilities $P(F), P(M), P(O)$. Future module: `classify/model`.
+probabilities $P(F), P(M), P(O)$. Implementation in `classify/model`.
 
 ## Formulas
 

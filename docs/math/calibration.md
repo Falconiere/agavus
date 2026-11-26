@@ -1,68 +1,18 @@
-# Calibration — making probabilities honest
+# Temperature calibration
 
-**Role**: corrects classifier confidence so that "0.9" empirically means 90%
-correct. Mandatory before the decision layer. Future module: `classify/model`.
+For class logits `z`, the engine computes `softmax(z / T)`. It fits a single positive
+temperature by minimizing negative log likelihood over 49 candidates from 0.2 to 5.
+A larger temperature spreads probability more evenly over classes. Scaling leaves the
+highest-scoring class unchanged, but it can change the minimum-loss action.
+[Implementation](../../src/agavus/classify/calibrate.py) · [Decision rule](three-way-decisions.md)
 
-## The problem
+For example, with logits (2, 0) the first class receives about 0.88 at T = 1 and
+0.73 at T = 2. These are probabilities of a routing class. A reliability check groups
+predictions by confidence and compares mean confidence to observed accuracy.
 
-A classifier can rank well and still lie about confidence: among predictions
-of ~0.9, only 75% may be correct. Thresholds and expected-loss decisions
-spend real costs against these numbers, so they must be trustworthy.
-
-**Reliability check**: bin held-out predictions by confidence; plot mean
-confidence vs observed accuracy. Perfect calibration = the diagonal.
-
-## Platt scaling (the formula)
-
-Fit a sigmoid on the model's score $z$, using a held-out set:
-
-$$
-P_{\text{cal}} = \sigma(a \cdot z + b) = \frac{1}{1 + e^{-(a z + b)}}
-$$
-
-$a, b$ are learned by minimizing log-loss on the held-out data (2 parameters
-— cheap, works with small gold sets).
-
-## Worked example
-
-Held-out reliability before calibration:
-
-| Predicted confidence | Observed accuracy |
-| -------------------- | ----------------- |
-| 0.90 | 0.75 |
-| 0.60 | 0.55 |
-
-After fitting Platt: raw 0.90 → **0.78**, raw 0.60 → **0.55**. Now a
-threshold of $\alpha \approx 0.86$ (Maria da Penha accept) genuinely filters
-for ~86%-correct decisions, as the loss matrix assumes.
-
-## Isotonic alternative
-
-A monotone step function fitted to the reliability curve — more flexible than
-Platt, but needs more data to avoid overfitting. With our small gold set,
-**Platt first**; isotonic later if data grows.
-
-## In agavus
-
-Implemented as **temperature scaling** (`classify/calibrate.py`): a single
-scalar T on the logits, grid-searched on calibration NLL — the multiclass
-analogue of Platt scaling. Document training uses three disjoint sets:
-training fits vocabulary, IDF and weights; calibration fits T; final holdout
-measures accuracy, macro-F1 and ECE. Scoring calibration examples again would
-give an optimistic estimate, like grading a student on the practice exam.
-
-The question router fits T from out-of-fold scores. Each fold learns its
-centering and scale from its own training examples; paired variants of an
-authored scenario stay in one fold. Independent question sets measure routing
-quality. Isotonic remains an option if data grows.
-
-## Rules
-
-- Fit on **held-out** data only — never the training set (it would look
-  perfectly calibrated and lie).
-- Keep final evaluation separate from calibration as well. Small calibration
-  samples can still give unreliable confidence; separation removes leakage,
-  not sampling uncertainty.
-- Re-calibrate whenever the model or corpus changes.
-- Report calibration quality (e.g., expected calibration error) alongside
-  F1 in evaluation (design doc §8).
+The document classifier fits vocabulary and weights on training data, fits temperature
+on a separate calibration partition and reports accuracy, macro-F1 and expected calibration
+error on the final holdout. The question router fits temperature using out-of-fold logits.
+Each fold learns its own centering and scale, and paired variants of an authored scenario
+stay in one fold. Small samples still carry substantial uncertainty.
+[Evaluation and split policy](../evals.md#splits-and-leakage)

@@ -1,24 +1,19 @@
 # agavus — Design Document
 
-Status: **MVP implemented and published** (corpus → taxonomy → classify →
-decide → retrieve → reason → answer; HF model repo + Space live).
+The engine supports document classification, question routing, retrieval and cited answers.
+The public demo and model repository are linked in the [README](../README.md).
 Scope: CPU-only legal classification + retrieval/answer engine for Brazilian law,
 restricted to **TJDFT** data and two domains.
 
 ## 1. Goals
 
-1. **Document classifier**: route legal text to the correct domain/subtopic.
-2. **Search/answer tool**: answer questions with *actual cited excerpts*
-   (statutes + decisions), never generated "opinions".
+1. Route documents and questions to family law, domestic violence or outside scope.
+2. Return cited excerpts or a rule conclusion with its statutory premise. Defer when
+   the evidence is insufficient.
 
-Constraints:
-
-- Production is CPU-only. Private learned-classifier experiments may use local
-  MPS after a training pilot; CPU training and inference must also work.
-- Pure-mathematical core (tiers 1–3 below); small CPU inference / API models
-  (tiers 4–5) allowed later as optional layers, never as source of truth.
-- No legal advice: answers are cited excerpts + abstention/escalation paths.
-- LGPD: anonymize parties; never expose personal data from case records.
+Production inference runs on CPU. The private learned-classifier comparison can also
+train on local MPS. Research artifacts remain isolated from production. Protect
+case-derived data and follow the [corpus privacy policy](corpus/privacy.md).
 
 ## 2. Domain scope
 
@@ -28,10 +23,8 @@ Constraints:
 | M | Maria da Penha / violência doméstica | medidas protetivas **and** DV criminal prosecutions: lesão corporal, ameaça, feminicídio, art. 24-A |
 | O | Out of scope | everything else, **including general criminal law** → reject |
 
-Subtopics come from CNJ's **TPU** (Tabelas Processuais Unificadas) taxonomy,
-filtered to these domains. Inside M, TPU subtopics preserve the distinction
-between protective measures (civil/autonomous) and criminal prosecutions —
-routing is binary, detail is not lost.
+The production output is a single area decision. Case metadata can retain subject codes.
+The engine does not produce a subtopic prediction.
 
 ### Taxonomy nature: routing, not legal branches
 
@@ -51,7 +44,7 @@ taxonomy of legal branches:
 co-occurs. Consequences:
 
 - Single-label routing resolves ambiguity through the **boundary region**:
-  mixed M/F matters are deferred (clarify/escalate), never forced into one class.
+  mixed M/F matters can defer when the expected loss of an area decision is high.
 - Evaluation watches the M↔F confusion cells explicitly (§8).
 - If TJDFT data shows frequent co-occurrence, evolve to **multi-label**
   classification; the decision layer's expected-loss rule generalizes to
@@ -73,45 +66,23 @@ TJDFT). `AGAVUS_DATA_START` still loads so older env files do not break;
 fetches ignore it. Statutes stay the current consolidated text. Train/held-out
 split by case, preferably by time, on whatever span was stored.
 
-| Source | Content | Use |
-| ------------------------- | -------------------------------------------- | ------------------------------ |
-| DataJud API (CNJ) | case metadata, filtered `tribunal = TJDFT` | labels (TPU codes), features |
-| DJEN | full-text decisions, filtered to TJDFT | training text, retrieval corpus |
-| TJDFT jurisprudence portal | acórdãos/decisões search | retrieval corpus supplement |
-| Planalto / LexML | statutes (CP, CC Livro IV, Lei 11.340/2006) | retrieval corpus, citation features |
-
-Caveats:
-
-- **Segredo de justiça**: family and Maria da Penha full texts are often
-  sealed. Expect metadata-heavy data for F/M, full-text-heavy for P.
-- Single court = consistent vocabulary; generalization to other tribunals is
-  an explicit later phase (domain shift), not an MVP concern.
+The three implemented source adapters and their coverage limits are documented in
+[corpus sources](corpus/sources.md). Statute articles and published decisions can
+support cited answers. Neither a court publication nor a routing probability
+establishes the likelihood that an individual protective order will be revoked.
 
 ## 4. Labeling strategy
 
-1. **Free labels**: DataJud records carry TPU classe/assunto codes → map to
-   F/M/O via a curated code table (`taxonomy` domain).
-2. **Weak labels from órgão julgador**: TJDFT specialized organs are strong
-   domain signals:
-   - Vara de Violência Doméstica e Familiar contra a Mulher → M
-   - Vara de Família → F
-   - Vara Criminal → O (general criminal is out of scope)
-   - Tribunal do Júri → O, unless TPU subjects confirm feminicídio/DV
-     context → M
-   Rules are versioned and auditable; conflicts with TPU codes go to a review
-   queue, never silently resolved.
-3. **Manual gold set**: small curated set (queries + documents) for calibration
-   and evaluation; the only human-labeled data.
+Case labeling tries mapped TPU subjects, then the issuing court. The shipped TPU
+table has no verified entries yet. Conflicting signals require review. Text labeling
+uses the curated statute map or an organ named in the reference. Training reads
+resolved labels and excludes those flagged for review. [Detailed policy](corpus/labeling.md)
 
 ## 5. Corpus schema (implemented in `corpus/records.py`)
 
-Frozen, typed records:
-
-- `CaseRecord`: id, tribunal, orgao_julgador, classe_tpu, assuntos_tpu[],
-  datas, movimentos, domain_label, label_source (tpu | organ | manual | weak).
-- `TextDocument`: id, source (djen | portal | statute), origin_ref, text,
-  citations[] (regex-extracted `art. X, Lei Y`), domain_label, label_source.
-- All party names stripped at ingestion (LGPD); ingestion is idempotent.
+CaseRecord holds metadata, dates, movements and provenance. TextDocument holds a
+source type, citable reference, text and extracted citations. Both allow an unresolved
+area and record the source of their label. [Fields and types](corpus/schema.md)
 
 ### Corpus storage policy: never in git
 
@@ -126,38 +97,32 @@ anonymized (re-identification risk). Split:
 
 - Corpus lives in `data/` (gitignored), location configurable via
   `AGAVUS_DATA_DIR` in the isolated settings module (default: `data/`).
-- Ingestion is idempotent and resumable: the corpus is a rebuildable cache,
-  not an asset — losing it costs a re-fetch, nothing more.
-- Hard guard: a pre-commit hook fails if anything under `data/` is staged,
-  on top of `.gitignore`.
-- Later, if sharing/versioning is needed: object storage (S3/R2) or a private
-  dataset host, referenced by config — never by git. DVC-style snapshot
-  versioning only if reproducibility demands it (skip for MVP).
+- Deterministic IDs deduplicate repeated source/reference keys. Preserve private raw
+  evidence and manifests where reproducibility matters.
+- The staged-data guard rejects files under `data/`.
 
 ## 6. Model stack
 
 Formula-by-formula explanations with worked examples: **[docs/math/](math/README.md)**.
 End-to-end data-to-prediction flow: **[math/classification-pipeline.md](math/classification-pipeline.md)**.
 
-| Tier | Component | Math | Role |
-| ---- | ------------------------- | ------------------------------------------------ | ------------------------- |
-| 1 | TF-IDF + logistic regression | `tfidf(t,d) = count(t,d)·log(N/df(t))`; softmax, cross-entropy | domain classifier (probabilities) |
-| 1 | Linear SVM / Naive Bayes | max-margin hinge / multinomial NB | baselines to beat |
-| 2 | BM25 + cosine + citation features | saturating TF, length normalization; regex citations | retrieval |
-| 3 | NMF/LDA, HDBSCAN, PageRank | matrix factorization; density clustering; citation graph | subtopic discovery, authority ranking |
-| 4 | Small CPU embeddings (MiniLM-class) | cosine over dense vectors | statute ranking; optional weights, BM25 fallback |
-| 5 | Quantized 0.5–4B via llama.cpp | CPU inference | optional bounded proposer behind a verifier (later, [tiny-llm.md](tiny-llm.md)) |
+| Entry point | Representation and decision |
+| --- | --- |
+| Document classification | Word and character TF-IDF, legal features and class-balanced logistic regression with temperature scaling |
+| Question routing | Pinned multilingual E5 encoder on CPU, linear classifier with temperature fitted on out-of-fold logits |
+| Search | SQLite FTS5 BM25 with citation boosts |
+| Accepted question | Area-specific rule and cited premise, or statute search prioritizing explicit citations and ranking by meaning. Lexical statute search is available when the index is missing. |
 
-- Word + char n-grams (Portuguese morphology/typos); binary citation features.
-- **Probability calibration** (Platt/isotonic on held-out set) is mandatory:
-  the decision layer consumes calibrated probabilities only.
+The CPU embedding layer (tier 4 in the design) serves question routing and statute ranking.
+The question entry point requires the encoder for routing and defers when it is unavailable.
+The cost matrix consumes calibrated area probabilities. [Math and training splits](math/classification-pipeline.md)
 
 ### 6.1 Known limitations → required mitigations
 
-These are **implementation requirements**, not optional improvements. Each
-limitation of the math core has a designated fix; mitigations live in
-preprocessing/features — deterministic, inspectable, CPU-only. Auditability
-beats opaque accuracy in legal text.
+These requirements govern work on the production core. The model table above describes
+what is implemented. The mitigation table also records design obligations, including
+review feedback, comparison of retrieval methods and calibration of costs. Their
+inclusion here does not indicate a deployed queue or a live fusion algorithm.
 
 | # | Limitation | Required mitigation | Module |
 | - | ---------------------------------------- | ------------------------------------------------------------------ | ------------------ |
@@ -178,7 +143,7 @@ abstaining, not from deeper understanding.
 
 `classify/learned/` may learn negation, wording and interactions from supervised
 examples instead of the lexicons and feature crosses above. This exception is
-limited to an isolated experiment: production retains every §6.1 mitigation.
+limited to the private experiment. The §6.1 requirements continue to govern production.
 Raw pretrained-tokenizer input feeds a trainable, pinned multilingual E5-small
 encoder with masked mean pooling and separate linear area and statement-relation
 heads. Relation labels (support, contradiction, unknown) are internal supervision,
@@ -213,7 +178,7 @@ Execution, formulas and artifact layout: [private learned classifier](math/learn
 ## 7. Decision layer: three-way decisions (Yao / DTRS)
 
 Actions: **accept** (classify/answer), **reject** (out of scope), **defer**
-(clarifying question, second retrieval pass, or human review queue).
+(clarification or insufficient evidence).
 
 Loss matrix (units: 1 = cost of one deferral round; placeholders to calibrate):
 
@@ -245,81 +210,36 @@ Interpretable thresholds (binary reduction per domain,
 | Família | ~0.89 | ~0.25 | strictest acceptance (M→F catastrophic) |
 | Maria da Penha | ~0.86 | ~0.12 | hardest to reject; weak signals defer |
 
-Applied at two gates: routing (classify) and answering (answer/abstain/escalate).
+Both routing paths minimize the full multiclass expected loss. The binary thresholds
+above illustrate the costs. Accepted questions also undergo evidence and delivery checks.
 
-## 8. Evaluation plan
+## 8. Evaluation
 
-Full plan, gold sets, targets, and regression policy:
-**[docs/evals.md](evals.md)**. Summary:
+Document training reports final-holdout accuracy, macro-F1 and calibration error.
+Release checks use authored routing examples. Space releases also test the question
+router on development scenarios. Retrieval has a separate article-level evaluation.
+Record coverage alongside precision and track M recall and unsafe routing explicitly.
+[Evaluation targets, measured results and gates](evals.md)
 
-- **Classifier**: macro-F1 per domain on held-out TJDFT data; confusion matrix
-  with special attention to M↔F errors; expected calibration error (ECE)
-  reported alongside F1.
-- **Decision layer**: accuracy-vs-coverage curves while sweeping α/β; target
-  e.g. ≥ 0.95 precision on accepted answers; track deferral rate and boundary
-  queue composition; review sampled boundary cases weekly. Reviewed boundary
-  cases flow back into the gold set (active learning: most-uncertain first).
-- **Retrieval**: recall@k on the gold question set; citation correctness
-  (every excerpt must carry a verifiable source reference).
-- **Safety**: zero tolerance for party-name leakage (automated scan);
-  out-of-scope rejection rate on an O-set.
+## 9. Extension and research boundaries
 
-## 9. Roadmap (maps to repo domain layout)
+Keep labels in the area registry and validate the composed loss matrix when extending it.
+New courts or domains require an explicit scope decision. Private cross-court
+decision reading retains tribunal, instance, issuing body and source on each record.
+A forecast of revocation would require consecutive requests, information available
+at filing and linked later outcomes, with transfers and unknown dispositions retained.
+The public engine supplies area classification and cited retrieval.
+[Area registry and extension requirements](extensibility.md)
 
-Extension to new areas (trabalhista, bancário, …) is a first-class design
-concern: **[docs/extensibility.md](extensibility.md)** — areas are data packs
-(AreaSpec registry), the engine is invariant. Seams honored from day one:
-labels via registry, loss matrix as composed data, namespaced per-area
-storage, area-parameterized pipelines.
+## 10. CLI
 
-1. `corpus/` — ✅ DataJud + statute ingestion (offline import), anonymization,
-   schema, SQLite store; gitignored `data/` + `AGAVUS_DATA_DIR` + guard hook.
-   ✅ DJEN client (live pull needs a Brazilian IP; this sandbox gets HTTP 403).
-2. `taxonomy/` — ✅ area registry, organ weak-label rules, statute map,
-   lexicon, gold-set seed; ⬜ TPU code table populated from real DataJud codes.
-3. `classify/` — ✅ TF-IDF (word-internal char n-grams) + balanced, calibrated
-   vectorized logreg; negation/citation/verb features + citation-verb crosses;
-   seeds; ⬜ baselines.
-4. `decide/` — ✅ loss matrix, expected-loss rule, three-way gates, safety
-   ceiling; ⬜ boundary queue feeding the gold set automatically.
-5. `retrieve/` — ✅ FTS5 BM25 + law-name column + citation boost + stopword
-   filtering + query-centered verbatim snippets; ✅ statute ranking by meaning
-   (tier 4, multilingual-e5-small, optional weights; plain fusion with BM25 lost).
-6. `reason/` — ✅ facts + area-scoped rule pack + verified chains (R-24A, R-22,
-   R-AP); ⬜ citation graph, temporal reasoning, more rules.
-7. `answer/` — ✅ extractive cited answers, degradation ladder, topic-targeted
-   clarification, content-token/citation relevance check, pre-delivery privacy
-   and advice-language verifier.
-8. ⬜ Later: tiers 4–5 ([tiny-llm.md](tiny-llm.md)), subtopic discovery,
-   other tribunals.
+Use `agavus classify TEXT` for a document, `agavus search QUERY` for lexical search
+and `agavus -p QUESTION` for cited answers. The CLI documents each output and exit code.
+[CLI](cli.md) · [Answer contract](response-quality.md) · [Publishing](publishing.md)
 
-Cross-cutting from step 3 onward: `evals/` harness + gold sets
-([evals.md](evals.md)) — no change ships without measured evidence;
-LoRA/tier upgrades are eval-triggered investments, never advance capabilities.
-Publishing to Hugging Face (model repo + CPU Space, eval-gated, LGPD-bound):
-**[docs/publishing.md](publishing.md)**.
+## 11. Reasoning and the learning lab
 
-All modules follow repo rules: strict types, tests in per-domain `tests/`
-folders, 2 spaces, size limits, zero duplication, `make check` green.
-
-## 10. CLI usage contract
-
-The product surface is defined in **[docs/cli.md](cli.md)**:
-`agavus -p "pergunta"` (ask → classify → decide → retrieve → cited excerpt),
-`agavus classify` for documents, `--explain` auditability trace, `--json`
-typed output, scriptable exit codes (0 accept / 10 defer / 20 reject).
-pt-BR user I/O; fixed no-legal-advice disclaimer; sources never empty.
-Delivery contract (pre-delivery checklist, degradation ladder, response-level
-evals): **[docs/response-quality.md](response-quality.md)**.
-
-## 11. Reasoning and the tiny-LLM layer
-
-- **Reasoning**: verified chains — symbolic syllogism, requirements
-  checklists, citation graph, temporal logic. Every conclusion carries its
-  cited premises; broken chains defer. **[docs/reasoning.md](reasoning.md)**.
-- **Tiny CPU LLM** (0.5–4B quantized, llama.cpp): optional bounded proposer
-  behind a verifier — transformer, not oracle. Disabled by default,
-  shadow-gated, cached; the classical core is complete without it.
-  **[docs/tiny-llm.md](tiny-llm.md)**.
-- **LLM lab** (approved, learning only): isolated tiny transformer with LM and
-  area heads; never feeds answers. **[docs/llm-lab.md](llm-lab.md)**.
+The engine matches grounded facts to three area-scoped rules and retrieves the cited
+provision before delivering a rule conclusion. Language-model training takes place in
+an isolated lab. Its weights never supply user answers.
+[Reasoning](reasoning.md) · [Lab isolation and data rules](llm-lab.md)
