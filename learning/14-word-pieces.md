@@ -1,5 +1,16 @@
 # 14. Word pieces (BPE)
 
+## Think of recognizing familiar chunks while reading
+
+A repeated sequence can become a convenient unit: you don't have to spell
+out every letter each time. BPE builds units by repeatedly merging frequent
+pairs. In our example, `a` followed by `r` appears four times, so `ar` is
+the first merged piece.
+
+**Where the analogy stops:** BPE counts adjacent pieces, not ideas or grammar.
+A piece can cross a word boundary or capture formatting noise. Tokenizing
+builds the units; it doesn't train the language model to use them.
+
 Lesson 2 compared three bricks: letters (too small), words (too many), and
 **word pieces**. Now we build the pieces.
 

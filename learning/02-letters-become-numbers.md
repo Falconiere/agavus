@@ -1,11 +1,20 @@
 # 2. Why split the text, and why use numbers?
 
+## Think of sounding out an unfamiliar word
+
+You can meet a new word and still recognize its letters. Splitting text lets
+the model reuse familiar pieces too. We then give each piece a numbered
+address, like an entry in an address book: `a` is entry 3 in our example.
+
+**Where the analogy stops:** recognizing a token doesn't give the model its
+meaning. An ID is just an address; learned vectors come later, in lesson 10.
+
 Two different questions. One at a time.
 
 ## Why split?
 
 Because **whole texts almost never repeat, but small pieces repeat all the
-time.** You can only learn from something you've seen more than once.
+time.** Repeated pieces give us more evidence about what tends to follow them.
 
 Imagine the model studied only `guarda`, and now meets `guardar`:
 

@@ -1,5 +1,15 @@
 # 4. Score the guesses
 
+## Think of being surprised by an answer
+
+If you were almost certain of an answer and it was wrong, that is a bigger
+surprise than missing a difficult question. Loss turns this intuition into a
+number. Giving the observed letter 50% produces about 0.69 loss; giving it
+only 10% produces about 2.30. The table below shows the same rule at other chances.
+
+**Where the analogy stops:** the model feels no surprise. Loss is a numerical
+score, not an emotion, and a low text-prediction loss isn't a truth score.
+
 Is the model any good? We need one number. It's called **loss**, and it means
 **surprise**.
 

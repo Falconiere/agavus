@@ -1,5 +1,16 @@
 # 16. A tiny GPT
 
+## Think of making several passes over your notes
+
+On one pass you gather clues; on another you combine them into something
+more useful. Each transformer layer mixes context through attention, then
+transforms each position's vector with a small network. Four layers mean
+four successive transformations of the representations.
+
+**Where the analogy stops:** layers aren't conscious thinking stages or
+written reasoning steps. This GPT is trained to predict letters. A lower loss
+doesn't establish that a generated claim follows from cited evidence.
+
 Attention (lesson 15) is the new idea. A GPT is attention plus pieces you
 already know, stacked a few times.
 
@@ -16,7 +27,7 @@ a GPU would really help.)
 flowchart TD
   A["the last 64 letters"] --> B["each letter: a vector<br/>+ a vector for its position"]
   B --> C["attention: look back"]
-  C --> D["small network: think"]
+  C --> D["small network:<br/>transform the clues"]
   D --> E{"4 layers?"}
   E -- "not yet" --> C
   E -- "done" --> F["one score per letter"]
@@ -27,7 +38,7 @@ flowchart TD
 | --- | --- | --- |
 | letter + position vectors | numbers that carry meaning and order | 10, 15 |
 | attention, 4 heads | each letter gathers clues from earlier letters | 15 |
-| small network (128 → 512 → 128) | thinks about what was gathered | 11, 13 |
+| small network (128 → 512 → 128) | transforms the gathered representation | 11, 13 |
 | repeat 4 times | later layers build on earlier ones | new |
 | scores → chances → loss | the same as every model before | 4, 13 |
 
@@ -144,8 +155,8 @@ pattern, near first and far later, is common in real models too.
 1. The vector passes through unchanged, so that layer does no harm.
 2. The exam should measure the whole model; dropout is only a training
    handicap to stop memorizing.
-3. Partly: training is far better than validation. That gap is memorizing.
-   More text, not a bigger model, is the cure.
+3. That gap suggests overfitting on a comparable split. Try earlier stopping,
+   regularization, or more suitable text; increasing size alone may worsen it.
 
 </details>
 

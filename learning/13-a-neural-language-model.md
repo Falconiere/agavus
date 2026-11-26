@@ -1,5 +1,16 @@
 # 13. A neural language model
 
+## Think of using the whole phrase as a clue
+
+One letter leaves many possibilities; `medi` gives a more specific lead.
+Instead of a separate tally for every four-letter context, this network
+reuses its weights across contexts. It maps the four letters to vectors,
+combines them, and produces a score for each possible next token.
+
+**Where the analogy stops:** these four slots aren't human working memory.
+They are a fixed input window. During prediction the context changes, while
+the trained weights stay fixed; a longer window alone doesn't guarantee improvement.
+
 The bigram counted, and remembered **1** letter. The tiny network learned from
 mistakes. Put them together: a network that predicts the next letter from the
 last **4**.
@@ -76,7 +87,8 @@ which makes sense: it sees the same thing.
 
 More memory stops helping after 4. With 16 letters, training loss fell to
 **0.65** while validation rose to **1.67**: that's **overfitting**, and it's
-the first time we've seen it for real. The cure is more text.
+the first time we've seen this gap for real in the neural lab. More suitable
+text may help; earlier stopping or a smaller model are other options.
 
 ## What it writes
 

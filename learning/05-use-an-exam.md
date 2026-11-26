@@ -1,5 +1,16 @@
 # 5. Use an exam
 
+## Think of practising a skill, then trying a new problem
+
+Repeating a worked answer can hide what you haven't learned. A fresh question
+tests whether the pattern transfers. Training text is our practice sheet;
+held-out text is the new problem. Later we add validation: a practice exam
+for choosing settings, separate from the final exam.
+
+**Where the analogy stops:** scores depend on what the exam covers. Similar
+training and exam scores don't prove that nothing was memorized, or that the
+model will handle another court, topic, or writing style.
+
 A student who sees the exam questions beforehand can get 100% and understand
 nothing. Models can do that too.
 
@@ -23,11 +34,12 @@ Compare the two:
 | What you see | What it means |
 | --- | --- |
 | Both high | too simple, or not trained enough |
-| Training low, held-out much higher | **memorizing** ("overfitting") |
-| Both low and close | learning something general |
+| Training low, held-out much higher | **overfitting**, or a different text distribution |
+| Both low and close | evidence of generalization on this held-out text |
 
-Ours are nearly equal, so it isn't memorizing. It can't: it remembers only one
-letter. It's simply a weak model.
+Ours are nearly equal on this split: there is little measured gap. A bigram
+can't condition on a whole article, but it can still overfit pair frequencies.
+Its main limitation here is the one-letter context.
 
 ## An exam question
 
@@ -51,7 +63,8 @@ A model has training loss 0.10 and held-out loss 5.00. What happened?
 
 <details><summary>Answer</summary>
 
-It memorized the training text and can't handle new text: overfitting.
+That large gap suggests overfitting if the texts come from the same
+distribution. Also check that the split and preprocessing are comparable.
 
 </details>
 

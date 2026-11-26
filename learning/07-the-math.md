@@ -1,10 +1,23 @@
 # 7. The math, step by step
 
+## Think of keeping a scorecard of your expectations
+
+For every next letter, record how much chance you gave the answer that
+actually appeared. Then combine the scores. A coin gives heads a chance of
+1/2; two heads in a row have chance 1/4. Logarithms let us add those separate
+surprises instead of multiplying ever-smaller probabilities.
+
+**Where the analogy stops:** this is a score of predictions under our model,
+not a measurement of human understanding. Each symbol below names a count,
+a probability, or an operation you can check by hand.
+
 Only four operations: **count, divide, multiply, and `ln`**.
 
 ```mermaid
 flowchart LR
-  A["1. Count<br/>pairs"] --> B["2. Divide<br/>chance"] --> C["3. Add 1<br/>no zeros"] --> D["4. Multiply<br/>whole word"] --> E["5. ln<br/>easy to add"] --> F["6. Average<br/>the loss"]
+  A["1. Count<br/>pairs"] --> B["2. Divide<br/>chance"] --> C["3. Add 1<br/>no zeros"]
+  C --> D["4. Multiply<br/>whole word"] --> E["5. ln<br/>easy to add"]
+  E --> F["6. Average<br/>the loss"]
 ```
 
 ## 1. Count

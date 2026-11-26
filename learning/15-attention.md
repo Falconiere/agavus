@@ -1,11 +1,22 @@
 # 15. Attention
 
+## Think of rereading the relevant part of a sentence
+
+When a phrase is unclear, you may look back for a useful clue. Attention
+provides a numerical version of gathering context: compare vectors, calculate
+shares, then mix information from the available positions. Our example uses
+9%, 24%, and 67%, producing a new vector you can calculate by hand.
+
+**Where the analogy stops:** there is no conscious choice of where to look.
+Shares are calculated from learned weights, and a large share isn't a full
+explanation of a prediction. The causal mask limits which positions are available.
+
 The neural model (lesson 13) saw the last **4** letters, always in the same
 slots: slot 1, slot 2, slot 3, slot 4. More slots made it worse (overfitting).
 
 But to guess what comes after `violência doméstica e fam`, the useful clue may
-be 20 letters back. A GPT keeps a long memory **and lets each letter choose
-where to look**. That choice is attention.
+be 20 letters back. A GPT uses a longer context **and calculates how much
+information to gather from each available position**. These mixtures are attention.
 
 ## The idea in one picture
 
@@ -74,7 +85,8 @@ a: 7.39 / 11.11 = 67%
 0.09 × [1, 0] + 0.24 × [0, 1] + 0.67 × [1, 1] = [0.76, 0.91]
 ```
 
-That new vector is what `a` "learned" from its past. That's all attention is:
+That new vector represents `a` using its available context. No weights change
+during this calculation. The three attention operations are:
 **match, shares, mix**.
 
 (The real model also divides the matches by the square root of the vector size,
@@ -107,10 +119,11 @@ vector. Now "an `a` right before me" and "an `a` far back" are different.
 
 ## Several heads
 
-One query can only look for one thing. So the model asks several questions at
-once, each with its own query, key and value tables: these are **heads**. Ours
-has 4. One may learn to look at the previous letter, another at the start of
-the word. We'll print what they look at in the next lesson.
+One head produces one set of shares per position. Several heads let the model
+combine different mixtures, each with its own query, key and value projections.
+Ours has 4. One may emphasize the previous letter, another the start of a word;
+they aren't assigned those roles, and need not have a single interpretable job.
+We'll print their shares in the next lesson.
 
 ## Check yourself
 

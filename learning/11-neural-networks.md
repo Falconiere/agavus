@@ -1,5 +1,16 @@
 # 11. Neural networks
 
+## Think of learning which clues matter
+
+When learning to sort unfamiliar items, you may first notice individual
+clues, then combinations. A network computes intermediate clues from inputs
+and adjusts its weights using errors. Below, weights 4 and 4 with bias -6
+show exactly how two inputs combine before a prediction.
+
+**Where the analogy stops:** an artificial neuron is a small calculation,
+not a biological cell. Backpropagation calculates derivatives; it isn't
+evidence that brains learn by this algorithm. More layers don't verify facts.
+
 A neural network is **many tiny calculators connected together**, whose numbers
 are found by trial and correction.
 
@@ -14,8 +25,10 @@ flowchart LR
   S --> Q["squash into<br/>0 to 1"] --> O["0.88"]
 ```
 
-Question: *is it domestic violence?* It should say yes only if there is a
-threat **and** it comes from a partner.
+Toy task: output 1 when both binary flags are 1. We name them "threat" and
+"partner" only to make the arithmetic concrete. This is an AND exercise,
+not a definition or assessment of domestic violence; those two flags are
+neither necessary nor sufficient for a legal classification.
 
 | Threat | Partner | Add up | Squashed |
 | --- | --- | --- | --- |
@@ -33,7 +46,7 @@ this, with 384 inputs and 3 outputs.
 
 ## Why is one not enough?
 
-Two negatives cancel in Portuguese. Was the request refused?
+Use these four short phrases as a simplified yes/no exercise. Was the request refused?
 
 | "não"? | "negou"? | Text | Refused? |
 | --- | --- | --- | --- |
@@ -42,8 +55,9 @@ Two negatives cancel in Portuguese. Was the request refused?
 | 0 | 1 | negou | 1 |
 | 1 | 1 | não negou | **0** |
 
-One neuron can only say "more clues, more yes". It can't say "one is yes, but
-**two** is no". So we add a layer in between:
+One sigmoid neuron puts a straight decision boundary between these input
+pairs. No straight line separates the two yes corners from the two no
+corners. So we add a layer in between:
 
 ```mermaid
 flowchart LR
@@ -65,8 +79,9 @@ flowchart LR
 | negou | 1 | 0 | 1 |
 | não negou | 2 | 1 | 2 - 2 = **0** |
 
-The middle layer **invented a new clue**: "more than one negative". That's the
-power of neural networks: they can build their own clues.
+We hand-picked a middle-layer clue: "more than one negative". Training can
+learn intermediate clues too; it doesn't have to discover this exact one.
+The four phrases form a simplified logic exercise, not a general negation parser.
 
 Without the ReLU in the middle, two layers would collapse into one: adding and
 multiplying twice is still just adding and multiplying.
@@ -79,7 +94,9 @@ Nobody types in the 4s. It starts with poor numbers and repeats:
 
 ```mermaid
 flowchart LR
-  A["1. Guess"] --> B["2. Measure surprise<br/>the loss"] --> C["3. Which way should<br/>each weight move?"] --> D["4. Move a<br/>small step"] --> A
+  A["1. Guess"] --> B["2. Measure surprise<br/>the loss"]
+  B --> C["3. Which way should<br/>each weight move?"]
+  C --> D["4. Move a<br/>small step"] --> A
 ```
 
 You know step 2: the loss from lesson 4. Step 3 has a name: the **gradient**.
@@ -95,12 +112,14 @@ A neuron with one weight, where the right answer is 1:
 | 2 | 0.88 | 0.71 | 0.35 |
 | 3 | 1.17 | 0.76 | 0.27 |
 
-For this neuron the step is simple: **answer minus guess**. First step:
+For this example (input 1, fixed bias 0, learning rate 1, cross-entropy),
+the weight update is **answer minus guess**. First step:
 1 - 0.50 = 0.50, so the weight moves from 0 to 0.50. The better the guess, the
 smaller the step.
 
-With many layers, the correction is passed from the end to the start, so every
-weight learns its share of the mistake. That's **backpropagation**.
+With many layers, derivatives are calculated from the output back through
+earlier operations. That's **backpropagation**. They tell an optimizer how
+a small change to each weight would affect loss; the optimizer updates weights.
 
 ## Counting against learning
 

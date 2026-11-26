@@ -1,5 +1,14 @@
 # 1. Guess the next letter
 
+## Think of finishing someone's sentence
+
+Someone says "bom..." and you anticipate "dia". A language model also uses
+earlier text to score possible continuations. Our first model gets a much
+smaller clue: only the previous letter. Try predicting after `d` in `guarda`.
+
+**Where the analogy stops:** anticipating text doesn't show that the model
+knows the speaker's intentions or checks whether a statement is true.
+
 Your phone keyboard suggests the next word. A **language model** does the
 same thing: it looks at some text and guesses what comes next.
 

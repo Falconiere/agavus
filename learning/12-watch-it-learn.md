@@ -1,5 +1,15 @@
 # 12. Watch a network learn
 
+## Think of practice with immediate feedback
+
+Try, score the result, adjust, repeat. Here we can watch that loop: `forward`
+makes predictions, `loss` scores them, `gradients` calculates sensitivity to
+each parameter, and `step` changes the parameters a little.
+
+**Where the analogy stops:** nobody explains the mistake to the network in
+words. It receives numerical targets. Solving these four practice examples
+doesn't show that it can interpret a new sentence.
+
 Lesson 11 in code. Run it:
 
 ```sh
@@ -31,7 +41,8 @@ One neuron gives up and says 50% to everything, as lesson 11 predicted.
 
 ```mermaid
 flowchart LR
-  A["forward<br/>guess"] --> B["loss<br/>surprise"] --> C["gradients<br/>whose fault?"] --> D["step<br/>move weights"] --> A
+  A["forward<br/>guess"] --> B["loss<br/>surprise"]
+  B --> C["gradients<br/>sensitivity to weights"] --> D["step<br/>move weights"] --> A
 ```
 
 `gradients` is backpropagation. It's four lines: the mistake at the end, then

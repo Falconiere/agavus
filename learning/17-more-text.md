@@ -1,5 +1,16 @@
 # 17. More text
 
+## Think of broadening your practice questions
+
+Practising varied examples can help you rely less on a particular answer.
+But a language exam won't necessarily improve because you spend the same
+study time on a different subject. More text changes both what the model
+practises and how often it revisits each example.
+
+**Where the analogy stops:** the model doesn't choose a study strategy.
+We choose the data, steps, and stopping point. A smaller training–exam gap
+can also mean worse training performance; compare the exam scores themselves.
+
 The tiny GPT (lesson 16) memorized: loss 0.87 on the articles it studied, 1.18
 on the exam. The usual cure is more text. So we tried three kinds.
 
@@ -44,14 +55,15 @@ Same model, same 6,000 training steps for every run.
 
 "Studied articles" is the loss on the statute articles it trained on. The
 **gap** is how much better it does on text it saw than on text it didn't:
-the memorizing.
+one indication of overfitting when the text distributions are comparable.
 
-**More text cures memorizing.** The gap fell from 0.31 to 0.11, and 0.06 with
-both. With more to read, it can't learn each article by heart.
+**More text reduced the measured gap here.** It fell from 0.31 to 0.11, and
+0.06 with both. But the exam got worse with Wikipedia: a smaller gap alone
+doesn't prove better generalization or eliminate memorization.
 
-**Similar text helps more than different text.** Wikipedia made the exam
-worse, even though it cut memorizing too. Its steps are spent on astronomy and
-monkeys, not on "§ 1º" and "parágrafo único".
+**The kind of text matters.** Wikipedia made the exam worse despite reducing
+the gap. Its steps include encyclopedia prose rather than only legal writing
+such as "§ 1º" and "parágrafo único".
 
 ## Is 1.174 really better than 1.181?
 
@@ -68,8 +80,8 @@ windows are read, which numbers dropout switches off.
 | **average** | **1.164** | **1.196** |
 
 The same model, the same text, and only luck changes: the Civil Code runs vary
-by **0.05**. Our "gain" of 0.007 was luck. On average, at 6,000 steps, the
-Civil Code is slightly **worse**.
+by **0.05**. Our apparent gain of 0.007 wasn't reliable evidence. On average
+in these three runs, at 6,000 steps, the Civil Code is slightly **worse**.
 
 **Never trust one run.** Before saying "B beats A", repeat both with a few
 seeds and check that the difference is bigger than the spread.
@@ -92,10 +104,11 @@ GPU we let it train 5× longer:
 | + Civil Code, 6,000 steps | 1.196 |
 | **+ Civil Code, 26,000 steps** | **1.093** |
 
-0.07 better than statutes only: far more than the seed spread for statutes
-only (0.01), so this one is real. Statutes alone can't use more steps; they
-just memorize sooner (lesson 16). **More text and more training, together.**
-That is the whole recipe of real LLMs, at a much bigger scale.
+About 0.07 better than the statutes-only average: a promising result, but the
+longer run used only one seed. Repeat the longer setup before claiming a
+reliable win. The statutes-only runs stopped improving earlier (lesson 16).
+**More text and more training, together**, helped this run; data quality,
+model size, and evaluation still matter.
 
 The GPU took 6.4 minutes for a run that took about 16 on our CPU. The model is
 so small that the GPU sat mostly idle (about 12% busy); bigger models are
@@ -112,7 +125,8 @@ where it shines.
 
 1. The model would have studied the answers; the exam would measure memory, not
    learning.
-2. It memorizes less: with more text, it sees each article fewer times.
+2. The measured gap shrank. With fixed steps it revisits each article less,
+   but check exam loss too before claiming that generalization improved.
 3. You can't tell. Repeat both with a few seeds; one run can be off by 0.05.
 4. Train longer (more steps). With the Civil Code, that took the exam from
    1.196 to 1.093.

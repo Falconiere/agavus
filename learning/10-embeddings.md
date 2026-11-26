@@ -1,5 +1,16 @@
 # 10. Embeddings: meaning as a position
 
+## Think of recognizing the same idea in different words
+
+"Ele me bateu" and "fui agredida" can bring related situations to mind,
+despite different wording. An encoder tries to represent useful relationships
+as nearby directions in a space of numbers. Unlike token ID 7, an embedding
+is a learned list of values that we can compare with another list.
+
+**Where the analogy stops:** the space reflects the model's training task.
+Nearness isn't proof of equivalent meaning, shared facts, or legal relevance.
+The measured examples below show why we still need evaluation.
+
 In lesson 2, a number was only a **name**: `u` = 7 told us where to look, and
 nothing about `u`. Now numbers will carry **meaning**.
 
@@ -8,7 +19,7 @@ nothing about `u`. Now numbers will carry **meaning**.
 On a city map, two numbers say where a place is. Places close together on the
 map are close in real life.
 
-An embedding does that with texts: **similar meanings get nearby positions.**
+An embedding aims to do that with texts: **related texts get nearby positions.**
 
 ```mermaid
 flowchart LR

@@ -1,5 +1,15 @@
 # 3. Learn by counting
 
+## Think of expectations built from repetition
+
+After seeing the same sequence repeatedly, you start expecting its next part.
+Our bigram makes that idea explicit with tally marks. In `guarda guarda`, `a`
+is followed by `r` twice out of four occasions: an observed share of 50%.
+
+**Where the analogy stops:** this model only counts adjacent tokens. It
+doesn't discover a grammar or know why a pair occurs. Smoothing adds a small
+allowance for unseen pairs; it doesn't supply that missing knowledge.
+
 How does the model know what follows `a`? **It looks and counts.**
 
 Find every `a` in the text, and see what comes after it:

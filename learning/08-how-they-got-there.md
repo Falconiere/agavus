@@ -1,5 +1,14 @@
 # 8. How people got to the formula
 
+## Think of improving a recipe after each problem
+
+First count what happened. Then notice that "never happened here" shouldn't
+mean "impossible". Finally choose a consistent way to score mistakes. These
+are three separate needs, which explain the pieces of our formula.
+
+**Where the analogy stops:** this is our teaching order, not a claim that
+the historical researchers followed one shared project or modeled a brain.
+
 Nobody wrote it in one go. Each piece fixed a problem left by another.
 
 ```mermaid

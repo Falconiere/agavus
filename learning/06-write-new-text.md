@@ -1,5 +1,16 @@
 # 6. Write new text
 
+## Think of improvising one phrase at a time
+
+You say something, then its ending becomes the starting point for your next
+phrase. Generation also feeds its own output back into the next prediction.
+For our bigram, writing `a` means consulting the `a` row again; it can't tell
+which `a` in `guarda` it has reached.
+
+**Where the analogy stops:** this model isn't planning a message. Sampling
+selects tokens using calculated probabilities, without checking their truth.
+Its weights or counts stay fixed while it writes.
+
 Guess a letter, then use it to guess the next one. Repeat. That's how a model
 writes.
 
@@ -29,11 +40,14 @@ exist, because **it remembers only one letter**.
 
 1. **Sounding right isn't being right.** The model picks likely letters. It
    doesn't know what is true. This is why Agavus answers with quoted laws.
-2. **More memory makes better text.** The next models look further back:
+2. **More context can improve text.** The next models look further back,
+   but still need enough data and training to use it:
 
 ```mermaid
 flowchart LR
-  A["Bigram<br/>1 letter back"] --> B["Better tokens<br/>pieces of words"] --> C["Small neural model<br/>several tokens back"] --> D["Tiny GPT<br/>chooses what to look at"]
+  A["Bigram<br/>1 letter back"] --> B["Better tokens<br/>pieces of words"]
+  B --> C["Small neural model<br/>several tokens back"]
+  C --> D["Tiny GPT<br/>mixes context with attention"]
 ```
 
 ## Check yourself
