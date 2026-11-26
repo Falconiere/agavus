@@ -130,6 +130,31 @@ Ours has 4. One may emphasize the previous letter, another the start of a word;
 they aren't assigned those roles, and need not have a single interpretable job.
 We'll print their shares in the next lesson.
 
+## Python: try it
+
+The first three keys and values come from the worked example. An invented
+fourth row makes the future tempting, so you can see the mask refuse it.
+
+```python
+import numpy as np  # Calculate matches, shares, and vector mixtures.
+
+query = np.array([1.0, 0.0])  # The current a asks with this two-coordinate vector.
+keys = np.array([[0.0, 1.0], [1.0, 0.0], [2.0, 0.0], [99.0, 0.0]])  # g, u, a, future.
+values = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0], [9.0, 9.0]])  # Their payloads.
+matches = keys @ query  # Dot products give scores 0, 1, 2, and 99.
+matches[3:] = -np.inf  # Block the future before softmax; its large score cannot help.
+# Subtract the maximum for numerical stability; this doesn't change the shares.
+positive = np.exp(matches - matches.max())
+shares = positive / positive.sum()  # Normalize the available positions to total 1.
+mixture = shares @ values  # Add each value vector multiplied by its share.
+print(np.round(shares, 2).tolist())  # Expect [0.09, 0.24, 0.67, 0.0].
+print(np.round(mixture, 2).tolist())  # Expect [0.76, 0.91].
+assert shares[3] == 0.0  # Future information must have exactly zero contribution.
+```
+
+Like the worked example, this omits division by the square root of key
+width. The full GPT includes that scaling. No weights are updated by this calculation.
+
 ## Check yourself
 
 1. Matches are 0, 0 and 0. What are the shares?

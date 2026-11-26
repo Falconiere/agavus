@@ -75,6 +75,30 @@ Too small is slow. Too big jumps over the valley.
 **3. It has no exam.** All 4 cases were used for training, so this shows it
 can *fit*, not that it *generalizes* (lesson 5).
 
+## Python: try it
+
+Use the actual lab network on the four exclusive-or examples. These are
+binary logic exercises, not a general parser for Portuguese or legal decisions.
+
+```python
+import numpy as np  # Hold the four examples in a small matrix.
+
+from agavus.lab.network import forward, start, train  # Predict, initialize, and fit.
+
+clues = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])  # Two flags per row.
+answers = np.array([0.0, 1.0, 1.0, 0.0])  # Exactly one active flag means yes.
+network = start(hidden=8, seed=0)  # Create eight hidden units from repeatable weights.
+# Repeat real forward passes, gradients, and updates using the lab implementation.
+trained, losses = train(network, clues, answers, steps=2000, rate=0.5)
+guesses = forward(trained, clues).guess  # Predict again with the final weights.
+print(f"Loss: {losses[0]:.3f} -> {losses[-1]:.3f}")  # Compare before and after training.
+print(np.round(guesses, 2).tolist())  # Expect values close to [0, 1, 1, 0].
+assert losses[-1] < losses[0]  # Training should improve this fixed-seed practice score.
+```
+
+The score describes the four training examples only. Change the seed or
+hidden-unit count to explore why finding a solution isn't guaranteed.
+
 ## Check yourself
 
 Why do the weights start random and not all equal?

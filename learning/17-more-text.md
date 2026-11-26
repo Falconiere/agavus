@@ -119,6 +119,32 @@ The GPU took 6.4 minutes for a run that took about 16 on our CPU. The model is
 so small that the GPU sat mostly idle (about 12% busy); bigger models are
 where it shines.
 
+## Python: try it
+
+Use a budget calculation and the **recorded** seed scores from the table.
+This analyzes those results rather than starting a new training run.
+
+```python
+from statistics import mean  # Average the recorded results across seeds.
+
+steps = 6000  # Use the same update budget as the short runs.
+batch = 32  # Each update reads 32 windows.
+context = 64  # Each window contributes 64 next-character training targets.
+targets_seen = steps * batch * context  # Count target presentations, including repeats.
+small_size = 120_000  # Approximate number of training characters in the small set.
+large_size = 640_000  # Approximate size after adding the other Civil Code articles.
+print(targets_seen / small_size)  # About 102 presentations per small-set character.
+print(targets_seen / large_size)  # About 19 presentations per larger-set character.
+statutes = [1.162, 1.169, 1.161]  # Copy the three recorded statutes-only GPU exam losses.
+civil = [1.226, 1.171, 1.192]  # Copy the three recorded mixed-text exam losses.
+print(f"Statutes mean: {mean(statutes):.3f}")  # Expect 1.164.
+print(f"Mixed mean: {mean(civil):.3f}")  # Expect 1.196; lower would be better.
+print(f"Mixed spread: {max(civil) - min(civil):.3f}")  # About 0.055 across these seeds.
+```
+
+The presentation counts are rough averages, not literal full passes through
+the data. Change `steps` to 30000; the recorded losses won't change automatically.
+
 ## Check yourself
 
 1. Why must the extra text never contain an exam article?

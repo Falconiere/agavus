@@ -145,6 +145,28 @@ a small change to each weight would affect loss; the optimizer updates weights.
 | Bigram | no, only counts |
 | Tiny GPT we'll build | yes, deep; trained by us |
 
+## Python: try it
+
+Train the one-weight neuron from the table. Input is fixed at 1, bias at
+0, target at 1, and learning rate at 1; those assumptions make the update simple.
+
+```python
+from math import exp, log  # Calculate sigmoid probabilities and their loss.
+
+weight = 0.0  # Start with no preference; fixed input 1 makes the score equal this weight.
+target = 1.0  # Every practice answer in this tiny example is yes.
+rate = 1.0  # Multiply each correction by this learning rate.
+for step in range(4):  # Inspect the state before each of four weight updates.
+  guess = 1 / (1 + exp(-weight))  # Sigmoid squashes the score into a probability.
+  loss = -log(guess)  # With target 1, score the chance assigned to yes.
+  print(f"{step}: weight={weight:.2f}, guess={guess:.2f}, loss={loss:.2f}")  # Trace it.
+  gradient = guess - target  # Derivative for this input, sigmoid, and cross-entropy.
+  weight -= rate * gradient  # Move against the gradient to reduce the loss.
+```
+
+The printed weights should be about 0.00, 0.50, 0.88, and 1.17. This example
+has no hidden layer or held-out exam; lesson 12 trains the two-layer network.
+
 ## Check yourself
 
 1. Weights 4 and 4, bias -6, squash after. Only "threat" is 1. What is the

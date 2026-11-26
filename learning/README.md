@@ -45,8 +45,27 @@ what was learned to make a prediction. Reading a prompt changes the context;
 it doesn't update our lab network's weights. See the [lab rules](../docs/llm-lab.md)
 and [product design](../docs/DESIGN.md) for the boundary between them.
 
-Read each worked example, then try its **Check yourself** before opening the
-answer. If a formula feels abstract, describe what its numbers stand for first.
+## Run the commented Python examples
+
+Every lesson has a **Python: try it** block. Each block runs independently;
+comments explain its useful lines, and the text says what output to look for.
+
+From the repository root, run `make install` once for the existing development
+dependencies, including NumPy and the CPU-capable PyTorch lab. Copy a lesson's
+Python block into `/tmp/agavus-example.py`, then run:
+
+```sh
+uv run python /tmp/agavus-example.py
+```
+
+The examples use authored strings, hand-chosen vectors, or explicitly marked
+recorded scores. They need no corpus, model download, network, or GPU. The
+small training examples measure practice loss; the GPT construction example
+starts with untrained weights and makes no accuracy claim.
+
+Read the illustration, run the code, and change one value to see what happens.
+Then try **Check yourself** before opening the answer. If a formula feels
+abstract, describe what its numbers stand for first.
 
 ```mermaid
 flowchart LR

@@ -57,6 +57,28 @@ This second diagram describes an LLM-assisted workflow, not Agavus's current
 extractive answer path. If search misses the needed source, later steps need
 to detect that and retry or defer. **A real source doesn't guarantee the right answer.**
 
+## Python: try it
+
+Use a synthetic source about colored tiles, not a real law. This checks
+verbatim provenance only; relevance and legal support need further checks.
+
+```python
+# Store one authored source under an explicit, synthetic reference.
+sources = {"demo://rule-1": "Red tiles go in the red tray."}
+reference = "demo://rule-1"  # Retrieval returns a source reference.
+excerpt = "Red tiles go in the red tray."  # The proposed answer quotes its words.
+source_text = sources.get(reference, "")  # A missing reference has no supporting text.
+if excerpt and excerpt in source_text:  # Require a nonempty, verbatim excerpt.
+  print(f"{excerpt} [{reference}]")  # Deliver the quote together with its reference.
+else:  # A missing source or invented wording cannot pass this small check.
+  print("Defer: no verbatim source support")  # Ask for more evidence instead.
+invented = "Blue tiles go in the red tray."  # A plausible-looking alternative.
+assert invented not in source_text  # It cannot be cited as a quote from this source.
+```
+
+Replace `excerpt` with the invented sentence, or change the reference to an
+unknown ID. Both should defer. A matching quote can still answer the wrong question.
+
 ## Check yourself
 
 An LLM reads the wrong article and explains it perfectly. Which box failed?

@@ -149,6 +149,35 @@ The first layer looks close by; later layers look further, building on what
 the first one gathered. Don't read too much into one sentence, but this
 pattern, near first and far later, is common in real models too.
 
+## Python: try it
+
+Build an **untrained** four-layer GPT with much narrower vectors than the
+recorded model. Inspect its forward pass; random predictions aren't learned language.
+
+```python
+import torch  # Provide CPU tensors and softmax.
+
+from agavus.lab.bigram import build_vocab  # Turn the toy characters into IDs.
+from agavus.lab.gpt import GptConfig, start  # Construct the actual transformer.
+
+vocab = build_vocab(("guarda guarda",))  # Use only the authored example's characters.
+# Keep four layers/heads, but shrink context and width for a fast CPU demonstration.
+config = GptConfig(context=8, width=16, layers=4, heads=4, dropout=0.0)
+model = start(vocab, config)  # Initialize random weights; this does not train them.
+ids = torch.tensor([vocab.encode("guarda")[:-1]])  # One row; remove the final boundary.
+with torch.no_grad():  # Inspect predictions without building a training-gradient graph.
+  scores, attention = model.run(ids)  # Pass through embeddings and all four layers.
+  probabilities = torch.softmax(scores[0, -1], dim=-1)  # Normalize the last position.
+print("Scores shape:", tuple(scores.shape))  # Expect (batch=1, positions=7, tokens=8).
+print("Attention layers:", len(attention))  # Expect four sets of attention shares.
+print("First layer:", tuple(attention[0].shape))  # Expect (1, 4 heads, 7, 7).
+tolerance = 1e-6  # Allow a tiny difference from 1 due to floating-point arithmetic.
+assert abs(float(probabilities.sum()) - 1.0) < tolerance  # Chances must total 1 within it.
+```
+
+Change the width while keeping it divisible by the head count. This changes
+the model's capacity; a useful model still needs training and held-out evaluation.
+
 ## Check yourself
 
 1. A layer adds its result to the vector instead of replacing it. What

@@ -106,6 +106,29 @@ Training keeps improving while validation gets worse: overfitting again. More
 kinds of brick means fewer examples of each, and we have 150 KB. Real LLMs use
 tens of thousands of pieces because they read vastly more text.
 
+## Python: try it
+
+Train the existing BPE tokenizer on the lesson's authored text, inspect
+its pieces, and check that even unseen Unicode text survives a round trip.
+
+```python
+from agavus.lab.bpe import train_bpe  # Learn frequent adjacent byte-pair merges.
+
+texts = ("guarda guarda guardar",)  # Repetition supplies evidence for reusable pieces.
+vocab = train_bpe(texts, merges=5)  # Perform up to five frequent-pair merges.
+ids = vocab.encode("guarda guardar")  # Apply the learned merges and add boundaries.
+pieces = [vocab.piece(token) for token in ids[1:-1]]  # Skip boundaries for display.
+print(pieces)  # Inspect the actual pieces instead of assuming grammatical roots.
+new_text = "guarda 日本語 🙂"  # Include characters absent from the training example.
+encoded = vocab.encode(new_text)  # Byte-based tokens can still represent them.
+decoded = vocab.decode(encoded)  # Join the token bytes back into the original text.
+print(decoded)  # Expect the exact Unicode input.
+assert decoded == new_text  # Lossless tokenization must preserve every character.
+```
+
+Try `merges=0`: the pieces become smaller, but the round-trip check should
+still pass. Learning a tokenizer doesn't train the language model's weights.
+
 ## Check yourself
 
 1. Why does BPE find `guard` in our small example?

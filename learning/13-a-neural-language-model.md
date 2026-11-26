@@ -109,6 +109,37 @@ It has real words now, and starts like an article. It still means nothing, and
 "Art. 15.4.5" doesn't exist. **Sounding more like law makes a wrong answer more
 dangerous, not less.**
 
+## Python: try it
+
+Train a very small four-character model on synthetic text. This measures
+fit to its practice text, not generalization or the recorded statute experiment.
+
+```python
+import torch  # Run the small neural model on CPU.
+
+from agavus.lab.bigram import build_vocab  # Learn character IDs from this text.
+from agavus.lab.data import Split  # Keep training and held-out inputs explicit.
+from agavus.lab.neural import NeuralConfig, examples, start, train  # Reuse the lab.
+
+torch.set_num_threads(1)  # Avoid thread overhead for this tiny, standalone example.
+texts = ("guarda guarda",)  # Use authored practice text, without the corpus.
+vocab = build_vocab(texts)  # Build the eight-token character vocabulary.
+# Use four inputs, eight coordinates per token, 16 hidden units, and batches of 16.
+config = NeuralConfig(context=4, vector=8, hidden=16, batch=16, rate=0.03)
+split = Split(train=texts, holdout=())  # No exam here: every example is for practice.
+before = start(vocab, config).loss(texts)  # Score the seeded starting weights.
+model, _ = train(split, vocab, config, steps=150)  # Update weights for 150 small batches.
+contexts, answers = examples(texts, vocab, config)  # Construct context/next-token pairs.
+print("Context:", vocab.decode(contexts[4].tolist()))  # This row contains guar.
+print("Actual next:", vocab.decode([int(answers[4])]))  # Its next character is d.
+after = model.loss(texts)  # Score the same practice text using the trained weights.
+print(f"Practice loss: {before:.3f} -> {after:.3f}")  # Observe learning on this input.
+assert after < before  # Confirm that this short run reduced the practice loss.
+```
+
+The model reuses its parameters across every context. The learning rate
+`0.03` controls update size; it isn't a probability or a guarantee of improvement.
+
 ## Check yourself
 
 1. Why does the network not need 9.5 billion boxes?

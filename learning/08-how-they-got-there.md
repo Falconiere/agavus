@@ -98,6 +98,29 @@ flowchart LR
   D --> C["Halvings<br/>Shannon"] --> E["Average = loss"]
 ```
 
+## Python: try it
+
+Calculate the toy 9-out-of-9 example, then express its surprise in both
+bits (`log2`) and nats (`ln`).
+
+```python
+from math import isclose, log, log2  # Calculate surprise in two different units.
+
+successes = 9  # The example observed nine successes.
+trials = 9  # There were nine observations in total.
+outcomes = 2  # Allow success and failure, including the unseen outcome.
+raw = successes / trials  # Raw counting assigns success a chance of 1.
+smoothed = (successes + 1) / (trials + outcomes)  # Add one for each possible outcome.
+bits = -log2(smoothed)  # Measure surprise by the base-2 logarithm.
+nats = -log(smoothed)  # Measure the same prediction with the natural logarithm.
+print(f"Raw: {raw:.2%}; smoothed: {smoothed:.2%}")  # Expect 100% and about 90.91%.
+print(f"Bits: {bits:.3f}; nats: {nats:.3f}")  # Different units, same prediction.
+assert isclose(nats, bits * log(2))  # One bit equals ln(2) nats.
+```
+
+The smoothing rule avoids treating an unseen outcome as impossible.
+Changing the logarithm's base changes the unit, not the ordering of predictions.
+
 ## Check yourself
 
 The chance is 1/16. How many halvings is that?

@@ -69,6 +69,25 @@ On the real laws:
 
 Only compare losses when the tokens and the test text are the same.
 
+## Python: try it
+
+Calculate the loss table directly. The probabilities are inputs to this
+example, so no model needs to be trained.
+
+```python
+from math import inf, log  # log is the natural logarithm; inf represents infinity.
+
+chances = (1.0, 0.9, 0.5, 0.25, 0.1, 0.01, 0.0)  # Chances of the actual answer.
+for chance in chances:  # Score the same observed answer under each prediction.
+  # log(0) is undefined, so handle the impossible-answer case explicitly.
+  loss = -log(chance) if chance > 0 else inf
+  print(f"{chance:.0%} -> {loss:.2f}")  # Round only the display, not the calculation.
+assert -log(0.5) < -log(0.1)  # More chance on the actual answer means less loss.
+```
+
+Read the result alongside the chips in the illustration. The 0% row must
+show infinity instead of crashing on `log(0)`. A displayed `-0.00` is zero.
+
 ## Check yourself
 
 Model A gave the right letter 50%. Model B gave it 10%. Who has the lower

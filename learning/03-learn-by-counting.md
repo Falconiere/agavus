@@ -72,6 +72,31 @@ Why `+ 8` below? There are 8 tokens, and each got one extra.
 Our text is tiny, so one extra changes a lot. With thousands of letters, it
 changes very little.
 
+## Python: try it
+
+Count the raw pairs, then apply the exact smoothing calculation from the table.
+
+```python
+from collections import Counter  # Count how often each next token appears.
+from itertools import pairwise  # Visit adjacent tokens without skipping a pair.
+
+text = "guarda guarda"  # Supply our authored example rather than a case record.
+pieces = ["<boundary>", *text, "<boundary>"]  # Mark the text's start and end.
+pairs = list(pairwise(pieces))  # Pair each token with the one after it.
+# Keep only pairs starting with a, then count their second tokens.
+counts = Counter(right for left, right in pairs if left == "a")
+total = sum(counts.values())  # There are four observed continuations of a.
+vocab_size = len(set(pieces) | {"<unknown>"})  # Include the reserved unknown token.
+raw = counts["r"] / total  # Two r continuations out of four gives 0.50.
+smoothed = (counts["r"] + 1) / (total + vocab_size)  # Add one to all eight counts.
+print(dict(counts))  # Expect r twice, space once, and boundary once.
+print(raw, smoothed)  # Expect 0.50 before smoothing and 0.25 after.
+assert (raw, smoothed) == (0.5, 0.25)  # Check both results against the worked example.
+```
+
+Change the requested next token from `"r"` to `"g"`. Its observed count is
+zero, but smoothing still gives it a positive chance.
+
 ## Check yourself
 
 After smoothing, what's the chance of `g → u`?

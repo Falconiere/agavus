@@ -62,6 +62,32 @@ Let's test the tiny model on `guia`, a word it never saw:
 It's fine on `gu`, which it knows, and surprised by `i`. The average is worse
 than the 1.36 for `guarda`.
 
+## Python: try it
+
+Use the real article-splitting helper with 15 synthetic strings. Split the
+study portion again for validation, before building the vocabulary.
+
+```python
+from agavus.lab.bigram import build_vocab, train_bigram  # Vocabulary and learner.
+from agavus.lab.data import split_articles  # Keep whole articles on one side.
+
+articles = tuple(f"guarda exemplo {n}" for n in range(15))  # Invent 15 distinct texts.
+outer = split_articles(articles)  # Reserve every fifth text as the final test.
+inner = split_articles(outer.train)  # Reserve validation from the remaining texts.
+training, validation, test = inner.train, inner.holdout, outer.holdout  # Name the roles.
+vocab = build_vocab(training)  # Learn token identities from training text only.
+model = train_bigram(training, vocab=vocab)  # Count only training pairs.
+print(len(training), len(validation), len(test))  # Expect 9, 3, and 3 texts.
+print("Validation loss:", model.loss(validation))  # Inspect the practice-exam score.
+print("Final test loss:", model.loss(test))  # Score once after fixing this setup.
+assert set(training).isdisjoint(validation)  # No training text may enter validation.
+assert set(training).isdisjoint(test)  # No training text may enter the final test.
+assert set(validation).isdisjoint(test)  # The two evaluation portions must differ.
+```
+
+These strings stand in for articles; the real corpus also needs separation
+by case. Don't keep changing settings after looking at the final test score.
+
 ## Check yourself
 
 A model has training loss 0.10 and held-out loss 5.00. What happened?

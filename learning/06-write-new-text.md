@@ -55,6 +55,33 @@ flowchart LR
   C --> D["Tiny GPT<br/>mixes context with attention"]
 ```
 
+## Python: try it
+
+This exposes the same token-by-token loop as `BigramModel.sample`, using
+the real trained probability table.
+
+```python
+import numpy as np  # Supply a repeatable random generator.
+
+from agavus.lab.bigram import train_bigram  # Reuse the lab's counting model.
+
+model = train_bigram(("guarda guarda",))  # Count pairs and apply smoothing.
+rng = np.random.default_rng(0)  # Fix the random seed so the example is repeatable.
+current = 0  # ID 0 is the boundary: start before the first character.
+generated: list[int] = []  # Collect the token IDs that will form the output.
+for _ in range(30):  # Cap the output even if no end token is sampled.
+  # Draw from the current row; likely tokens are chosen more often, not always.
+  following = int(rng.choice(model.vocab.size, p=model.probs[current]))
+  if following == 0:  # The same boundary ID now means end of text.
+    break  # Stop without adding the boundary to the written text.
+  generated.append(following)  # Append the sampled token to the output.
+  current = following  # Its own row supplies the next prediction.
+print(repr(model.vocab.decode(generated)))  # Turn IDs into text, showing spaces.
+```
+
+Smoothing allows every token, including the unknown token (displayed as
+`�`), and the model can stop immediately. Try another seed; the weights stay fixed.
+
 ## Check yourself
 
 Why can't our bigram reliably write the word `guarda`?

@@ -101,6 +101,29 @@ as if choosing among about 4 equal options. Knowing nothing means 8 options:
 | 4 to 6 | `BigramModel.loss` |
 | know-nothing score | `uniform_loss` |
 
+## Python: try it
+
+Use the exact smoothed probabilities for the seven steps in `guarda`,
+including its start and end boundaries.
+
+```python
+from math import exp, isclose, log, prod  # Exponent, comparison, ln, and multiplication.
+
+# List the seven probabilities in the same order as the worked table.
+chances = (2 / 9, 3 / 10, 3 / 10, 3 / 12, 3 / 10, 3 / 10, 2 / 12)
+word_chance = prod(chances)  # Multiply all steps to get the whole sequence's chance.
+surprises = [-log(chance) for chance in chances]  # Score each actual next token.
+mean_loss = sum(surprises) / len(surprises)  # Average so length alone isn't a penalty.
+perplexity = exp(mean_loss)  # Express uncertainty as an equivalent number of choices.
+print(f"Word chance: {word_chance:.8f}")  # The probability of this complete sequence.
+print(f"Mean loss: {mean_loss:.2f}")  # Expect about 1.36.
+print(f"Equivalent choices: {perplexity:.2f}")  # Expect about 3.88.
+assert isclose(mean_loss, -log(word_chance) / len(chances))  # The two routes agree.
+```
+
+Compare the two routes: multiply first and take `-ln`, or take `-ln` of
+each step and add. Only the displayed values are rounded.
+
 ## Check yourself
 
 With smoothing, what is `P(space | a)`? Its loss? (`ln(6) = 1.79`)

@@ -81,6 +81,27 @@ The list of all tokens is the **vocabulary**. Ours, for `guarda guarda`:
 Two are special: **■** marks the start or end of a text, and **?** stands for
 a letter we never saw.
 
+## Python: try it
+
+Build the vocabulary addresses yourself, then turn the IDs back into text.
+
+```python
+text = "guarda guarda"  # Use the same tiny training text as the illustration.
+letters = sorted(set(text))  # Keep each character once, in a repeatable order.
+# Reserve IDs 0 and 1, then append the characters; * unpacks the letter list.
+tokens = ["<boundary>", "<unknown>", *letters]
+# enumerate supplies each position; the dictionary maps token text to that ID.
+token_to_id = {token: number for number, token in enumerate(tokens)}
+ids = [token_to_id[letter] for letter in text]  # Look up each character's address.
+restored = "".join(tokens[number] for number in ids)  # Join the addressed letters.
+print(token_to_id)  # Check that a is 3, d is 4, g is 5, r is 6, and u is 7.
+print(ids)  # Repeated characters reuse the same ID.
+assert restored == text  # Encoding and decoding must preserve the original text.
+```
+
+The two special IDs are reserved here; the text isn't wrapped in boundaries
+yet. The lab's `vocab.encode` adds those boundaries automatically.
+
 ## Check yourself
 
 1. Why is it easier to learn from pieces than from whole sentences?

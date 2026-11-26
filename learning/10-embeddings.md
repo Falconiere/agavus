@@ -136,6 +136,27 @@ That last row is the price: better results, harder to explain.
 An LLM also starts by turning each token into a vector. So you've just met the
 first layer of a transformer.
 
+## Python: try it
+
+These two-dimensional vectors are chosen by hand so you can check the
+arithmetic. They aren't measurements from the pretrained text encoder.
+
+```python
+import numpy as np  # Work with numerical vectors.
+
+query = np.array([1.0, 0.0])  # An arrow along the first coordinate.
+vectors = np.array([[0.8, 0.6], [0.0, 1.0]])  # One nearby direction and one at 90 degrees.
+dots = vectors @ query  # Multiply corresponding coordinates, then add.
+lengths = np.linalg.norm(vectors, axis=1)  # Measure each candidate arrow's length.
+query_length = np.linalg.norm(query)  # Measure the query arrow's length too.
+similarities = dots / (lengths * query_length)  # Remove the effect of arrow length.
+print(similarities.tolist())  # Expect [0.8, 0.0], not percentages of truth.
+assert np.allclose(similarities, [0.8, 0.0])  # Check the hand-worked geometry.
+```
+
+Double the first candidate vector's coordinates. Its dot product doubles,
+but its cosine stays the same because its length doubles too.
+
 ## Check yourself
 
 1. Compute the similarity of (0.6, 0.8) and (1, 0).

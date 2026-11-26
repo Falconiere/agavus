@@ -49,6 +49,27 @@ They do the same job with two big differences:
 | Looks back at | 1 letter | thousands of words |
 | Learned from | a few laws | a huge amount of text |
 
+## Python: try it
+
+This handwritten table uses the raw pairs in `guarda guarda`. It isolates
+prediction; lesson 3 adds training and smoothing.
+
+```python
+# Store a probability row for each possible current letter in this small demo.
+table = {"a": {"r": 0.5, " ": 0.25, "<end>": 0.25}, "d": {"a": 1.0}}
+current = "a"  # Give the predictor one letter, without the earlier sentence.
+chances = table[current]  # Read only the probability row for that letter.
+# max compares tokens by their probability; the lambda supplies that number.
+guess = max(chances, key=lambda token: chances[token])
+for token, chance in chances.items():  # Visit each possible continuation.
+  print(repr(token), f"{chance:.0%}")  # repr makes the space token visible.
+print("Most likely:", guess)  # The largest probability belongs to r.
+assert sum(chances.values()) == 1.0  # All alternatives together must total 100%.
+```
+
+You should see 50%, 25%, and 25%, with `r` most likely. Change `current`
+to `"d"` and see how the selected row changes.
+
 ## Check yourself
 
 Our model sees the `d` in `guarda` and must guess the next letter.
