@@ -149,4 +149,4 @@ pattern, near first and far later, is common in real models too.
 
 </details>
 
-Back to the [lesson list](README.md)
+Next: [17. More text](17-more-text.md). Back to the [lesson list](README.md)

@@ -1,9 +1,9 @@
 # LLM lab — learn by building a tiny legal language model
 
-Status: **approved 2026-11-25; no code yet.** An isolated learning track that
-builds a tiny transformer with two outputs: next token (LM) and area
-(classifier). Companion: [tiny-llm.md](tiny-llm.md), which still governs any
-LLM that reaches users.
+Status: **approved 2026-11-25; steps 1–4 built on CPU, GPU repeat pending.**
+An isolated learning track that builds a tiny transformer with two outputs:
+next token (LM) and area (classifier). Companion: [tiny-llm.md](tiny-llm.md),
+which still governs any LLM that reaches users.
 
 ## 1. Goals and non-goals
 
@@ -41,7 +41,7 @@ decision rule are untouched.
 | --- | --- | --- |
 | Statute articles in the corpus (347; ~150 KB) | yes | yes |
 | Authored seed queries | yes (class head) | yes |
-| Openly licensed pt-BR text | later; license recorded first | yes, if license allows |
+| Openly licensed pt-BR text | training only; license recorded below first | yes, if license allows |
 | DJEN decisions, DataJud records, anything derived from them | **no** | **never** |
 | Gold sets | evaluation only, never training | not needed there |
 
@@ -51,6 +51,18 @@ positives), and language models memorize. Lifting the exclusion needs a
 privacy audit, deduplication, a memorization test and a change to this note.
 
 Allowlist, not denylist: the loader selects `source = statute` explicitly.
+
+Extra training text (`src/agavus/lab/extra.py`, kept in gitignored `data/`):
+
+| Source | License | Size used |
+| --- | --- | --- |
+| Civil Code articles outside the corpus's family book, from the page already fetched | public domain: laws aren't protected (Lei 9.610/1998, art. 8º, IV) | 1,817 articles, ~524 KB |
+| Portuguese Wikipedia, `wikimedia/wikipedia` 20231101.pt via the HF rows API: first 1,500 characters of 350 articles, URL kept per article | CC BY-SA 4.0; attribution kept; no model is published (§2), so nothing is redistributed | ~485 KB |
+
+Extra text only joins the training side. Validation, the exam and the letter
+vocabulary stay the statute articles', and any extra text sharing 100
+characters in a row with a statute article is dropped, so nothing leaks into
+the exam. Wikipedia mixes pt-BR and pt-PT.
 
 ## 4. Build order
 

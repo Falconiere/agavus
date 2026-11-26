@@ -1,7 +1,14 @@
-"""Run the lab: `uv run python -m agavus.lab [bigram|network|neural|bpe|gpt]`."""
+"""Run the lab: `uv run python -m agavus.lab [experiment] [options]`.
+
+Experiments: bigram (default), network, neural, bpe, gpt [civil] [wikipedia],
+fetch-wikipedia.
+"""
 
 import sys
+from collections.abc import Callable, Sequence
+from pathlib import Path
 
+import httpx
 import torch
 
 from agavus.config.settings import load_settings
@@ -15,6 +22,13 @@ from agavus.lab.bigram import (
 )
 from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
 from agavus.lab.data import Split, load_articles, split_articles
+from agavus.lab.extra import (
+  civil_code_rest,
+  fetch_wikipedia,
+  load_wikipedia,
+  save_wikipedia,
+  without_leaks,
+)
 from agavus.lab.gpt import GptConfig, GptModel
 from agavus.lab.gpt import train as train_gpt
 from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
@@ -41,6 +55,14 @@ GPT_STEPS = 6000
 GPT_CHECK_EVERY = 500
 ATTENTION_TEXT = "Art. 22. Constatada a prática de violência doméstica"
 SHOWN_LOOKS = 3
+# About as much text as the rest of the Civil Code, from many articles.
+WIKIPEDIA_ARTICLES = 350
+WIKIPEDIA_CHARS = 1500
+WIKIPEDIA_TIMEOUT = 60.0
+EXTRAS: dict[str, Callable[[Path], tuple[str, ...]]] = {
+  "civil": civil_code_rest,
+  "wikipedia": load_wikipedia,
+}
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
 
@@ -152,36 +174,72 @@ def _show_attention(model: GptModel) -> None:
     print(f"  head {head}: {shown}")
 
 
-def run_gpt() -> int:
-  """Tiny GPT: steps chosen on validation, exam opened once at the end."""
+def _extra_texts(names: Sequence[str]) -> tuple[str, ...] | None:
+  """Requested extra text, minus anything that overlaps a statute article."""
+  data_dir = load_settings().data_dir
+  texts: list[str] = []
+  for name in names:
+    if name not in EXTRAS:
+      print(f"lab: unknown extra {name!r}; choose from {', '.join(EXTRAS)}")
+      return None
+    found = EXTRAS[name](data_dir)
+    if not found:
+      print(f"lab: no {name} text found (wikipedia needs: python -m agavus.lab fetch-wikipedia)")
+      return None
+    texts.extend(found)
+  clean = without_leaks(texts, load_articles(data_dir))
+  print(f"extra text: {len(clean)} texts, {sum(map(len, clean)):,} characters", end="")
+  print(f" ({len(texts) - len(clean)} dropped for overlapping a statute article)")
+  return clean
+
+
+def run_gpt(extras: Sequence[str] = ()) -> int:
+  """Tiny GPT: steps chosen on validation, exam opened once at the end.
+
+  Extra text only joins the training side; validation, exam and the letter
+  vocabulary stay the statute articles', so losses stay comparable.
+  """
   studied = _studied()
-  if studied is None:
+  extra = _extra_texts(extras)
+  if studied is None or extra is None:
     return 1
   split, vocab = studied
+  inner = split_articles(split.train)
   config = GptConfig(check_every=GPT_CHECK_EVERY)
-  _, history = train_gpt(split_articles(split.train), vocab, config, steps=GPT_STEPS)
+  _, history = train_gpt(Split(inner.train + extra, inner.holdout), vocab, config, steps=GPT_STEPS)
   best = _chosen_steps(history, len(history))
-  model, _ = train_gpt(Split(split.train, ()), vocab, config, steps=best)
+  model, _ = train_gpt(Split(split.train + extra, ()), vocab, config, steps=best)
   print(f"parameters: {model.size():,}")
   _report(model, split)
   _show_attention(model)
   return 0
 
 
+def run_fetch_wikipedia() -> int:
+  """Download the openings of Wikipedia articles into data/lab/ (CC BY-SA 4.0)."""
+  data_dir = load_settings().data_dir
+  with httpx.Client(timeout=WIKIPEDIA_TIMEOUT) as client:
+    found = fetch_wikipedia(client, articles=WIKIPEDIA_ARTICLES, chars=WIKIPEDIA_CHARS)
+  path = save_wikipedia(data_dir, found)
+  print(f"saved {len(found)} articles, {sum(len(a.text) for a in found):,} characters: {path}")
+  return 0
+
+
 def main(arguments: list[str]) -> int:
   """Choose the experiment; the bigram is the default."""
-  experiments = {
-    "bigram": run_bigram,
-    "network": run_network,
-    "neural": run_neural,
-    "bpe": run_bpe,
+  experiments: dict[str, Callable[[list[str]], int]] = {
+    "bigram": lambda _: run_bigram(),
+    "network": lambda _: run_network(),
+    "neural": lambda _: run_neural(),
+    "bpe": lambda _: run_bpe(),
     "gpt": run_gpt,
+    "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
   }
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:
     print(f"lab: unknown experiment {name!r}; choose from {', '.join(experiments)}")
     return 1
-  return experiments[name]()
+  return experiments[name](arguments[1:])
 
 
 if __name__ == "__main__":

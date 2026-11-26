@@ -20,6 +20,7 @@ flowchart LR
   M --> N["14. Word<br/>pieces"]
   N --> O["15. Attention"]
   O --> P["16. A tiny<br/>GPT"]
+  P --> Q["17. More<br/>text"]
 ```
 
 | Lesson | Question it answers |
@@ -40,6 +41,7 @@ flowchart LR
 | [14. Word pieces](14-word-pieces.md) | Why not letters or whole words? |
 | [15. Attention](15-attention.md) | How does a letter choose where to look? |
 | [16. A tiny GPT](16-a-tiny-gpt.md) | What is a GPT, piece by piece? |
+| [17. More text](17-more-text.md) | Does more text help, and which text? |
 
 Run the real thing at any time:
 
