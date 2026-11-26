@@ -280,6 +280,7 @@ def compute(context: RunContext, settings: Settings) -> dict[str, object]:
   result["cpu_latency"] = cpu_latency(tfidf, context.rows("final"))
   result["temperatures"] = temperatures
   results["tfidf"] = result
+  tfidf.save_calibrated(context.state.folder, temperatures)
   context.state.put("result:tfidf", result)
   _evaluate_neural(context, "frozen", context.state.folder / "frozen", results)
   for name, folder in checkpoints:

@@ -46,5 +46,11 @@ def test_verdict_never_declares_partial_or_unsafe_or_weak_recall_winner(tmp_path
   assert verdict(_results(recall=0.97), complete=True)["winner"] is None
   report = tmp_path / "report"
   report.mkdir()
-  write_report(report, _results(), {"winner": None, "status": "partial"})
-  assert "partial" in (report / "report.md").read_text()
+  measured = _results()
+  measured["tfidf"]["cpu_latency"] = {"median_seconds": 0.01, "max_seconds": 0.02}
+  measured["tfidf"]["relation"] = _metrics() | {"category_failures": {"quotation": ["pair"]}}
+  write_report(report, measured, {"winner": None, "status": "partial"})
+  receipt = (report / "report.md").read_text()
+  assert "partial" in receipt
+  assert "CPU median/max: 0.0100s / 0.0200s" in receipt
+  assert "quotation: 1" in receipt

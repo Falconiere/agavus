@@ -22,10 +22,13 @@ from agavus.classify.learned.runner import ensure_private_path, experiment
 from agavus.classify.learned.state import ExperimentState
 from agavus.classify.learned.train import TokenizedSample, build_optimizer, train_step
 from agavus.classify.learned.types import RELATIONS, Sample
+from agavus.classify.store import load_model
 from agavus.config.settings import Settings
 from agavus.taxonomy.areas import AREAS
 
 from .fixtures import tiny_model, tiny_tokenizer
+
+CALIBRATION_TEMPERATURES = (1.7, 2.3)
 
 
 def _dataset() -> Dataset:
@@ -80,6 +83,9 @@ def test_baselines_fit_training_only_and_calibration_ignores_final_labels(tmp_pa
   assert first == second
   assert np.isfinite(validation_loss(predictor.model, calibration, execution, joint=True))
   assert (state.folder / "baselines.db").is_file()
+  tfidf.save_calibrated(state.folder, CALIBRATION_TEMPERATURES)
+  for task, temperature in zip(("area", "relation"), CALIBRATION_TEMPERATURES, strict=True):
+    assert load_model(state.folder / "baselines.db", f"tfidf:{task}").temperature == temperature
 
 
 def test_real_cpu_pilot_and_document_length_normalization(tmp_path: Path) -> None:

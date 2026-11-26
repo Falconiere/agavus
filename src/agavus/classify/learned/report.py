@@ -1,5 +1,6 @@
 """Conservative comparison verdicts and a small private human-readable receipt."""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -79,7 +80,7 @@ def write_report(
   lines = [
     "# Private learned-classifier experiment",
     "",
-    str(summary),
+    f"Status: {summary.get('status', 'unknown')}. Winner: {summary.get('winner') or 'none'}.",
     "",
     "| Variant | Document F1 | M recall | Unsafe M | ECE | Precision | Coverage | Relation F1 |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -96,6 +97,32 @@ def write_report(
       f"| {name} | {values[0]} | {values[1]} | {len(unsafe)} | {values[2]} | "
       f"{values[3]} | {values[4]} | {number(relation, 'macro_f1'):.4f} |"
     )
+  lines.extend(["", "## Diagnostics", ""])
+  for name, result in results.items():
+    latency = as_dict(result.get("cpu_latency"))
+    if latency:
+      lines.append(
+        f"- {name}: CPU median/max: {number(latency, 'median_seconds'):.4f}s / "
+        f"{number(latency, 'max_seconds'):.4f}s per document."
+      )
+    categories = as_dict(as_dict(result["relation"]).get("category_failures"))
+    failures = ", ".join(
+      f"{category}: {len(ids)}"
+      for category, ids in sorted(categories.items())
+      if isinstance(ids, list)
+    )
+    if failures:
+      lines.append(f"  Relation errors by category: {failures}.")
+    pairs = as_dict(result.get("counterfactuals"))
+    failed = pairs.get("relation_flip_and_area_stable_failures")
+    if isinstance(failed, list):
+      lines.append(
+        f"  Grant/denial flip with stable area: {len(failed)} failures / "
+        f"{pairs['families']} unseen families."
+      )
+  lines.extend(
+    ["", "## Run summary", "", "```json", json.dumps(summary, indent=2, ensure_ascii=False), "```"]
+  )
   lines.extend(
     [
       "",

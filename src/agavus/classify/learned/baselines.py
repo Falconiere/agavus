@@ -1,7 +1,8 @@
 """Unchanged TF-IDF features and a frozen raw-token E5 linear comparison."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -41,6 +42,12 @@ class TfidfBaseline:
     """Retain every production feature family in this baseline."""
     model = self.models[examples[0].sample.task]
     return model.model.logits(model.vectorizer.transform([_text(item) for item in examples]))
+
+  def save_calibrated(self, folder: Path, temperatures: tuple[float, float]) -> None:
+    """Persist the calibration used in the comparison, rather than initial raw scores."""
+    for task, temperature in zip(("area", "relation"), temperatures, strict=True):
+      fitted = replace(self.models[task], temperature=temperature)
+      save_model(folder / "baselines.db", f"tfidf:{task}", fitted)
 
 
 def fit_tfidf(
