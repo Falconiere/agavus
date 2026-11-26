@@ -57,7 +57,12 @@ co-occurs. Consequences:
   classification; the decision layer's expected-loss rule generalizes to
   label sets without structural change.
 
-## 3. Data sources (TJDFT only)
+## 3. Production data sources (TJDFT only)
+
+The private decision-reading pilot may compare public family and domestic-violence
+decisions from TJSP and TJRJ with the TJDFT sample. Keep each court's sources, dates,
+deciding bodies and findings identifiable in the ignored experiment directory.
+Production ingestion, training and published retrieval retain their TJDFT scope.
 
 Deep-dive documentation: **[docs/corpus/](corpus/README.md)** (range, sources,
 schema, ingestion, labeling, privacy, storage).
