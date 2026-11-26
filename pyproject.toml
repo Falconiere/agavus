@@ -56,6 +56,13 @@ strict = true
 files = ["src", "scripts", "space"]
 mypy_path = "src:scripts:stubs"
 
+# Pyright does not select .venv on its own, so the onnxruntime stub cannot
+# resolve numpy. mypy already runs inside this environment.
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+stubPath = "stubs"
+
 [tool.pytest.ini_options]
 testpaths = ["src", "scripts", "space"]
 pythonpath = ["scripts"]
