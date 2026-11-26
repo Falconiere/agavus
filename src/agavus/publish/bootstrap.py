@@ -40,7 +40,7 @@ def ensure_public_corpus(storage: CorpusStorage) -> None:
   if foreign:
     raise ValueError(
       "data dir holds non-public texts; release builds need a clean "
-      f"AGAVUS_DATA_DIR (first offender: {foreign[0]!r})"
+      + f"AGAVUS_DATA_DIR (first offender: {foreign[0]!r})"
     )
 
 
@@ -53,7 +53,7 @@ def bootstrap_corpus(settings: Settings, assets_dir: Path) -> Path:
   storage = CorpusStorage(settings.data_dir)
   ensure_public_corpus(storage)
   for stem, name in ASSET_NAMES.items():
-    import_statute_file(settings, name, assets_dir / f"{stem}.html")
+    _ = import_statute_file(settings, name, assets_dir / f"{stem}.html")
   storage.run_labeling()
   data = training_set(storage)
   classifier, report = train_classifier(data)

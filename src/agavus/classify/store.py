@@ -47,7 +47,7 @@ def _connect(db_path: Path) -> sqlite3.Connection:
   db_path.parent.mkdir(parents=True, exist_ok=True)
   conn = sqlite3.connect(db_path)
   conn.row_factory = sqlite3.Row
-  conn.executescript(_SCHEMA)
+  _ = conn.executescript(_SCHEMA)
   columns = {row["name"] for row in conn.execute("PRAGMA table_info(train_reports)")}
   if "n_calibration" not in columns:
     conn.execute("ALTER TABLE train_reports ADD COLUMN n_calibration INTEGER NOT NULL DEFAULT 0")

@@ -13,7 +13,7 @@ _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _PHONE = re.compile(r"(?:\+?55[\s.-]?)?(?:\(?\d{2}\)?[\s.-]?)?(?:9\s?)?\d{4}[\s.-]?\d{4}\b")
 _ROLE_NAME = re.compile(
   r"(?i)\b(autora?|réu?|requerente|requerid[oa]|vítima|ofendid[oa]|testemunha)"
-  r"(\s*[:\u2013-]\s*|\s+)([A-ZÀ-Ú][\wÀ-ú]+(?:\s+[A-ZÀ-Ú][\wÀ-ú]+)+)"
+  + r"(\s*[:\u2013-]\s*|\s+)([A-ZÀ-Ú][\wÀ-ú]+(?:\s+[A-ZÀ-Ú][\wÀ-ú]+)+)"
 )
 _LABELED_ID = re.compile(r"(?i)\b(RG|CPF|CNPJ)\s*[:nºo°.\s]*[\d./-]{5,20}")
 

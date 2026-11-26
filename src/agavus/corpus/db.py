@@ -17,6 +17,7 @@ from typing import TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
+from agavus.corpus.jsonutil import as_int
 from agavus.corpus.records import (
   CaseRecord,
   LabelSource,
@@ -86,12 +87,13 @@ def connect(root: Path) -> sqlite3.Connection:
   path.parent.mkdir(parents=True, exist_ok=True)
   conn = sqlite3.connect(path)
   conn.row_factory = sqlite3.Row
-  version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+  raw: object = conn.execute("PRAGMA user_version").fetchone()[0]
+  version = as_int(raw)
   if version != SCHEMA_VERSION:
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.executescript(_SCHEMA)
+    _ = conn.execute("PRAGMA journal_mode=WAL")
+    _ = conn.executescript(_SCHEMA)
     _migrate_fts(conn)
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    _ = conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
   return conn
 
 
@@ -99,8 +101,8 @@ def _migrate_fts(conn: sqlite3.Connection) -> None:
   """FTS index is rebuildable: recreate when the column layout changed."""
   columns = {row[1] for row in conn.execute("PRAGMA table_info(texts_fts)")}
   if "law_name" not in columns:
-    conn.execute("DROP TABLE texts_fts")
-    conn.execute(
+    _ = conn.execute("DROP TABLE texts_fts")
+    _ = conn.execute(
       "CREATE VIRTUAL TABLE texts_fts USING fts5(doc_id UNINDEXED, origin_ref, law_name, text)"
     )
     conn.commit()
