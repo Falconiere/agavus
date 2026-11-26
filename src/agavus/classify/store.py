@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS train_reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, run_at TEXT NOT NULL,
   holdout_accuracy REAL NOT NULL, holdout_macro_f1 REAL NOT NULL,
   holdout_ece REAL NOT NULL, temperature REAL NOT NULL,
-  n_train INTEGER NOT NULL, n_holdout INTEGER NOT NULL
+  n_train INTEGER NOT NULL, n_holdout INTEGER NOT NULL,
+  n_calibration INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -47,7 +48,29 @@ def _connect(db_path: Path) -> sqlite3.Connection:
   conn = sqlite3.connect(db_path)
   conn.row_factory = sqlite3.Row
   conn.executescript(_SCHEMA)
+  columns = {row["name"] for row in conn.execute("PRAGMA table_info(train_reports)")}
+  if "n_calibration" not in columns:
+    conn.execute("ALTER TABLE train_reports ADD COLUMN n_calibration INTEGER NOT NULL DEFAULT 0")
   return conn
+
+
+def _save_report(conn: sqlite3.Connection, name: str, report: TrainReport) -> None:
+  """Append split counts without erasing reports from older model versions."""
+  conn.execute(
+    "INSERT INTO train_reports (name, run_at, holdout_accuracy, holdout_macro_f1,"
+    " holdout_ece, temperature, n_train, n_holdout, n_calibration) VALUES (?,?,?,?,?,?,?,?,?)",
+    (
+      name,
+      datetime.now(UTC).isoformat(),
+      report.holdout_accuracy,
+      report.holdout_macro_f1,
+      report.holdout_ece,
+      report.temperature,
+      report.n_train,
+      report.n_holdout,
+      report.n_calibration,
+    ),
+  )
 
 
 def save_model(
@@ -88,20 +111,7 @@ def save_model(
       (name, weights.astype(np.float64).tobytes(), classifier.model.bias.tobytes()),
     )
     if report is not None:
-      conn.execute(
-        "INSERT INTO train_reports (name, run_at, holdout_accuracy, holdout_macro_f1,"
-        " holdout_ece, temperature, n_train, n_holdout) VALUES (?,?,?,?,?,?,?,?)",
-        (
-          name,
-          datetime.now(UTC).isoformat(),
-          report.holdout_accuracy,
-          report.holdout_macro_f1,
-          report.holdout_ece,
-          report.temperature,
-          report.n_train,
-          report.n_holdout,
-        ),
-      )
+      _save_report(conn, name, report)
     conn.commit()
 
 

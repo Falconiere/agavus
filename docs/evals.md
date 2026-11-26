@@ -52,10 +52,25 @@ Rules:
 
 ## Splits and leakage
 
-- Train/held-out split **by case, by time** (train ≤ 2025, eval 2026+):
-  evaluation mimics future cases.
-- Dedup before splitting: same case/acórdão never on both sides.
-- Vocabulary, IDF, model, calibrator fitted on train only.
+- Split documents into **training / calibration / final holdout**, grouped
+  by case. Masked and unmasked CNJ numbers in provenance identify the same
+  case; normalized duplicate texts also stay together, transitively.
+- Within each class, order groups by their latest publication date: newest
+  20% of **dated groups** for final holdout, preceding 20% for calibration,
+  remainder for training (at least one group in each). Undated statutes and
+  authored seeds stay in training so they do not displace older cases.
+  Entirely undated classes use the same proportions with stable group hashes
+  to order groups. This is a per-class chronological split, not a single
+  court-wide date cutoff.
+- Require three independent dated groups per class when dates are present,
+  or three undated groups otherwise; fail explicitly when there are fewer.
+  Exclude unresolved labels and case-derived documents without an identifiable
+  CNJ number. Conflicting labels within a group fail rather than being guessed.
+- Fit vocabulary, IDF and weights on training only; temperature on calibration
+  only; report metrics on final holdout only. Report all three sample counts.
+- Query routing uses authored data only. Scenario variants stay together in
+  calibration folds, with normalization learned inside each training fold.
+  Development questions guide iteration; they are not an untouched test set.
 
 ## Harness and regression policy
 
@@ -215,3 +230,51 @@ encoder weights every question is deferred (since v0.4.0). Space
 releases now require the router gate (`publish/router_gate.py`).
 More questions answered means more retrieval errors shown: retrieval dev with
 real routing is 21 right, 5 wrong, 14 deferred (was 17/1/22).
+
+## Evaluation repair and query expansion (2026-11-26)
+
+The document pipeline previously fitted temperature and reported ECE on the
+same holdout. It now separates calibration and final evaluation, preserves
+case groups and dates, and excludes labels awaiting review. Legacy SQLite
+reports retain their values with calibration count zero; they are not directly
+comparable with the new reports.
+
+The question router adds 64 authored synthetic queries in 32 paired scenarios
+(330 queries total). New scenario variants stay together in calibration folds;
+legacy seeds are grouped by normalized text. Each fold fits its own vector
+centering and scale. The encoder, solver settings and decision costs are
+unchanged: **M ceiling preserved**.
+
+Measured locally using the pinned CPU ONNX encoder on the existing 50-question
+**development** set:
+
+| Metric | Previous | Revised |
+| --- | --- | --- |
+| Correct / wrong / deferred decisions | 36 / 2 / 12 | 42 / 1 / 7 |
+| Accepted precision | 29/31 (93.5%) | 29/30 (96.7%) |
+| Accepted coverage | 62% | 60% |
+| Correct out-of-scope rejections | 7 | 13 |
+| Argmax macro-F1 | 0.922 | 0.922 |
+| ECE | 0.056 | 0.026 |
+| M argmax recall | 19/20 | 19/20 |
+| Unsafe M decisions | 0 | 0 |
+
+The improvement is mainly more reliable out-of-scope rejection, not more
+correct accepted answers. The 10-question routing-v1 regression gate also
+passes: M recall and accepted precision 1.00, accepted coverage 0.50.
+The larger set's 0.95 M recall still misses the 0.98 target. No hidden-set
+predictions were rerun for this iteration; development results are not an
+independent estimate of generalization. Jev checked the authored scenario
+labels for routing consistency; this is not lawyer review.
+
+Document retraining selected 651 resolved corpus labels plus 86 seeds.
+An initial split allocated quotas across undated auxiliary data and dated
+cases together, leaving family training without real cases: accuracy 0.333,
+ECE 0.319. The mixed-source split now reserves calibration/evaluation quotas
+from dated cases and retains undated auxiliary data in training. On 621
+training / 58 calibration / 58 evaluation examples: accuracy 0.966,
+macro-F1 0.648, ECE 0.031. Evaluation contains 34 family, 23 domestic-violence
+and only **one** out-of-scope case. Weak organ labels are not expert gold.
+The candidate also fails the query gold M-recall gate (0.75); it remains a
+local candidate rather than replacing the document artifact. More independently
+reviewed out-of-scope documents and a fresh query gold set remain necessary.

@@ -55,8 +55,8 @@ def bootstrap_corpus(settings: Settings, assets_dir: Path) -> Path:
   for stem, name in ASSET_NAMES.items():
     import_statute_file(settings, name, assets_dir / f"{stem}.html")
   storage.run_labeling()
-  texts, targets = training_set(storage)
-  classifier, report = train_classifier(texts, targets)
+  data = training_set(storage)
+  classifier, report = train_classifier(data)
   save_model(model_path(settings), "classifier", classifier, report)
   return model_path(settings)
 

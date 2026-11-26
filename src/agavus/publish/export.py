@@ -65,6 +65,7 @@ def _latest_report(db_path: Path) -> TrainReport:
     temperature=float(row["temperature"]),
     n_train=int(row["n_train"]),
     n_holdout=int(row["n_holdout"]),
+    n_calibration=int(row["n_calibration"]) if "n_calibration" in set(row.keys()) else 0,
   )
 
 

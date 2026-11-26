@@ -120,15 +120,16 @@ def _run_label(settings: Settings) -> int:
 
 def _run_train(settings: Settings) -> int:
   storage = CorpusStorage(settings.data_dir)
-  texts, targets = training_set(storage)
-  if not texts:
+  data = training_set(storage)
+  if not data.texts:
     print("train: no labeled texts — run ingest + label first")
     return 1
-  classifier, report = train_classifier(texts, targets)
+  classifier, report = train_classifier(data)
   db_path = settings.data_dir / "models" / "models.db"
   save_model(db_path, "classifier", classifier, report)
   print(
-    f"train: {report.n_train} train / {report.n_holdout} holdout · "
+    f"train: {report.n_train} train / {report.n_calibration} calibration / "
+    f"{report.n_holdout} evaluation · "
     f"acc {report.holdout_accuracy:.2f} · F1 {report.holdout_macro_f1:.2f} · "
     f"ECE {report.holdout_ece:.3f} · T {report.temperature:.2f} → {db_path}"
   )

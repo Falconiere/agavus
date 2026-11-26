@@ -1,12 +1,9 @@
-"""Training pipeline: fit-on-train-only, held-out calibration, metrics.
+"""Case-grouped training, separate calibration, and final holdout metrics."""
 
-Deterministic split (sorted, every k-th to holdout). The vectorizer, model,
-and temperature are fitted exclusively on the training side; the holdout
-measures honest generalization (docs/evals.md).
-"""
-
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,12 +16,13 @@ from agavus.classify.calibrate import (
 from agavus.classify.features import TfidfVectorizer, VectorizerConfig
 from agavus.classify.model import LogRegModel, TrainConfig, softmax, train_logreg
 from agavus.classify.seed import SEED_QUERIES
+from agavus.classify.splits import TrainingData, split_examples
+from agavus.corpus.records import TextSource
 from agavus.corpus.storage import CorpusStorage
 from agavus.evals.metrics import accuracy, macro_f1
 
 FloatArray = NDArray[np.float64]
-HOLDOUT_EVERY = 5
-MIN_HOLDOUT_FOR_CALIBRATION = 5
+_CNJ = re.compile(r"(?<!\d)\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}(?!\d)")
 
 
 @dataclass(frozen=True)
@@ -37,6 +35,7 @@ class TrainReport:
   temperature: float
   n_train: int
   n_holdout: int
+  n_calibration: int = 0
 
 
 @dataclass(frozen=True)
@@ -73,41 +72,58 @@ class TrainedClassifier:
     return contributions[:k]
 
 
-def training_set(storage: CorpusStorage) -> tuple[list[str], list[str]]:
-  """Labeled corpus texts + authored seeds (shared by CLI and Space)."""
-  labels = {decision.record_id: decision for decision in storage.load_labels()}
+def training_set(storage: CorpusStorage) -> TrainingData:
+  """Resolved corpus labels + seeds, retaining case identity and dates."""
+  labels = {
+    decision.record_id: decision
+    for decision in storage.load_labels()
+    if decision.domain_label is not None and not decision.needs_review
+  }
   texts: list[str] = []
   targets: list[str] = []
-  for document in storage.load_texts():
-    decision = labels.get(document.id)
-    if decision is not None and decision.domain_label is not None:
+  groups: list[str] = []
+  dates: list[date | None] = []
+  for document in storage.load_texts_by_ids(tuple(labels)).values():
+    match = _CNJ.search(document.origin_ref)
+    if document.source != TextSource.STATUTE and match is None:
+      continue
+    decision = labels[document.id]
+    if decision.domain_label is not None:
       texts.append(document.text)
       targets.append(decision.domain_label)
+      groups.append(re.sub(r"\D", "", match[0]) if match else document.origin_ref)
+      dates.append(document.published_at)
   texts += [text for text, _ in SEED_QUERIES]
   targets += [label for _, label in SEED_QUERIES]
-  return texts, targets
+  groups += [text for text, _ in SEED_QUERIES]
+  dates += [None] * len(SEED_QUERIES)
+  return TrainingData(tuple(texts), tuple(targets), tuple(groups), tuple(dates))
 
 
 def train_classifier(
-  texts: Sequence[str],
-  labels: Sequence[str],
+  texts: Sequence[str] | TrainingData,
+  labels: Sequence[str] = (),
   *,
   vectorizer_config: VectorizerConfig | None = None,
   train_config: TrainConfig | None = None,
 ) -> tuple[TrainedClassifier, TrainReport]:
   """Train + calibrate + report; raises on degenerate inputs."""
+  if isinstance(texts, TrainingData):
+    if labels:
+      raise ValueError("labels are already included in TrainingData")
+    data = texts
+    texts, labels = data.texts, data.labels
+  else:
+    data = TrainingData(tuple(texts), tuple(labels), tuple(texts), (None,) * len(texts))
   classes = tuple(sorted(set(labels)))
   min_classes = 2
   if len(classes) < min_classes or len(texts) != len(labels):
     raise ValueError("need >= 2 classes and aligned texts/labels")
-  order = sorted(range(len(texts)), key=lambda index: (labels[index], texts[index]))
-  holdout = set(order[::HOLDOUT_EVERY])
-  if not holdout or len(holdout) == len(texts):
-    raise ValueError("degenerate holdout split")
-  train_texts = [text for index, text in enumerate(texts) if index not in holdout]
-  train_labels = [label for index, label in enumerate(labels) if index not in holdout]
-  hold_texts = [text for index, text in enumerate(texts) if index in holdout]
-  hold_labels = [label for index, label in enumerate(labels) if index in holdout]
+  split = split_examples(texts, labels, groups=data.groups, dates=data.dates)
+  train_texts = [texts[index] for index in split.train]
+  train_labels = [labels[index] for index in split.train]
+  hold_texts = [texts[index] for index in split.holdout]
+  hold_labels = [labels[index] for index in split.holdout]
   vectorizer = TfidfVectorizer(vectorizer_config)
   vectorizer.fit(train_texts)
   model = train_logreg(
@@ -117,11 +133,10 @@ def train_classifier(
     n_features=len(vectorizer.vocab),
     config=train_config,
   )
+  calibration = model.logits(vectorizer.transform([texts[index] for index in split.calibration]))
+  temperature = fit_temperature(calibration, [classes.index(labels[i]) for i in split.calibration])
   logits = model.logits(vectorizer.transform(hold_texts))
   targets = [classes.index(label) for label in hold_labels]
-  temperature = 1.0
-  if len(targets) >= MIN_HOLDOUT_FOR_CALIBRATION:
-    temperature = fit_temperature(logits, targets)
   probs = softmax(apply_temperature(logits, temperature))
   predictions = [classes[int(index)] for index in probs.argmax(axis=1)]
   report = TrainReport(
@@ -131,5 +146,6 @@ def train_classifier(
     temperature=temperature,
     n_train=len(train_texts),
     n_holdout=len(hold_texts),
+    n_calibration=len(split.calibration),
   )
   return TrainedClassifier(vectorizer, model, temperature), report

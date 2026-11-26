@@ -68,9 +68,12 @@ training):
 | Coverage | {eval_report.coverage:.2f} |
 | Accept / defer / reject | {eval_report.accepted}/{eval_report.deferred}/{eval_report.rejected} |
 
-Holdout at train time: {train_report.n_train} train / {train_report.n_holdout}
-holdout · acc {train_report.holdout_accuracy:.2f} · ECE {train_report.holdout_ece:.3f}
+Split at train time: {train_report.n_train} train /
+{train_report.n_calibration} calibration / {train_report.n_holdout} evaluation
+· acc {train_report.holdout_accuracy:.2f} · ECE {train_report.holdout_ece:.3f}
 · temperature {train_report.temperature:.2f}.
+Legacy reports with zero calibration count did not record an independent
+calibration partition and are not directly comparable.
 
 ## Training data provenance
 

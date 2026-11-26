@@ -45,14 +45,24 @@ Platt, but needs more data to avoid overfitting. With our small gold set,
 ## In agavus
 
 Implemented as **temperature scaling** (`classify/calibrate.py`): a single
-scalar T on the logits, grid-searched on held-out NLL — the multiclass
-analogue of Platt scaling. ECE is reported by `agavus eval` and gates
-releases. Isotonic remains an option if data grows.
+scalar T on the logits, grid-searched on calibration NLL — the multiclass
+analogue of Platt scaling. Document training uses three disjoint sets:
+training fits vocabulary, IDF and weights; calibration fits T; final holdout
+measures accuracy, macro-F1 and ECE. Scoring calibration examples again would
+give an optimistic estimate, like grading a student on the practice exam.
+
+The question router fits T from out-of-fold scores. Each fold learns its
+centering and scale from its own training examples; paired variants of an
+authored scenario stay in one fold. Independent question sets measure routing
+quality. Isotonic remains an option if data grows.
 
 ## Rules
 
 - Fit on **held-out** data only — never the training set (it would look
   perfectly calibrated and lie).
+- Keep final evaluation separate from calibration as well. Small calibration
+  samples can still give unreliable confidence; separation removes leakage,
+  not sampling uncertainty.
 - Re-calibrate whenever the model or corpus changes.
 - Report calibration quality (e.g., expected calibration error) alongside
   F1 in evaluation (design doc §8).

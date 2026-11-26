@@ -75,9 +75,12 @@ Citation flag + "protetiva" + "defiro" → `P(M) = 0.97` → **accept as M**.
    same lexicon version, same frozen vectorizer, same feature extractors.
    Drift here silently corrupts probabilities. Artifacts are versioned
    together.
-2. **Fit on train only**: vocabulary, IDF weights, model, calibrator —
-   all fitted on the training split; held-out cases never leak in
-   (split by case/time, see [../corpus/ingestion.md](../corpus/ingestion.md)).
+2. **Separate learning, confidence and grading**: training fits vocabulary,
+   IDF and model weights; a separate calibration partition fits temperature;
+   final holdout measures quality. Keep each case and duplicate text group
+   together; prefer newer cases for calibration and evaluation. Undated
+   statutes and seeds remain auxiliary training data when dated cases are
+   available (see [../evals.md](../evals.md#splits-and-leakage)).
 3. **Determinism**: same input → same vector → same probabilities. No
    randomness at inference — this is what makes the safety thresholds
    trustworthy.
