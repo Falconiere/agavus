@@ -1,6 +1,6 @@
 # LLM lab — learn by building a tiny legal language model
 
-Status: **approved 2026-11-25; steps 1–4 built on CPU, GPU repeat pending.**
+Status: **approved 2026-11-25; steps 1–4 done (CPU, GPU repeat 2026-11-26).**
 An isolated learning track that builds a tiny transformer with two outputs:
 next token (LM) and area (classifier). Companion: [tiny-llm.md](tiny-llm.md),
 which still governs any LLM that reaches users.
@@ -148,6 +148,24 @@ Rules:
    verify checksums.
 6. Destroy the machine after each session and confirm billing stopped.
 7. Record GPU, hours, cost, seed, config, data hash and losses per run.
+
+### Run log
+
+**Session 1, 2026-11-26.** RTX 3070 8 GB, PyTorch 2.15.0+cu132, ~55 min,
+R$ 1.03. Default `GptConfig` (822,627 parameters, context 64, width 128,
+4 layers, 4 heads, dropout 0.2). Data: exported bundle, sha256 `0cada48c…`.
+Runs on `agavus-training` under `runs/`, copies in `data/lab/runs/`
+(checksums verified). The GPU repeats the CPU result within seed noise.
+
+| Run | Seed | Steps tried / chosen | Best validation | Exam | Minutes |
+| --- | --- | --- | --- | --- | --- |
+| statutes | 0, 1, 2 | 6,000 / 5,500, 5,500, 4,000 | 1.141, 1.122, 1.143 | 1.162, 1.169, 1.161 | 6–7 |
+| + Civil Code | 0, 1, 2 | 6,000 / 5,500, 6,000, 6,000 | 1.169, 1.185, 1.178 | 1.226, 1.171, 1.192 | 6–7 |
+| + Civil Code | 0 | 30,000 / 26,000 | 1.057 | **1.093** | 30 |
+
+CPU references, seed 0: statutes 1.181, + Civil Code 1.174 (6,000 steps).
+Lessons: one run can be off by ~0.05, so compare seed averages; extra text
+only pays off with more steps.
 
 ## 7. Rule changes (approved 2026-11-25)
 
