@@ -1,5 +1,10 @@
 # 2. Why split the text, and why use numbers?
 
+![Letters become token IDs](illustrations/token-addresses.webp)
+
+Follow each letter to its ID: `guarda` becomes `5, 7, 3, 6, 4, 3` in our
+vocabulary. Both `a` tiles use address 3; the IDs don't rank their meanings.
+
 ## Think of sounding out an unfamiliar word
 
 You can meet a new word and still recognize its letters. Splitting text lets

@@ -1,5 +1,10 @@
 # 15. Attention
 
+![Attention mixes values](illustrations/attention-mixture.webp)
+
+Mix the three value cards with rounded shares 9%, 24%, and 67% to get
+`[0.76, 0.91]`. This is the unscaled toy example below, not a trained head's trace.
+
 ## Think of rereading the relevant part of a sentence
 
 When a phrase is unclear, you may look back for a useful clue. Attention

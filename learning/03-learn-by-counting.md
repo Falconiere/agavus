@@ -1,5 +1,10 @@
 # 3. Learn by counting
 
+![Count pairs, then divide](illustrations/tokens-and-counts.webp)
+
+Follow the three arrows from `a`: two `r`s, one space, one end. These are
+observed shares **before smoothing**; adding 1 changes the probabilities below.
+
 ## Think of expectations built from repetition
 
 After seeing the same sequence repeatedly, you start expecting its next part.

@@ -1,5 +1,10 @@
 # 10. Embeddings: meaning as a position
 
+![IDs versus embeddings](illustrations/embedding-map.webp)
+
+The drawers identify tokens; the map illustrates relationships between texts.
+Its positions are invented for teaching, not a projection of the measured vectors.
+
 ## Think of recognizing the same idea in different words
 
 "Ele me bateu" and "fui agredida" can bring related situations to mind,

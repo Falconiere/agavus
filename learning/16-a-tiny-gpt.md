@@ -1,5 +1,11 @@
 # 16. A tiny GPT
 
+![Four transformer layers](illustrations/transformer-stack.webp)
+
+Follow the representations through four separate layers. Each gathers context
+with attention, then transforms vectors with a network; layers aren't written thoughts.
+Residual additions are omitted from this overview and explained below.
+
 ## Think of making several passes over your notes
 
 On one pass you gather clues; on another you combine them into something

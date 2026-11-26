@@ -1,5 +1,10 @@
 # 5. Use an exam
 
+![Train, validate, then test](illustrations/practice-and-exam.webp)
+
+Use practice examples to train, validation to choose settings, and the final
+test to assess the choice. The curves illustrate patterns; they aren't run logs.
+
 ## Think of practising a skill, then trying a new problem
 
 Repeating a worked answer can hide what you haven't learned. A fresh question

@@ -1,5 +1,10 @@
 # 7. The math, step by step
 
+![Chances become a score](illustrations/scorecard.webp)
+
+A separate three-step example: `1/2 × 1/2 × 1/4 = 1/16`. Its total surprise
+is about 2.77 and mean loss 0.92. Below, we calculate all seven `guarda` steps.
+
 ## Think of keeping a scorecard of your expectations
 
 For every next letter, record how much chance you gave the answer that

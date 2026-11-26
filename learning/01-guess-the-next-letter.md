@@ -1,5 +1,10 @@
 # 1. Guess the next letter
 
+![One-letter context window](illustrations/next-letter.webp)
+
+Cover the earlier tiles: the bigram gets only `d`. It scores possible next
+letters without seeing the `guar` before it.
+
 ## Think of finishing someone's sentence
 
 Someone says "bom..." and you anticipate "dia". A language model also uses

@@ -1,5 +1,10 @@
 # 9. Where does the article number come from?
 
+![Check a generated citation](illustrations/memory-and-sources.webp)
+
+An article-shaped answer can be wrong. Follow the open-book path: find the
+source, check that its passage supports the answer, or defer.
+
 ## Think of remembering an answer versus checking a book
 
 You might recall an article number confidently and still misremember it.

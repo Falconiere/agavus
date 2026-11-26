@@ -7,15 +7,23 @@ Read in order, and stop whenever something is unclear.
 
 Think of learning a new language: you notice recurring pieces, try an answer,
 get feedback, and practise on new examples. That gives us a way into the math.
-Each lesson starts with an analogy, explains its limit, then works through
-the model's actual numbers. Use the analogy to ask **what goes in, what changes,
-and what comes out?**
+Each lesson opens with its own illustration and caption, then connects an
+analogy to the model's actual numbers and explains its limit. Use the picture
+to ask **what goes in, what changes, and what comes out?**
+
+Read the picture first, then trace the example in the text. The
+[illustration index](illustrations/README.md) links to every image at full size.
 
 These are comparisons with familiar activities, not explanations of how brains
 work. A model's "neuron" is a calculation; "attention" is a weighted mixture.
 Neither word establishes human awareness or human reasoning.
 
 ## Three different jobs
+
+![Continue, classify, and verify are different jobs.](illustrations/three-jobs.webp)
+
+The three desks show different outputs: a next token, area scores, and a
+conclusion supported by premises. None of these outputs establishes the other two.
 
 | Job | Familiar activity | Input → output |
 | --- | --- | --- |

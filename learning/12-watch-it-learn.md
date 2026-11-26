@@ -1,5 +1,10 @@
 # 12. Watch a network learn
 
+![Training checkpoints](illustrations/training-steps.webp)
+
+Read the three checkpoints from the recorded example below: loss falls from
+0.711 to 0.132 to 0.001. The unopened envelope reminds us there is no unseen test.
+
 ## Think of practice with immediate feedback
 
 Try, score the result, adjust, repeat. Here we can watch that loop: `forward`

@@ -1,5 +1,10 @@
 # 17. More text
 
+![Text and training budget](illustrations/data-and-time.webp)
+
+More pages and more training time are separate choices. Compare unseen-text
+loss and repeat with different seeds before calling a setup better.
+
 ## Think of broadening your practice questions
 
 Practising varied examples can help you rely less on a particular answer.

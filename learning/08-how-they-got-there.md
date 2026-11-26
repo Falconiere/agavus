@@ -1,5 +1,10 @@
 # 8. How people got to the formula
 
+![Three tools for prediction](illustrations/formula-tools.webp)
+
+Read the tools from left to right: count repetitions, allow for unseen pairs,
+then score predictions. This is our conceptual order, not a historical timeline.
+
 ## Think of improving a recipe after each problem
 
 First count what happened. Then notice that "never happened here" shouldn't

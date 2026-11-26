@@ -1,5 +1,10 @@
 # 14. Word pieces (BPE)
 
+![Merge frequent pieces](illustrations/word-pieces.webp)
+
+The rows show **selected stages**, not consecutive merges: letters, `ar`,
+then `guard`. The table below supplies the intermediate steps.
+
 ## Think of recognizing familiar chunks while reading
 
 A repeated sequence can become a convenient unit: you don't have to spell

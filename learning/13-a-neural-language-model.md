@@ -1,5 +1,10 @@
 # 13. A neural language model
 
+![Shared weights across contexts](illustrations/shared-weights.webp)
+
+The four slots supply context. Different contexts use the same learned
+parameters, rather than needing a separate table row for every possible context.
+
 ## Think of using the whole phrase as a clue
 
 One letter leaves many possibilities; `medi` gives a more specific lead.

@@ -1,5 +1,10 @@
 # 6. Write new text
 
+![Sample, append, repeat](illustrations/sampling-loop.webp)
+
+The wheel illustrates the **unsmoothed `a` row** from our tiny text. If it
+selects `r`, consult the `r` row next; don't keep spinning the `a` wheel.
+
 ## Think of improvising one phrase at a time
 
 You say something, then its ending becomes the starting point for your next

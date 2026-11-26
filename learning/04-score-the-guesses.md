@@ -1,5 +1,10 @@
 # 4. Score the guesses
 
+![Probability becomes loss](illustrations/loss-surprise.webp)
+
+Keep the actual answer `a` fixed. Giving it 90%, 50%, or 10% produces loss
+about 0.11, 0.69, or 2.30. The chips represent a score, not a feeling.
+
 ## Think of being surprised by an answer
 
 If you were almost certain of an answer and it was wrong, that is a bigger

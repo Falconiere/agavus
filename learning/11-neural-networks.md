@@ -1,5 +1,10 @@
 # 11. Neural networks
 
+![Train versus predict](illustrations/learning-and-predicting.webp)
+
+At the top, changing a weight changes the prediction. The numbers use input 1,
+bias 0, and learning rate 1. At the bottom, context grows while weights stay fixed.
+
 ## Think of learning which clues matter
 
 When learning to sort unfamiliar items, you may first notice individual
