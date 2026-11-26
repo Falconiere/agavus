@@ -12,6 +12,7 @@ dist/
 # Local config
 .env
 .codex/tmp/
+.claude/tmp/
 
 # Corpus (LGPD: real data never in git)
 data/
