@@ -1,48 +1,30 @@
 """Run the lab: `uv run python -m agavus.lab [experiment] [options]`.
 
-Experiments: bigram (default), network, neural, bpe, gpt [civil] [wikipedia],
-fetch-wikipedia.
+Experiments: bigram (default), network, neural, bpe, gpt (see gpt_run.py),
+fetch-wikipedia, export.
 """
 
 import sys
-from collections.abc import Callable, Sequence
-from pathlib import Path
+from collections.abc import Callable
 
 import httpx
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.lab.bigram import (
-  BigramModel,
-  CharVocab,
-  build_vocab,
-  loss_per_character,
-  train_bigram,
-  uniform_loss,
-)
+from agavus.lab.bigram import CharVocab, build_vocab, loss_per_character, train_bigram, uniform_loss
 from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
+from agavus.lab.bundle import BUNDLE_FILE, local_texts, write_bundle
 from agavus.lab.data import Split, load_articles, split_articles
-from agavus.lab.extra import (
-  civil_code_rest,
-  fetch_wikipedia,
-  load_wikipedia,
-  save_wikipedia,
-  without_leaks,
-)
-from agavus.lab.gpt import GptConfig, GptModel
-from agavus.lab.gpt import train as train_gpt
+from agavus.lab.extra import fetch_wikipedia, save_wikipedia
+from agavus.lab.gpt_run import run_gpt
 from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
-from agavus.lab.neural import NeuralConfig, NeuralModel
+from agavus.lab.neural import NeuralConfig
 from agavus.lab.neural import train as train_neural
-from agavus.lab.training import History
+from agavus.lab.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 
-SAMPLE_SEED = 7
-SAMPLE_CHARS = 200
 HIDDEN = 8
 NETWORK_SEED = 0
 STEPS = 2000
-# More threads only fight over work this small.
-THREADS = 4
 NEURAL_STEPS = 4000
 SHOWN_CHECKS = 8
 # Chosen on validation articles (learning/14-word-pieces.md).
@@ -51,18 +33,10 @@ NEURAL_MERGES = 100
 BPE_NEURAL_STEPS = 3000
 SHOWN_PIECES = 20
 EXAMPLE_WORDS = ("guarda", "guardar", "medida protetiva", "descumprimento")
-GPT_STEPS = 6000
-GPT_CHECK_EVERY = 500
-ATTENTION_TEXT = "Art. 22. Constatada a prática de violência doméstica"
-SHOWN_LOOKS = 3
 # About as much text as the rest of the Civil Code, from many articles.
 WIKIPEDIA_ARTICLES = 350
 WIKIPEDIA_CHARS = 1500
 WIKIPEDIA_TIMEOUT = 60.0
-EXTRAS: dict[str, Callable[[Path], tuple[str, ...]]] = {
-  "civil": civil_code_rest,
-  "wikipedia": load_wikipedia,
-}
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
 
@@ -75,12 +49,6 @@ def _statutes() -> Split | None:
   return split_articles(articles)
 
 
-def _report(model: BigramModel | NeuralModel | GptModel, split: Split) -> None:
-  print(f"loss train:    {model.loss(split.train):.4f}")
-  print(f"loss holdout:  {model.loss(split.holdout):.4f}")
-  print(f"sample: {model.sample(seed=SAMPLE_SEED, max_chars=SAMPLE_CHARS)}")
-
-
 def run_bigram() -> int:
   """Train the bigram on statutes and report losses and a sample."""
   split = _statutes()
@@ -90,7 +58,7 @@ def run_bigram() -> int:
   print(f"articles: {len(split.train)} train / {len(split.holdout)} holdout")
   print(f"vocabulary: {model.vocab.size} tokens")
   print(f"loss uniform:  {uniform_loss(model.vocab):.4f}")
-  _report(model, split)
+  report(model, split)
   return 0
 
 
@@ -105,15 +73,6 @@ def run_network() -> int:
   for text, answer, single, guess in zip(TEXTS, REFUSED, alone, guesses, strict=True):
     print(f"{text:<15} {answer:>6.0f}  {single:>10.2f}  {guess:>7.2f}")
   return 0
-
-
-def _chosen_steps(history: History, shown: int) -> int:
-  """Print some checks; the step with the lowest validation loss wins."""
-  for number, training, validation in history[:: max(len(history) // shown, 1)]:
-    print(f"step {number:>5}  training {training:.3f}  validation {validation:.3f}")
-  best = min(history, key=lambda entry: entry[2])[0]
-  print(f"steps chosen on validation: {best}")
-  return best
 
 
 def _studied() -> tuple[Split, CharVocab] | None:
@@ -133,10 +92,10 @@ def run_neural() -> int:
   split, vocab = studied
   config = NeuralConfig()
   _, history = train_neural(split_articles(split.train), vocab, config, steps=NEURAL_STEPS)
-  best = _chosen_steps(history, SHOWN_CHECKS)
+  best = chosen_steps(history, SHOWN_CHECKS)
   model, _ = train_neural(Split(split.train, ()), vocab, config, steps=best)
   print(f"loss bigram holdout: {train_bigram(split.train).loss(split.holdout):.4f}")
-  _report(model, split)
+  report(model, split)
   return 0
 
 
@@ -160,61 +119,6 @@ def run_bpe() -> int:
   return 0
 
 
-def _show_attention(model: GptModel) -> None:
-  """For the last letter, the earlier letters each head of the last layer looks at most."""
-  looks = model.looks(ATTENTION_TEXT)[-1]
-  letters = ["⟨start⟩", *ATTENTION_TEXT][-looks.shape[-1] :]
-  print(f"text: {ATTENTION_TEXT!r}; who the last letter {letters[-1]!r} looks at:")
-  for head, row in enumerate(looks[:, -1]):
-    top = torch.topk(row, SHOWN_LOOKS)
-    shown = ", ".join(
-      f"{letters[int(where)]!r} at {int(where)} ({float(share):.0%})"
-      for share, where in zip(top.values, top.indices, strict=True)
-    )
-    print(f"  head {head}: {shown}")
-
-
-def _extra_texts(names: Sequence[str]) -> tuple[str, ...] | None:
-  """Requested extra text, minus anything that overlaps a statute article."""
-  data_dir = load_settings().data_dir
-  texts: list[str] = []
-  for name in names:
-    if name not in EXTRAS:
-      print(f"lab: unknown extra {name!r}; choose from {', '.join(EXTRAS)}")
-      return None
-    found = EXTRAS[name](data_dir)
-    if not found:
-      print(f"lab: no {name} text found (wikipedia needs: python -m agavus.lab fetch-wikipedia)")
-      return None
-    texts.extend(found)
-  clean = without_leaks(texts, load_articles(data_dir))
-  print(f"extra text: {len(clean)} texts, {sum(map(len, clean)):,} characters", end="")
-  print(f" ({len(texts) - len(clean)} dropped for overlapping a statute article)")
-  return clean
-
-
-def run_gpt(extras: Sequence[str] = ()) -> int:
-  """Tiny GPT: steps chosen on validation, exam opened once at the end.
-
-  Extra text only joins the training side; validation, exam and the letter
-  vocabulary stay the statute articles', so losses stay comparable.
-  """
-  studied = _studied()
-  extra = _extra_texts(extras)
-  if studied is None or extra is None:
-    return 1
-  split, vocab = studied
-  inner = split_articles(split.train)
-  config = GptConfig(check_every=GPT_CHECK_EVERY)
-  _, history = train_gpt(Split(inner.train + extra, inner.holdout), vocab, config, steps=GPT_STEPS)
-  best = _chosen_steps(history, len(history))
-  model, _ = train_gpt(Split(split.train + extra, ()), vocab, config, steps=best)
-  print(f"parameters: {model.size():,}")
-  _report(model, split)
-  _show_attention(model)
-  return 0
-
-
 def run_fetch_wikipedia() -> int:
   """Download the openings of Wikipedia articles into data/lab/ (CC BY-SA 4.0)."""
   data_dir = load_settings().data_dir
@@ -222,6 +126,18 @@ def run_fetch_wikipedia() -> int:
     found = fetch_wikipedia(client, articles=WIKIPEDIA_ARTICLES, chars=WIKIPEDIA_CHARS)
   path = save_wikipedia(data_dir, found)
   print(f"saved {len(found)} articles, {sum(len(a.text) for a in found):,} characters: {path}")
+  return 0
+
+
+def run_export() -> int:
+  """Write the allowlisted lab text to one file, to inspect and then upload."""
+  data_dir = load_settings().data_dir
+  texts = local_texts(data_dir)
+  sha = write_bundle(data_dir / BUNDLE_FILE, texts)
+  print(f"statutes: {len(texts.statutes)} articles")
+  for name, found in texts.extras.items():
+    print(f"{name}: {len(found)} texts, {sum(map(len, found)):,} characters")
+  print(f"saved: {data_dir / BUNDLE_FILE}\nsha256: {sha}")
   return 0
 
 
@@ -234,6 +150,7 @@ def main(arguments: list[str]) -> int:
     "bpe": lambda _: run_bpe(),
     "gpt": run_gpt,
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
+    "export": lambda _: run_export(),
   }
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:
