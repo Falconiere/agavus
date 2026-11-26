@@ -20,11 +20,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+learned = [
+    "torch>=2.7",
+    "transformers>=5",
+    "safetensors>=0.5",
+]
 lab = [
     "torch>=2.7",
 ]
 dev = [
     "torch>=2.7",
+    "transformers>=5",
+    "safetensors>=0.5",
     "pytest>=8.0",
     "ruff>=0.8",
     "mypy>=1.13",

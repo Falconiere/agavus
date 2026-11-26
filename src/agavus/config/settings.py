@@ -26,6 +26,8 @@ class Settings:
   data_dir: Path
   data_start: date
   datajud_api_key: str
+  learned_device: str = "auto"
+  learned_budget_minutes: float = 120.0
 
 
 def load_settings() -> Settings:
@@ -40,4 +42,6 @@ def load_settings() -> Settings:
     data_dir=Path(data_dir or DEFAULT_DATA_DIR),
     data_start=date.fromisoformat(start or DEFAULT_DATA_START),
     datajud_api_key=key or DEFAULT_DATAJUD_KEY,
+    learned_device=os.environ.get("AGAVUS_LEARNED_DEVICE", "auto").strip() or "auto",
+    learned_budget_minutes=float(os.environ.get("AGAVUS_LEARNED_BUDGET_MINUTES", "120")),
   )

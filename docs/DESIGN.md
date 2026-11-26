@@ -13,7 +13,8 @@ restricted to **TJDFT** data and two domains.
 
 Constraints:
 
-- No GPU. Training must run on CPU in minutes; inference cheap.
+- Production is CPU-only. Private learned-classifier experiments may use local
+  MPS after a training pilot; CPU training and inference must also work.
 - Pure-mathematical core (tiers 1–3 below); small CPU inference / API models
   (tiers 4–5) allowed later as optional layers, never as source of truth.
 - No legal advice: answers are cited excerpts + abstention/escalation paths.
@@ -167,6 +168,42 @@ Fallback for #1 only if rules prove insufficient: CPU dependency parsing
 Architectural invariant: even perfect NLU would not remove the need for
 **citations + defer**. Correctness comes from quoting real sources and
 abstaining, not from deeper understanding.
+
+#### Private learned-classifier alternative
+
+`classify/learned/` may learn negation, wording and interactions from supervised
+examples instead of the lexicons and feature crosses above. This exception is
+limited to an isolated experiment: production retains every §6.1 mitigation.
+Raw pretrained-tokenizer input feeds a trainable, pinned multilingual E5-small
+encoder with masked mean pooling and separate linear area and statement-relation
+heads. Relation labels (support, contradiction, unknown) are internal supervision,
+never routing areas or generated legal explanations. No runtime cue rules apply
+in this path.
+
+Compare TF-IDF, frozen E5, area-only fine-tuning and joint fine-tuning on one
+frozen 60/15/10/15 training/validation/calibration/final split. Cases, duplicate
+texts and synthetic template families stay together. Undated statutes and existing
+query seeds are training-only auxiliaries. Fit temperatures only on calibration;
+select checkpoints only on validation; report locked final results without tuning.
+Exclude unresolved labels and residual personal data. Weak labels retain their
+provenance. Additional negative cases are snapshot-only organ-derived labels.
+
+Use 480-token document windows with 64-token overlap and a prefix in every
+window; average window logits and normalize each document's training contribution.
+Reject oversized statement pairs without truncation. AdamW uses encoder/head
+rates 2e-5/1e-3, equal task weighting and training-only class balancing.
+
+The optional `learned` extra stays outside application imports. All artifacts,
+provenance, split membership and structured SQLite state stay under ignored
+`data/experiments/learned/`; nothing is uploaded or replaces live artifacts.
+The two-hour local computation ceiling includes pilot, encoding, training,
+calibration and evaluation. Reserve evaluation time first, then choose a common
+epoch count (at most three) for seeds 0, 1 and 2. Incomplete comparisons have no
+winner. A candidate must beat both baselines, preserve M recall, have zero observed
+unsafe M decisions, ECE ≤ 0.05 and accepted precision ≥ 0.95; report the separate
+M recall ≥ 0.98 target. Synthetic and weak-label results cannot establish safety.
+M ceiling preserved; citations, deferral and the existing loss matrix remain mandatory.
+Execution, formulas and artifact layout: [private learned classifier](math/learned-classifier.md).
 
 ## 7. Decision layer: three-way decisions (Yao / DTRS)
 
