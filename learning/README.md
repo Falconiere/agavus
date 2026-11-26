@@ -18,6 +18,8 @@ flowchart LR
   K --> L["12. Watch<br/>it learn"]
   L --> M["13. Neural<br/>language model"]
   M --> N["14. Word<br/>pieces"]
+  N --> O["15. Attention"]
+  O --> P["16. A tiny<br/>GPT"]
 ```
 
 | Lesson | Question it answers |
@@ -36,6 +38,8 @@ flowchart LR
 | [12. Watch it learn](12-watch-it-learn.md) | What does training look like? |
 | [13. A neural language model](13-a-neural-language-model.md) | What if it remembers more than one letter? |
 | [14. Word pieces](14-word-pieces.md) | Why not letters or whole words? |
+| [15. Attention](15-attention.md) | How does a letter choose where to look? |
+| [16. A tiny GPT](16-a-tiny-gpt.md) | What is a GPT, piece by piece? |
 
 Run the real thing at any time:
 

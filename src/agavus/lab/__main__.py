@@ -1,4 +1,4 @@
-"""Run the lab: `uv run python -m agavus.lab [bigram|network|neural|bpe]`."""
+"""Run the lab: `uv run python -m agavus.lab [bigram|network|neural|bpe|gpt]`."""
 
 import sys
 
@@ -7,6 +7,7 @@ import torch
 from agavus.config.settings import load_settings
 from agavus.lab.bigram import (
   BigramModel,
+  CharVocab,
   build_vocab,
   loss_per_character,
   train_bigram,
@@ -14,9 +15,12 @@ from agavus.lab.bigram import (
 )
 from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
 from agavus.lab.data import Split, load_articles, split_articles
+from agavus.lab.gpt import GptConfig, GptModel
+from agavus.lab.gpt import train as train_gpt
 from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
 from agavus.lab.neural import NeuralConfig, NeuralModel
 from agavus.lab.neural import train as train_neural
+from agavus.lab.training import History
 
 SAMPLE_SEED = 7
 SAMPLE_CHARS = 200
@@ -33,6 +37,10 @@ NEURAL_MERGES = 100
 BPE_NEURAL_STEPS = 3000
 SHOWN_PIECES = 20
 EXAMPLE_WORDS = ("guarda", "guardar", "medida protetiva", "descumprimento")
+GPT_STEPS = 6000
+GPT_CHECK_EVERY = 500
+ATTENTION_TEXT = "Art. 22. Constatada a prática de violência doméstica"
+SHOWN_LOOKS = 3
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
 
@@ -45,7 +53,7 @@ def _statutes() -> Split | None:
   return split_articles(articles)
 
 
-def _report(model: BigramModel | NeuralModel, split: Split) -> None:
+def _report(model: BigramModel | NeuralModel | GptModel, split: Split) -> None:
   print(f"loss train:    {model.loss(split.train):.4f}")
   print(f"loss holdout:  {model.loss(split.holdout):.4f}")
   print(f"sample: {model.sample(seed=SAMPLE_SEED, max_chars=SAMPLE_CHARS)}")
@@ -77,25 +85,35 @@ def run_network() -> int:
   return 0
 
 
-def run_neural() -> int:
-  """Neural model: steps chosen on validation, exam opened once at the end."""
-  split = _statutes()
-  if split is None:
-    return 1
-  inner = split_articles(split.train)
-  torch.set_num_threads(THREADS)
-  vocab = build_vocab(split.train)
-  config = NeuralConfig()
-  _, history = train_neural(
-    inner.train, vocab, config, steps=NEURAL_STEPS, validation=inner.holdout
-  )
-  for number, training, validation in history[:: len(history) // SHOWN_CHECKS]:
+def _chosen_steps(history: History, shown: int) -> int:
+  """Print some checks; the step with the lowest validation loss wins."""
+  for number, training, validation in history[:: max(len(history) // shown, 1)]:
     print(f"step {number:>5}  training {training:.3f}  validation {validation:.3f}")
   best = min(history, key=lambda entry: entry[2])[0]
-  model, _ = train_neural(split.train, vocab, config, steps=best)
-  bigram = train_bigram(split.train)
   print(f"steps chosen on validation: {best}")
-  print(f"loss bigram holdout: {bigram.loss(split.holdout):.4f}")
+  return best
+
+
+def _studied() -> tuple[Split, CharVocab] | None:
+  """Statutes split for the exam, with a letter vocabulary from the study side."""
+  split = _statutes()
+  if split is None:
+    return None
+  torch.set_num_threads(THREADS)
+  return split, build_vocab(split.train)
+
+
+def run_neural() -> int:
+  """Neural model: steps chosen on validation, exam opened once at the end."""
+  studied = _studied()
+  if studied is None:
+    return 1
+  split, vocab = studied
+  config = NeuralConfig()
+  _, history = train_neural(split_articles(split.train), vocab, config, steps=NEURAL_STEPS)
+  best = _chosen_steps(history, SHOWN_CHECKS)
+  model, _ = train_neural(Split(split.train, ()), vocab, config, steps=best)
+  print(f"loss bigram holdout: {train_bigram(split.train).loss(split.holdout):.4f}")
   _report(model, split)
   return 0
 
@@ -112,7 +130,7 @@ def run_bpe() -> int:
     print(f"{word}: {[full.piece(token) for token in full.encode(word)[1:-1]]}")
   bigram = train_bigram(split.train, vocab=full)
   small = BpeVocab(full.merges[:NEURAL_MERGES])
-  neural, _ = train_neural(split.train, small, NeuralConfig(), steps=BPE_NEURAL_STEPS)
+  neural, _ = train_neural(Split(split.train, ()), small, NeuralConfig(), steps=BPE_NEURAL_STEPS)
   for name, model in (("bigram", bigram), ("neural", neural)):
     loss = loss_per_character(model.loss(split.holdout), split.holdout, model.vocab)
     print(f"{name} + BPE holdout, per character: {loss:.4f}")
@@ -120,9 +138,45 @@ def run_bpe() -> int:
   return 0
 
 
+def _show_attention(model: GptModel) -> None:
+  """For the last letter, the earlier letters each head of the last layer looks at most."""
+  looks = model.looks(ATTENTION_TEXT)[-1]
+  letters = ["⟨start⟩", *ATTENTION_TEXT][-looks.shape[-1] :]
+  print(f"text: {ATTENTION_TEXT!r}; who the last letter {letters[-1]!r} looks at:")
+  for head, row in enumerate(looks[:, -1]):
+    top = torch.topk(row, SHOWN_LOOKS)
+    shown = ", ".join(
+      f"{letters[int(where)]!r} at {int(where)} ({float(share):.0%})"
+      for share, where in zip(top.values, top.indices, strict=True)
+    )
+    print(f"  head {head}: {shown}")
+
+
+def run_gpt() -> int:
+  """Tiny GPT: steps chosen on validation, exam opened once at the end."""
+  studied = _studied()
+  if studied is None:
+    return 1
+  split, vocab = studied
+  config = GptConfig(check_every=GPT_CHECK_EVERY)
+  _, history = train_gpt(split_articles(split.train), vocab, config, steps=GPT_STEPS)
+  best = _chosen_steps(history, len(history))
+  model, _ = train_gpt(Split(split.train, ()), vocab, config, steps=best)
+  print(f"parameters: {model.size():,}")
+  _report(model, split)
+  _show_attention(model)
+  return 0
+
+
 def main(arguments: list[str]) -> int:
   """Choose the experiment; the bigram is the default."""
-  experiments = {"bigram": run_bigram, "network": run_network, "neural": run_neural, "bpe": run_bpe}
+  experiments = {
+    "bigram": run_bigram,
+    "network": run_network,
+    "neural": run_neural,
+    "bpe": run_bpe,
+    "gpt": run_gpt,
+  }
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:
     print(f"lab: unknown experiment {name!r}; choose from {', '.join(experiments)}")

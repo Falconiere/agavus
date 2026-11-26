@@ -13,6 +13,8 @@ from torch import Tensor
 from torch.nn.functional import cross_entropy
 
 from agavus.lab.bigram import BOUNDARY, Vocab
+from agavus.lab.data import Split
+from agavus.lab.training import History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 8192
 
@@ -63,12 +65,7 @@ class NeuralModel:
   def loss(self, texts: Sequence[str]) -> float:
     """Mean surprise over every character, like the bigram's."""
     contexts, answers = examples(texts, self.vocab, self.config)
-    total = 0.0
-    with torch.no_grad():
-      for start in range(0, len(answers), EVAL_BATCH):
-        part = slice(start, start + EVAL_BATCH)
-        total += float(cross_entropy(self.scores(contexts[part]), answers[part], reduction="sum"))
-    return total / len(answers)
+    return mean_surprise(self.scores, contexts, answers, EVAL_BATCH)
 
   def sample(self, *, seed: int, max_chars: int) -> str:
     """Write one character at a time until a boundary or max_chars."""
@@ -77,9 +74,7 @@ class NeuralModel:
     ids: list[int] = []
     while len(ids) < max_chars:
       context = torch.tensor([recent], device=self.config.device)
-      with torch.no_grad():
-        chances = torch.softmax(self.scores(context)[0], dim=0).cpu()
-      chosen = int(torch.multinomial(chances, 1, generator=generator).item())
+      chosen = pick(self.scores(context)[0], generator)
       if chosen == BOUNDARY:
         break
       ids.append(chosen)
@@ -105,50 +100,28 @@ def examples(texts: Sequence[str], vocab: Vocab, config: NeuralConfig) -> tuple[
 
 def start(vocab: Vocab, config: NeuralConfig) -> NeuralModel:
   """Random small weights, reproducible by seed."""
-  generator = torch.Generator().manual_seed(config.seed)
-
-  def weights(rows: int, columns: int, size: float) -> Tensor:
-    values = torch.randn(rows, columns, generator=generator) * size
-    return values.to(config.device).requires_grad_()
-
-  def zeros(length: int) -> Tensor:
-    return torch.zeros(length, device=config.device).requires_grad_()
-
+  init = Init.seeded(config.seed, config.device)
   inputs = config.context * config.vector
   return NeuralModel(
     config=config,
     vocab=vocab,
-    vectors=weights(vocab.size, config.vector, 1.0),
-    hidden_weights=weights(inputs, config.hidden, 1.0 / math.sqrt(inputs)),
-    hidden_bias=zeros(config.hidden),
-    out_weights=weights(config.hidden, vocab.size, 0.01),
-    out_bias=zeros(vocab.size),
+    vectors=init.matrix(vocab.size, config.vector, 1.0),
+    hidden_weights=init.matrix(inputs, config.hidden, 1.0 / math.sqrt(inputs)),
+    hidden_bias=init.zeros(config.hidden),
+    out_weights=init.matrix(config.hidden, vocab.size, 0.01),
+    out_bias=init.zeros(vocab.size),
   )
 
 
 def train(
-  texts: Sequence[str],
-  vocab: Vocab,
-  config: NeuralConfig,
-  *,
-  steps: int,
-  validation: Sequence[str] = (),
-) -> tuple[NeuralModel, list[tuple[int, float, float]]]:
-  """Train for `steps`; history holds (step, training, validation) losses."""
+  split: Split, vocab: Vocab, config: NeuralConfig, *, steps: int
+) -> tuple[NeuralModel, History]:
+  """Learn from split.train; history is checked on split.holdout, if any (see `fit`)."""
   model = start(vocab, config)
-  contexts, answers = examples(texts, vocab, config)
-  generator = torch.Generator().manual_seed(config.seed)
-  optimizer = torch.optim.AdamW(
-    model.parameters(), lr=config.rate, weight_decay=config.weight_decay
-  )
-  history: list[tuple[int, float, float]] = []
-  for number in range(1, steps + 1):
+  contexts, answers = examples(split.train, vocab, config)
+
+  def mistake(generator: torch.Generator) -> Tensor:
     picked = torch.randint(len(answers), (config.batch,), generator=generator).to(config.device)
-    mistake = cross_entropy(model.scores(contexts[picked]), answers[picked])
-    slopes = torch.autograd.grad(mistake, model.parameters())
-    for weight, slope in zip(model.parameters(), slopes, strict=True):
-      weight.grad = slope
-    optimizer.step()
-    if validation and number % config.check_every == 0:
-      history.append((number, model.loss(texts), model.loss(validation)))
-  return model, history
+    return cross_entropy(model.scores(contexts[picked]), answers[picked])
+
+  return model, fit(model, mistake, config, steps=steps, watch=split)
