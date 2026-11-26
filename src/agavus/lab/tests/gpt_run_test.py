@@ -19,6 +19,7 @@ TEXTS = Texts(statutes=STATUTES, extras={"civil": ("Art. 900. A posse.",), "wiki
 def test_defaults_run_on_cpu() -> None:
   options = parse([])
   assert (options.device, options.extras, options.texts, options.out) == ("cpu", [], None, None)
+  assert options.seed == 0
 
 
 def test_unknown_extra_is_refused() -> None:
@@ -40,12 +41,12 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   bundle = tmp_path / "texts.json"
   write_bundle(bundle, TEXTS)
   out = tmp_path / "run"
-  arguments = ["civil", "--steps", "2", "--check-every", "1", "--texts", str(bundle)]
+  arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3", "--texts", str(bundle)]
   assert run_gpt([*arguments, "--out", str(out)]) == 0
   record = json.loads((out / "run.json").read_text(encoding="utf-8"))
   assert record["data_sha256"] == digest(bundle)
   assert record["steps_chosen"] in {1, 2}
-  assert record["config"]["device"] == "cpu"
+  assert (record["config"]["device"], record["config"]["seed"]) == ("cpu", len("abc"))
   assert len(record["history"]) == len("12")
   assert len(torch.load(out / "model.pt")) > 0
   assert not list(out.glob("*.partial"))
