@@ -100,6 +100,7 @@ Extra training text is kept under the gitignored data directory.
 | 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `model/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
 
 | Every federal law Planalto indexes: ordinary, complementary and delegated laws, decree-laws, codes and the Constitution, each in its newest consolidated text (`model/planalto.py`) | Public domain under Lei 9.610/1998, art. 8º, IV | 18,707 law pages found on 2026-11-27; first crawl in progress |
+| FineWeb-2 Portuguese (`HuggingFaceFW/fineweb-2`, `por_Latn`): web text filtered by Hugging Face from Common Crawl, pt-BR and pt-PT mixed. Documents the residual personal-data scan flags are dropped | ODC-By 1.0, plus Common Crawl terms of use; attribution kept in the data manifest; no model is published (§2) | first file `000_00000.parquet`, 4.8 GB, of 66 (276 GB) |
 | Portuguese Wikipedia 20231101.pt, all six Parquet shards from `wikimedia/wikipedia` | CC BY-SA 4.0; local only, not yet wired into training | 1.58 GB compressed, SHA-256 verified against Hugging Face |
 
 `uv run python -m agavus.model fetch-planalto` walks Planalto's index pages, follows each law
