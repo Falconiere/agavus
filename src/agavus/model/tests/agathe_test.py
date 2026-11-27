@@ -36,7 +36,9 @@ def test_windows_inputs_sit_one_token_before_answers() -> None:
 def test_stream_joins_texts_with_one_boundary() -> None:
   vocab = build_vocab(TEXTS)
   first, second = (vocab.encode(text) for text in TEXTS)
-  assert stream(TEXTS, vocab).tolist() == first + second[1:]
+  ids = stream(TEXTS, vocab)
+  assert ids.tolist() == first + second[1:]
+  assert ids.dtype == torch.uint8
 
 
 def test_attention_never_looks_ahead() -> None:

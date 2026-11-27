@@ -18,6 +18,7 @@ from agavus.model.data import Split
 from agavus.model.training import IGNORED, History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 64
+BYTE_IDS = 256
 # Typical size of a starting weight.
 SPREAD = 0.02
 GROWTH = 4
@@ -180,11 +181,11 @@ def windows(texts: Sequence[str], vocab: Vocab, context: int) -> tuple[Tensor, T
 
 
 def stream(texts: Sequence[str], vocab: Vocab) -> Tensor:
-  """All training texts in one row of ids, joined by boundaries."""
-  ids = [BOUNDARY]
-  for text in texts:
-    ids.extend(vocab.encode(text)[1:])
-  return torch.tensor(ids)
+  """All training texts in one row of ids, joined by boundaries; one byte per id when it fits."""
+  kind = torch.uint8 if vocab.size <= BYTE_IDS else torch.int64
+  parts = [torch.tensor([BOUNDARY], dtype=kind)]
+  parts.extend(torch.tensor(vocab.encode(text)[1:], dtype=kind) for text in texts)
+  return torch.cat(parts)
 
 
 def start(vocab: Vocab, config: AgatheConfig) -> AgatheModel:
@@ -230,7 +231,7 @@ def train(
 
   def mistake(generator: torch.Generator) -> Tensor:
     starts = torch.randint(last_start, (config.batch, 1), generator=generator)
-    rows = ids[(starts + offsets).clamp(max=len(ids) - 1)].to(config.device)
+    rows = ids[(starts + offsets).clamp(max=len(ids) - 1)].long().to(config.device)
     scores = model.scores(rows[:, :-1], training=True)
     return cross_entropy(scores.flatten(0, 1), rows[:, 1:].flatten())
 

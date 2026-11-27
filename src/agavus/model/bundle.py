@@ -6,14 +6,22 @@ upload only that file. The SHA-256 identifies the data in every run record.
 
 import hashlib
 import json
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agavus.model.data import load_articles
+from agavus.model.data import load_articles, load_case_texts
 from agavus.model.extra import civil_code_rest, load_wikipedia
 from agavus.model.federal import load_federal
+from agavus.model.planalto import load_planalto
 
 BUNDLE_FILE = Path("lab") / "export" / "texts.json"
+# Local texts that join the frozen bundle by name; run records hash the merged result.
+LOCAL: dict[str, Callable[[Path], tuple[str, ...]]] = {
+  "federal": load_federal,
+  "planalto": load_planalto,
+  "djen": load_case_texts,
+}
 
 
 @dataclass(frozen=True)
@@ -32,10 +40,20 @@ def local_texts(data_dir: Path) -> Texts:
   )
 
 
+def merged(base: Texts, data_dir: Path, names: Sequence[str]) -> Texts:
+  """`base` plus each named local text it doesn't hold yet."""
+  found = {name: LOCAL[name](data_dir) for name in names if name in LOCAL}
+  return Texts(base.statutes, {**base.extras, **found})
+
+
+def with_local(data_dir: Path, names: Sequence[str]) -> Texts:
+  """The frozen statute bundle plus the named local texts."""
+  return merged(read_bundle(data_dir / BUNDLE_FILE), data_dir, names)
+
+
 def federal_texts(data_dir: Path) -> Texts:
   """Combine the frozen statute bundle with the local federal articles, without SQLite."""
-  base = read_bundle(data_dir / BUNDLE_FILE)
-  return Texts(base.statutes, {**base.extras, "federal": load_federal(data_dir)})
+  return with_local(data_dir, ["federal"])
 
 
 def digest(path: Path) -> str:

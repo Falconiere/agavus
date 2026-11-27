@@ -7,7 +7,7 @@ import agavus
 from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
 from agavus.model.bigram import build_vocab
-from agavus.model.data import load_articles, split_articles
+from agavus.model.data import load_articles, load_case_texts, split_articles
 
 PACKAGE = Path(agavus.__file__).parent
 LAB_PACKAGES = {"model", "server"}
@@ -38,6 +38,19 @@ def test_only_statutes_are_loaded(tmp_path: Path) -> None:
     ]
   )
   assert load_articles(tmp_path) == ("primeiro", "segundo")
+
+
+def test_case_texts_are_anonymized_djen_once_without_flagged_data(tmp_path: Path) -> None:
+  CorpusStorage(tmp_path).save_texts(
+    [
+      _document("a", TextSource.DJEN, "decisão sintética"),
+      _document("b", TextSource.DJEN, "decisão sintética"),
+      _document("c", TextSource.DJEN, "contato fulano@exemplo.com.br"),
+      _document("d", TextSource.STATUTE, "Art. 1º Lei."),
+      _document("e", TextSource.DJEN, "outra decisão"),
+    ]
+  )
+  assert load_case_texts(tmp_path) == ("decisão sintética", "outra decisão")
 
 
 def test_split_holds_out_whole_articles() -> None:

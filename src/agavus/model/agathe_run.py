@@ -19,12 +19,13 @@ from agavus.config.settings import load_settings
 from agavus.model.agathe import AgatheConfig, AgatheModel, train
 from agavus.model.bigram import build_vocab
 from agavus.model.bundle import (
+  LOCAL,
   Texts,
   bundle_bytes,
   digest,
-  federal_texts,
   local_texts,
   read_bundle,
+  with_local,
 )
 from agavus.model.data import Split, split_articles
 from agavus.model.extra import without_leaks
@@ -35,7 +36,7 @@ STEPS = 6000
 CHECK_EVERY = 500
 ATTENTION_TEXT = "Art. 22. Constatada a prática de violência doméstica"
 SHOWN_LOOKS = 3
-EXTRA_NAMES = ("civil", "wikipedia", "federal")
+EXTRA_NAMES = ("civil", "wikipedia", "federal", "planalto", "djen")
 
 
 def parse(arguments: Sequence[str]) -> argparse.Namespace:
@@ -53,6 +54,9 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("--rate", type=float, default=defaults.rate, help="AdamW learning rate")
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--seed", type=int, default=0, help="starting weights, batches, dropout")
+  parser.add_argument(
+    "--once", action="store_true", help="train once and keep the last step (large text)"
+  )
   parser.add_argument("--texts", type=Path, help="exported bundle instead of the local corpus")
   parser.add_argument("--out", type=Path, help="folder for run.json and model.pt")
   options = parser.parse_args(list(arguments))
@@ -115,8 +119,8 @@ def run_agathe(arguments: Sequence[str]) -> int:
   options = parse(arguments)
   if options.texts:
     texts = read_bundle(options.texts)
-  elif "federal" in options.extras:
-    texts = federal_texts(load_settings().data_dir)
+  elif set(options.extras) & LOCAL.keys():
+    texts = with_local(load_settings().data_dir, options.extras)
   else:
     texts = local_texts(load_settings().data_dir)
   if not texts.statutes:
@@ -142,9 +146,16 @@ def run_agathe(arguments: Sequence[str]) -> int:
   )
   synchronize(config.device)
   began = time.monotonic()
-  _, history = train(Split(inner.train + extra, inner.holdout), vocab, config, steps=options.steps)
+  model, history = train(
+    Split(inner.train + extra, inner.holdout), vocab, config, steps=options.steps
+  )
   best = chosen_steps(history, len(history))
-  model, _ = train(Split(split.train + extra, ()), vocab, config, steps=best)
+  if options.once:
+    if history and best != options.steps:
+      print(f"lab: validation was lowest at step {best}; keeping step {options.steps} (--once)")
+    best = options.steps
+  else:
+    model, _ = train(Split(split.train + extra, ()), vocab, config, steps=best)
   print(f"parameters: {model.size():,}")
   training, holdout, sample = report(model, split)
   show_attention(model)

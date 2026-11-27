@@ -10,17 +10,15 @@ import torch
 
 from agavus.model.agathe import AgatheConfig, AgatheModel, start
 from agavus.model.bigram import build_vocab
-from agavus.model.bundle import Texts, bundle_bytes, digest, read_bundle
+from agavus.model.bundle import LOCAL, Texts, bundle_bytes, digest, merged, read_bundle
 from agavus.model.data import split_articles
-from agavus.model.federal import load_federal
 
 
 def _inputs_sha256(bundle: Path, texts: Texts, extras: Sequence[str], data_dir: Path | None) -> str:
-  """Federal runs hash the bundle plus the local federal articles they trained on."""
-  if data_dir is None or "federal" not in extras:
+  """Runs with local texts hash the bundle plus the local texts they trained on."""
+  if data_dir is None or not set(extras) & LOCAL.keys():
     return digest(bundle)
-  merged = Texts(texts.statutes, {**texts.extras, "federal": load_federal(data_dir)})
-  return sha256(bundle_bytes(merged)).hexdigest()
+  return sha256(bundle_bytes(merged(texts, data_dir, extras))).hexdigest()
 
 
 def load_checkpoint(run: Path, bundle: Path, data_dir: Path | None = None) -> AgatheModel:

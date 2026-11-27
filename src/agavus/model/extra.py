@@ -29,6 +29,7 @@ WIKIPEDIA_DATASET = {"dataset": "wikimedia/wikipedia", "config": "20231101.pt", 
 PAGE = 100
 # Long enough that shared legal boilerplate ("Redação dada pela Lei ...") passes.
 LEAK_RUN = 100
+SHINGLE = 32
 LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 MARKDOWN_HEADING = re.compile(r"#+")
 OWN_ARTICLE = re.compile(r"\s(?=Art\.\s*\d)")
@@ -108,8 +109,24 @@ def _runs(text: str) -> set[str]:
 
 
 def without_leaks(texts: Sequence[str], protected: Sequence[str]) -> tuple[str, ...]:
-  """Drop texts that share LEAK_RUN characters in a row with a protected text."""
+  """Drop texts that share LEAK_RUN characters in a row with a protected text.
+
+  A shared run covers a SHINGLE-long piece starting at some multiple of the stride, so only
+  texts with such a piece in common get the exact (slow) comparison.
+  """
   guarded: set[str] = set()
   for text in protected:
     guarded |= _runs(text)
-  return tuple(text for text in texts if guarded.isdisjoint(_runs(text)))
+  pieces = {
+    flat[start : start + SHINGLE]
+    for flat in (" ".join(text.split()) for text in protected)
+    for start in range(len(flat) - SHINGLE + 1)
+  }
+  stride = LEAK_RUN - SHINGLE
+
+  def suspect(text: str) -> bool:
+    flat = " ".join(text.split())
+    ends = range(0, len(flat) - LEAK_RUN + stride + 1, stride)
+    return any(flat[start : start + SHINGLE] in pieces for start in ends)
+
+  return tuple(text for text in texts if not suspect(text) or guarded.isdisjoint(_runs(text)))

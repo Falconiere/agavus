@@ -12,7 +12,7 @@ from agavus.model.agathe import AgatheModel
 from agavus.model.bigram import Vocab, build_vocab, train_bigram, uniform_loss
 from agavus.model.data import Split
 from agavus.model.neural import NeuralModel
-from agavus.model.training import History, Init, synchronize
+from agavus.model.training import History, Init, check_sample, synchronize
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -88,3 +88,12 @@ def test_mps_training_validation_and_sampling() -> None:
     assert all(weight.device.type == "mps" for weight in model.parameters())
     assert math.isfinite(history[0][2])
     assert len(model.sample(seed=1, max_chars=2)) <= len("ab")
+
+
+def test_check_sample_keeps_small_text_and_spaces_out_large_text() -> None:
+  small = ("ab", "cd")
+  assert check_sample(small, chars=10) == small
+  large = tuple(f"{index:04d}" for index in range(100))
+  sample = check_sample(large, chars=40)
+  assert sample == large[::10]
+  assert sum(map(len, sample)) == len("0000") * 10

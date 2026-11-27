@@ -11,7 +11,14 @@ from torch.nn.functional import cross_entropy
 from agavus.model.data import Split
 
 IGNORED = -100
+CHECK_CHARS = 1_000_000
 History = list[tuple[int, float, float]]
+
+
+def check_sample(texts: Sequence[str], chars: int = CHECK_CHARS) -> tuple[str, ...]:
+  """Evenly spaced texts totalling about `chars`, so each training-loss check stays cheap."""
+  stride = max(1, -(-sum(map(len, texts)) // chars))
+  return tuple(texts[::stride])
 
 
 def synchronize(device: str) -> None:
@@ -97,13 +104,14 @@ def fit(
   weights = model.parameters()
   optimizer = torch.optim.AdamW(weights, lr=settings.rate, weight_decay=settings.weight_decay)
   history: History = []
+  checked = check_sample(watch.train)
   for number in range(1, steps + 1):
     slopes = torch.autograd.grad(mistake(generator), weights)
     for weight, slope in zip(weights, slopes, strict=True):
       weight.grad = slope
     optimizer.step()
     if watch.holdout and number % settings.check_every == 0:
-      history.append((number, model.loss(watch.train), model.loss(watch.holdout)))
+      history.append((number, model.loss(checked), model.loss(watch.holdout)))
   return history
 
 

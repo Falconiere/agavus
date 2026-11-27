@@ -82,3 +82,12 @@ def test_without_leaks_drops_long_shared_runs_only() -> None:
   boilerplate = "início " + "x" * (LEAK_RUN - 1)
   assert without_leaks([copied, boilerplate, "outro"], [protected]) == (boilerplate, "outro")
   assert without_leaks([spaced], ["x" * (LEAK_RUN // 2) + " " + "x" * (LEAK_RUN // 2)]) == ()
+
+
+def test_without_leaks_finds_a_copied_run_at_every_offset() -> None:
+  protected = "".join(chr(ord("a") + i % 26) + str(i) for i in range(80))
+  run = " ".join(protected.split())[7 : 7 + LEAK_RUN]
+  texts = [f"{'y' * offset}{run}{'z' * 5}" for offset in range(140)]
+  assert without_leaks(texts, [protected]) == ()
+  short = [f"{'y' * offset}{run[:-1]}" for offset in range(140)]
+  assert without_leaks(short, [protected]) == tuple(short)

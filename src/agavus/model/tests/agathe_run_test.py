@@ -61,15 +61,19 @@ def test_extra_texts_drop_leaks() -> None:
   assert extra_texts(leaked, ["civil"]) == ("ok",)
 
 
+def _run(bundle: Path, out: Path, arguments: list[str]) -> str:
+  """Train from a synthetic bundle and return the saved run record's JSON."""
+  write_bundle(bundle, TEXTS)
+  assert run_agathe([*arguments, "--texts", str(bundle), "--out", str(out)]) == 0
+  return (out / "run.json").read_text(encoding="utf-8")
+
+
 def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   bundle = tmp_path / "texts.json"
-  write_bundle(bundle, TEXTS)
-  out = tmp_path / "run"
-  arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3", "--texts", str(bundle)]
+  arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3"]
   shape = ["--layers", "5", "--width", "12", "--heads", "3", "--context", "2", "--batch", "8"]
-  shape += ["--rate", "1e-3"]
-  assert run_agathe([*arguments, *shape, "--out", str(out)]) == 0
-  record = json.loads((out / "run.json").read_text(encoding="utf-8"))
+  record = json.loads(_run(bundle, tmp_path / "run", [*arguments, *shape, "--rate", "1e-3"]))
+  out = tmp_path / "run"
   assert record["data_sha256"] == digest(bundle)
   assert record["steps_chosen"] in {1, 2}
   assert (record["config"]["device"], record["config"]["seed"]) == ("cpu", len("abc"))
@@ -82,3 +86,11 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   assert record["config"]["rate"] == RATE
   assert [w.shape for w in torch.load(out / "model.pt")] == [w.shape for w in expected.parameters()]
   assert not list(out.glob("*.partial"))
+
+
+def test_once_keeps_the_last_step_and_accepts_local_texts(tmp_path: Path) -> None:
+  steps = ["civil", "--steps", "3", "--check-every", "1", "--once"]
+  shape = ["--width", "12", "--heads", "3", "--context", "2", "--batch", "4"]
+  record = json.loads(_run(tmp_path / "texts.json", tmp_path / "once", [*steps, *shape]))
+  assert (record["steps_tried"], record["steps_chosen"]) == (len("abc"), len("abc"))
+  assert parse(["djen", "planalto"]).extras == ["djen", "planalto"]
