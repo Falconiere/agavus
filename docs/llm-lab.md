@@ -22,9 +22,13 @@ Non-goals:
 
 ## 2. Isolation rules
 
+For scripts written before the package rename, replace `agavus.lab` with
+`agavus.language_model` in imports and `python -m` commands. The installation
+extra is still `lab`, and existing run files are read from `data/lab/`.
+
 | Rule | Why |
 | --- | --- |
-| Lab code lives in `src/agavus/lab/`; no product package imports it | nothing experimental reaches a user |
+| Lab code lives in `src/agavus/language_model/`; no product package imports it | nothing experimental reaches a user |
 | The lab may read product code (evals, corpus readers); never the reverse | one-way dependency, checked by a test |
 | PyTorch goes in an optional `lab` extra; steps 1–2 use NumPy or stdlib | the product install stays small |
 | Every command runs on CPU; GPU only makes it faster (`--device`) | keeps "no GPU-required code" true |
@@ -57,14 +61,14 @@ Extra training text is kept under the gitignored data directory.
 | --- | --- | --- |
 | Civil Code articles outside the corpus's family book, from the page already fetched | public domain: laws aren't protected (Lei 9.610/1998, art. 8º, IV) | 1,817 articles, ~524 KB |
 | Portuguese Wikipedia, `wikimedia/wikipedia` 20231101.pt via the HF rows API: first 1,500 characters of 350 articles, URL kept per article | CC BY-SA 4.0; attribution kept; no model is published (§2), so nothing is redistributed | ~485 KB |
-| 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `lab/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
+| 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `language_model/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
 
 Extra text only joins the training side. Validation, the exam and the letter
 vocabulary stay the statute articles', and any extra text sharing 100
 characters in a row with a statute article is dropped, so nothing leaks into
 the exam. Wikipedia mixes pt-BR and pt-PT.
 
-`uv run python -m agavus.lab fetch-federal` uses the frozen statute reference bundle at
+`uv run python -m agavus.language_model fetch-federal` uses the frozen statute reference bundle at
 `data/lab/export/texts.json`. Keep this bundle when moving the lab to another Mac.
 The collector requests one allowlisted page at a time, with a two-second delay, and reuses
 HTML captures under `data/lab/text/federal/sources/`. If the portal times out, rerun the
@@ -151,7 +155,7 @@ excludes DJEN, DataJud and case-derived material because the model can memorize 
 The location of the hardware does not change that risk.
 
 ```sh
-uv run --extra lab python -m agavus.lab gpt civil federal --device mps \
+uv run --extra lab python -m agavus.language_model gpt civil federal --device mps \
   --layers 5 --width 128 --heads 4 --context 64 --batch 32 --steps 1000 \
   --out data/lab/runs/federal-local
 ```

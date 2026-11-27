@@ -21,7 +21,7 @@ Attention (lesson 15) is the new idea. A GPT is attention plus pieces you
 already know, stacked a few times.
 
 ```sh
-uv run python -m agavus.lab gpt
+uv run python -m agavus.language_model gpt
 ```
 
 (About 15 minutes on our CPU, with 4 threads. This is the first lab model where
@@ -157,8 +157,8 @@ recorded model. Inspect its forward pass; random predictions aren't learned lang
 ```python
 import torch  # Provide CPU tensors and softmax.
 
-from agavus.lab.bigram import build_vocab  # Turn the toy characters into IDs.
-from agavus.lab.gpt import GptConfig, start  # Construct the actual transformer.
+from agavus.language_model.bigram import build_vocab  # Turn the toy characters into IDs.
+from agavus.language_model.gpt import GptConfig, start  # Construct the actual transformer.
 
 vocab = build_vocab(("guarda guarda",))  # Use only the authored example's characters.
 # Keep four layers/heads, but shrink context and width for a fast CPU demonstration.

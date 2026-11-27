@@ -94,7 +94,7 @@ as if choosing among about 4 equal options. Knowing nothing means 8 options:
 
 ## In the code
 
-| Step | Where in `src/agavus/lab/bigram.py` |
+| Step | Where in `src/agavus/language_model/bigram.py` |
 | --- | --- |
 | 1 | `count_pairs` |
 | 2 and 3 | `train_bigram` |

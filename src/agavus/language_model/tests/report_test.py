@@ -2,9 +2,9 @@
 
 import pytest
 
-from agavus.lab.bigram import train_bigram
-from agavus.lab.data import Split
-from agavus.lab.report import chosen_steps, report
+from agavus.language_model.bigram import train_bigram
+from agavus.language_model.data import Split
+from agavus.language_model.report import chosen_steps, report
 
 
 def test_lowest_validation_wins(capsys: pytest.CaptureFixture[str]) -> None:

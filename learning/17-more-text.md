@@ -20,8 +20,8 @@ The tiny GPT (lesson 16) memorized: loss 0.87 on the articles it studied, 1.18
 on the exam. The usual cure is more text. So we tried three kinds.
 
 ```sh
-uv run python -m agavus.lab fetch-wikipedia   # once
-uv run python -m agavus.lab gpt civil         # or: gpt wikipedia, gpt civil wikipedia
+uv run python -m agavus.language_model fetch-wikipedia   # once
+uv run python -m agavus.language_model gpt civil         # or: gpt wikipedia, gpt civil wikipedia
 ```
 
 ## Where the text came from

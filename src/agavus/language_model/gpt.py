@@ -13,9 +13,9 @@ import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy, dropout, gelu, layer_norm
 
-from agavus.lab.bigram import BOUNDARY, Vocab
-from agavus.lab.data import Split
-from agavus.lab.training import IGNORED, History, Init, fit, mean_surprise, pick
+from agavus.language_model.bigram import BOUNDARY, Vocab
+from agavus.language_model.data import Split
+from agavus.language_model.training import IGNORED, History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 64
 # Typical size of a starting weight.

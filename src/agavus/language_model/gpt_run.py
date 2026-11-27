@@ -1,4 +1,4 @@
-"""Run the tiny GPT: `python -m agavus.lab gpt [civil] [wikipedia] [federal] [options]`.
+"""Run the tiny GPT: `python -m agavus.language_model gpt [civil] [wikipedia] [federal] [options]`.
 
 Same command on a laptop and on a rented GPU (docs/llm-lab.md §6): there, the
 text comes from an exported bundle (`--texts`) and `--out` keeps a run record
@@ -16,13 +16,20 @@ from pathlib import Path
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.lab.bigram import build_vocab
-from agavus.lab.bundle import Texts, bundle_bytes, digest, federal_texts, local_texts, read_bundle
-from agavus.lab.data import Split, split_articles
-from agavus.lab.extra import without_leaks
-from agavus.lab.gpt import GptConfig, GptModel, train
-from agavus.lab.report import THREADS, chosen_steps, report
-from agavus.lab.training import synchronize
+from agavus.language_model.bigram import build_vocab
+from agavus.language_model.bundle import (
+  Texts,
+  bundle_bytes,
+  digest,
+  federal_texts,
+  local_texts,
+  read_bundle,
+)
+from agavus.language_model.data import Split, split_articles
+from agavus.language_model.extra import without_leaks
+from agavus.language_model.gpt import GptConfig, GptModel, train
+from agavus.language_model.report import THREADS, chosen_steps, report
+from agavus.language_model.training import synchronize
 
 STEPS = 6000
 CHECK_EVERY = 500
@@ -33,7 +40,7 @@ EXTRA_NAMES = ("civil", "wikipedia", "federal")
 
 def parse(arguments: Sequence[str]) -> argparse.Namespace:
   """Options; every one has a CPU-friendly default."""
-  parser = argparse.ArgumentParser(prog="python -m agavus.lab gpt")
+  parser = argparse.ArgumentParser(prog="python -m agavus.language_model gpt")
   parser.add_argument("extras", nargs="*", choices=EXTRA_NAMES, help="extra training text")
   parser.add_argument("--steps", type=int, default=STEPS, help="most steps to try on validation")
   parser.add_argument("--check-every", type=int, default=CHECK_EVERY)

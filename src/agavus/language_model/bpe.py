@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from itertools import pairwise
 
-from agavus.lab.bigram import BOUNDARY, RESERVED
+from agavus.language_model.bigram import BOUNDARY, RESERVED
 
 BYTES = 256
 FIRST_MERGE = RESERVED + BYTES

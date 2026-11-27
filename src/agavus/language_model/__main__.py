@@ -1,4 +1,4 @@
-"""Run the lab: `uv run python -m agavus.lab [experiment] [options]`.
+"""Run the lab: `uv run python -m agavus.language_model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, gpt (see gpt_run.py),
 fetch-wikipedia, fetch-federal, export.
@@ -11,17 +11,31 @@ import httpx
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.lab.bigram import CharVocab, build_vocab, loss_per_character, train_bigram, uniform_loss
-from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
-from agavus.lab.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
-from agavus.lab.data import Split, load_articles, split_articles
-from agavus.lab.extra import fetch_wikipedia, save_wikipedia
-from agavus.lab.federal import fetch_federal
-from agavus.lab.gpt_run import run_gpt
-from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
-from agavus.lab.neural import NeuralConfig
-from agavus.lab.neural import train as train_neural
-from agavus.lab.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.language_model.bigram import (
+  CharVocab,
+  build_vocab,
+  loss_per_character,
+  train_bigram,
+  uniform_loss,
+)
+from agavus.language_model.bpe import FIRST_MERGE, BpeVocab, train_bpe
+from agavus.language_model.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
+from agavus.language_model.data import Split, load_articles, split_articles
+from agavus.language_model.extra import fetch_wikipedia, save_wikipedia
+from agavus.language_model.federal import fetch_federal
+from agavus.language_model.gpt_run import run_gpt
+from agavus.language_model.network import (
+  CLUES,
+  REFUSED,
+  TEXTS,
+  forward,
+  start,
+  train,
+  train_single_neuron,
+)
+from agavus.language_model.neural import NeuralConfig
+from agavus.language_model.neural import train as train_neural
+from agavus.language_model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 
 HIDDEN = 8
 NETWORK_SEED = 0

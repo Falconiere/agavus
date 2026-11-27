@@ -2,8 +2,8 @@
 
 import torch
 
-from agavus.lab.bigram import BOUNDARY, build_vocab
-from agavus.lab.neural import NeuralConfig, examples
+from agavus.language_model.bigram import BOUNDARY, build_vocab
+from agavus.language_model.neural import NeuralConfig, examples
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)

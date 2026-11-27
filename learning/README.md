@@ -110,5 +110,5 @@ flowchart LR
 Run the real thing at any time:
 
 ```sh
-uv run python -m agavus.lab
+uv run python -m agavus.language_model
 ```

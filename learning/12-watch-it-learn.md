@@ -18,7 +18,7 @@ doesn't show that it can interpret a new sentence.
 Lesson 11 in code. Run it:
 
 ```sh
-uv run python -m agavus.lab network
+uv run python -m agavus.language_model network
 ```
 
 The task: *was the request refused?* `negou` is yes, `não negou` is no.
@@ -42,7 +42,7 @@ One neuron gives up and says 50% to everything, as lesson 11 predicted.
 
 ## Read the code
 
-`src/agavus/lab/network.py`, one function per idea:
+`src/agavus/language_model/network.py`, one function per idea:
 
 ```mermaid
 flowchart LR
@@ -83,7 +83,7 @@ binary logic exercises, not a general parser for Portuguese or legal decisions.
 ```python
 import numpy as np  # Hold the four examples in a small matrix.
 
-from agavus.lab.network import forward, start, train  # Predict, initialize, and fit.
+from agavus.language_model.network import forward, start, train  # Predict, initialize, and fit.
 
 clues = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])  # Two flags per row.
 answers = np.array([0.0, 1.0, 1.0, 0.0])  # Exactly one active flag means yes.

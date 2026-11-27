@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from agavus.lab.extra import (
+from agavus.language_model.extra import (
   LEAK_RUN,
   WikipediaArticle,
   civil_code_rest,

@@ -8,9 +8,17 @@ import pytest
 
 from agavus.corpus.httpfixtures import mock_client
 from agavus.corpus.statutes import STATUTES
-from agavus.lab.bundle import BUNDLE_FILE, Texts, federal_texts, write_bundle
-from agavus.lab.extra import LEAK_RUN
-from agavus.lab.federal import ADCT, CLT, FEDERAL_DIR, LAWS, FederalLaw, fetch_federal, load_federal
+from agavus.language_model.bundle import BUNDLE_FILE, Texts, federal_texts, write_bundle
+from agavus.language_model.extra import LEAK_RUN
+from agavus.language_model.federal import (
+  ADCT,
+  CLT,
+  FEDERAL_DIR,
+  LAWS,
+  FederalLaw,
+  fetch_federal,
+  load_federal,
+)
 
 FIRST = FederalLaw("CF/1988", "synthetic.htm")
 SECOND = FederalLaw("CLT", "other.htm")

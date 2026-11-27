@@ -63,7 +63,7 @@ the real trained probability table.
 ```python
 import numpy as np  # Supply a repeatable random generator.
 
-from agavus.lab.bigram import train_bigram  # Reuse the lab's counting model.
+from agavus.language_model.bigram import train_bigram  # Reuse the lab's counting model.
 
 model = train_bigram(("guarda guarda",))  # Count pairs and apply smoothing.
 rng = np.random.default_rng(0)  # Fix the random seed so the example is repeatable.

@@ -3,9 +3,9 @@
 import pytest
 import torch
 
-from agavus.lab.bigram import CharVocab, build_vocab
-from agavus.lab.gpt import GptConfig, start, stream, windows
-from agavus.lab.training import IGNORED
+from agavus.language_model.bigram import CharVocab, build_vocab
+from agavus.language_model.gpt import GptConfig, start, stream, windows
+from agavus.language_model.training import IGNORED
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)

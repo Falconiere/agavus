@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from agavus.lab.bigram import UNKNOWN, build_vocab, train_bigram, uniform_loss
+from agavus.language_model.bigram import UNKNOWN, build_vocab, train_bigram, uniform_loss
 
 TEXT = "guarda guarda"
 TEXT_VOCAB_SIZE = 8

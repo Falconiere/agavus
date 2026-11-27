@@ -7,12 +7,12 @@ from dataclasses import replace
 import pytest
 import torch
 
-from agavus.lab import gpt, neural
-from agavus.lab.bigram import Vocab, build_vocab, train_bigram, uniform_loss
-from agavus.lab.data import Split
-from agavus.lab.gpt import GptModel
-from agavus.lab.neural import NeuralModel
-from agavus.lab.training import History, Init, synchronize
+from agavus.language_model import gpt, neural
+from agavus.language_model.bigram import Vocab, build_vocab, train_bigram, uniform_loss
+from agavus.language_model.data import Split
+from agavus.language_model.gpt import GptModel
+from agavus.language_model.neural import NeuralModel
+from agavus.language_model.training import History, Init, synchronize
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)

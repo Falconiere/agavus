@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 import torch
 
-from agavus.lab.bigram import build_vocab
-from agavus.lab.bundle import Texts, digest, write_bundle
-from agavus.lab.data import split_articles
-from agavus.lab.gpt import GptConfig, start
-from agavus.lab.gpt_run import extra_texts, parse, run_gpt
+from agavus.language_model.bigram import build_vocab
+from agavus.language_model.bundle import Texts, digest, write_bundle
+from agavus.language_model.data import split_articles
+from agavus.language_model.gpt import GptConfig, start
+from agavus.language_model.gpt_run import extra_texts, parse, run_gpt
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)

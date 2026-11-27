@@ -11,9 +11,9 @@ from tempfile import TemporaryDirectory
 import httpx
 
 from agavus.corpus.statutes import decode_html, html_to_text, segment_articles
-from agavus.lab.bigram import UNKNOWN, build_vocab
-from agavus.lab.data import split_articles
-from agavus.lab.extra import without_leaks
+from agavus.language_model.bigram import UNKNOWN, build_vocab
+from agavus.language_model.data import split_articles
+from agavus.language_model.extra import without_leaks
 
 PLANALTO = "https://www.planalto.gov.br/ccivil_03/"
 PUBLIC_DOMAIN = "Public domain (Lei 9.610/1998, art. 8º, IV)"

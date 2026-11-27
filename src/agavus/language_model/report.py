@@ -3,8 +3,8 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from agavus.lab.data import Split
-from agavus.lab.training import History
+from agavus.language_model.data import Split
+from agavus.language_model.training import History
 
 SAMPLE_SEED = 7
 SAMPLE_CHARS = 200
