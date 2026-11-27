@@ -11,7 +11,13 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor
-from torch.nn.functional import cross_entropy, dropout, gelu, layer_norm
+from torch.nn.functional import (
+  cross_entropy,
+  dropout,
+  gelu,
+  layer_norm,
+  scaled_dot_product_attention,
+)
 
 from agavus.model.bigram import BOUNDARY, Vocab
 from agavus.model.data import Split
@@ -39,6 +45,7 @@ class AgatheConfig:
   check_every: int = 250
   seed: int = 0
   device: str = "cpu"
+  bf16: bool = False
 
 
 @dataclass(frozen=True)
@@ -68,8 +75,14 @@ class Layer:
     ]
 
 
-def attend(layer: Layer, vectors: Tensor, heads: int) -> tuple[Tensor, Tensor]:
-  """Each position gathers from earlier ones; also returns who looked at whom."""
+def attend(
+  layer: Layer, vectors: Tensor, heads: int, *, show: bool = True
+) -> tuple[Tensor, Tensor | None]:
+  """Each position gathers from earlier ones; with `show`, also who looked at whom.
+
+  Without `show`, PyTorch's fused attention never builds the positions x positions table,
+  so memory grows with the context instead of its square.
+  """
   batch, length, width = vectors.shape
   size = width // heads
 
@@ -77,6 +90,9 @@ def attend(layer: Layer, vectors: Tensor, heads: int) -> tuple[Tensor, Tensor]:
     return (vectors @ weights).view(batch, length, heads, size).transpose(1, 2)
 
   query, key, value = per_head(layer.query), per_head(layer.key), per_head(layer.value)
+  if not show:
+    fused = scaled_dot_product_attention(query, key, value, is_causal=True)
+    return fused.transpose(1, 2).reshape(batch, length, width) @ layer.mix, None
   scores = query @ key.transpose(-2, -1) / math.sqrt(size)
   future = torch.ones(length, length, dtype=torch.bool, device=vectors.device).triu(1)
   looks = torch.softmax(scores.masked_fill(future, float("-inf")), dim=-1)
@@ -105,14 +121,17 @@ class AgatheModel:
     """How many numbers training adjusts."""
     return sum(weight.numel() for weight in self.parameters())
 
-  def run(self, ids: Tensor, *, training: bool = False) -> tuple[Tensor, list[Tensor]]:
-    """Scores per position, and each layer's attention (who looked at whom)."""
+  def run(
+    self, ids: Tensor, *, training: bool = False, show: bool = False
+  ) -> tuple[Tensor, list[Tensor]]:
+    """Scores per position and, with `show`, each layer's attention (who looked at whom)."""
     rate, width = self.config.dropout, self.config.width
     vectors = self.tokens[ids] + self.positions[: ids.shape[1]]
     all_looks: list[Tensor] = []
     for layer in self.layers:
-      gathered, looks = attend(layer, layer_norm(vectors, (width,)), self.config.heads)
-      all_looks.append(looks)
+      gathered, looks = attend(layer, layer_norm(vectors, (width,)), self.config.heads, show=show)
+      if looks is not None:
+        all_looks.append(looks)
       vectors = vectors + dropout(gathered, rate, training)
       hidden = gelu(layer_norm(vectors, (width,)) @ layer.up + layer.up_bias)
       vectors = vectors + dropout(hidden @ layer.down + layer.down_bias, rate, training)
@@ -130,7 +149,7 @@ class AgatheModel:
     """
     ids = self.vocab.encode(text)[:-1][-self.config.context :]
     with torch.no_grad():
-      _, looks = self.run(torch.tensor([ids], device=self.config.device))
+      _, looks = self.run(torch.tensor([ids], device=self.config.device), show=True)
     return [layer[0].cpu() for layer in looks]
 
   def loss(self, texts: Sequence[str]) -> float:
@@ -232,7 +251,9 @@ def train(
   def mistake(generator: torch.Generator) -> Tensor:
     starts = torch.randint(last_start, (config.batch, 1), generator=generator)
     rows = ids[(starts + offsets).clamp(max=len(ids) - 1)].long().to(config.device)
-    scores = model.scores(rows[:, :-1], training=True)
-    return cross_entropy(scores.flatten(0, 1), rows[:, 1:].flatten())
+    kind = torch.device(config.device).type
+    with torch.autocast(kind, dtype=torch.bfloat16, enabled=config.bf16):
+      scores = model.scores(rows[:, :-1], training=True)
+    return cross_entropy(scores.float().flatten(0, 1), rows[:, 1:].flatten())
 
   return model, fit(model, mistake, config, steps=steps, watch=split)

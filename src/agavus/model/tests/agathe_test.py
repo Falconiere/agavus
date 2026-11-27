@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from agavus.model.agathe import AgatheConfig, start, stream, windows
+from agavus.model.agathe import AgatheConfig, attend, start, stream, windows
 from agavus.model.bigram import CharVocab, build_vocab
 from agavus.model.training import IGNORED
 
@@ -91,3 +91,14 @@ def test_same_context_suffix_has_the_same_seeded_continuation() -> None:
   suffix = "a guarda"
   full = list(model.continuation("um começo diferente " + suffix, seed=7, max_chars=20))
   assert full and full == list(model.continuation(suffix, seed=7, max_chars=20))
+
+
+def test_fused_attention_matches_the_shown_attention() -> None:
+  model = start(build_vocab(["abcdef ghij"]), AgatheConfig(context=16, width=12, heads=3, layers=1))
+  vectors = torch.randn(2, 16, 12, generator=torch.Generator().manual_seed(0))
+  with torch.no_grad():
+    shown, looks = attend(model.layers[0], vectors, 3, show=True)
+    fused, none = attend(model.layers[0], vectors, 3, show=False)
+  assert looks is not None
+  assert none is None
+  assert torch.allclose(shown, fused, atol=1e-6)

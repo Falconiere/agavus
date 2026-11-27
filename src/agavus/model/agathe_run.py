@@ -54,6 +54,7 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("--rate", type=float, default=defaults.rate, help="AdamW learning rate")
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--seed", type=int, default=0, help="starting weights, batches, dropout")
+  parser.add_argument("--bf16", action="store_true", help="bfloat16 mixed precision")
   parser.add_argument(
     "--once", action="store_true", help="train once and keep the last step (large text)"
   )
@@ -140,6 +141,7 @@ def run_agathe(arguments: Sequence[str]) -> int:
     context=options.context,
     batch=options.batch,
     rate=options.rate,
+    bf16=options.bf16,
     check_every=options.check_every,
     device=options.device,
     seed=options.seed,
