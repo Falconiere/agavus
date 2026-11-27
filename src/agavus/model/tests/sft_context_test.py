@@ -5,13 +5,15 @@ from pathlib import Path
 import pytest
 
 from agavus.model.federal import PUBLIC_DOMAIN
-from agavus.model.law_search import Hit, search
+from agavus.model.law_search import EMENTA, Hit, search
 from agavus.model.sft import Conversation
 from agavus.model.sft_context import (
   CONTEXT_CHARS,
   NOT_FOUND,
   SEARCHED,
+  Deferrals,
   contextualize,
+  contextualize_parallel,
   teacher_for_training,
   with_context,
 )
@@ -32,6 +34,14 @@ def _pair(
   )
 
 
+def _two_laws() -> list[Conversation]:
+  """One article pair from each synthetic law."""
+  return [
+    _pair("Quem fica com a guarda dos filhos?", GUARD, f"{LAW}, art. 2"),
+    _pair("Onde tramita o divórcio?", "Na vara.", f"{OTHER}, art. 1"),
+  ]
+
+
 @pytest.fixture
 def db(tmp_path: Path) -> Path:
   return synthetic_index(tmp_path)
@@ -44,6 +54,8 @@ def test_with_context_numbers_the_articles_before_the_question() -> None:
     "Pergunta: E a guarda?"
   )
   assert with_context("Oi?", []) == "Pergunta: Oi?"
+  ementa = Hit("r3", NAME, EMENTA, "Cria medidas.")
+  assert with_context("Do que trata?", [ementa]).startswith(f"[1] {NAME}, ementa:\nCria")
 
 
 def test_the_cited_article_is_in_context_even_when_search_misses_it(db: Path) -> None:
@@ -76,10 +88,36 @@ def test_negatives_defer_without_the_cited_article_and_repeat_for_a_seed(db: Pat
   assert all(c.origin_ref == pair.origin_ref for c in negatives)
 
 
-def test_unindexed_and_multi_turn_conversations_are_skipped(db: Path) -> None:
-  ementa = _pair("Do que trata a lei?", "Cria medidas.", LAW, "rules:ementa")
+def test_ementa_pairs_answer_from_the_ementa_and_unindexed_ones_are_skipped(db: Path) -> None:
+  ementa = _pair("Do que trata a Lei nº 99.999?", "Cria medidas.", LAW, "rules:ementa")
+  unindexed = _pair("Do que trata a outra lei?", "Divórcio.", OTHER, "rules:ementa")
   longer = Conversation((*ementa.turns, *ementa.turns), "s", f"{LAW}, art. 1", PUBLIC_DOMAIN)
-  assert contextualize([ementa, longer], db, seed=0) == []
+  (found,) = contextualize([ementa, unindexed, longer], db, seed=0, negatives=0)
+  assert found.turns[0][1].startswith(f"[1] {NAME}, ementa:\nCria medidas fictícias.")
+  assert (found.turns[1][1], found.origin_ref) == ("Cria medidas.", LAW)
+
+
+def test_unrelated_negatives_defer_on_another_laws_hits(db: Path) -> None:
+  pairs = _two_laws() * (REPEATS // 2)
+  found = contextualize(pairs, db, seed=3, negatives=0, unrelated=NEGATIVES)
+  deferred = [(c, p) for c, p in zip(found, pairs, strict=True) if c.turns[1][1] == NOT_FOUND]
+  assert abs(len(deferred) / REPEATS - NEGATIVES) < SLACK
+  # LAW's articles are labeled with its NAME; OTHER, without a card, with its url.
+  labels = {LAW: f"{NAME}, art.", OTHER: f"{OTHER}, art."}
+  for conversation, pair in deferred:
+    context = conversation.turns[0][1]
+    assert labels[pair.origin_ref.partition(", ")[0]] not in context
+    assert context.endswith(f"Pergunta: {pair.turns[0][1]}")
+
+
+def test_parallel_shards_keep_every_pair_and_one_worker_is_serial(db: Path) -> None:
+  pairs = _two_laws() * 10
+  shares = Deferrals(negatives=0.3, unrelated=0.2)
+  serial = contextualize(pairs, db, seed=5, negatives=0.3, unrelated=0.2)
+  assert contextualize_parallel(pairs, db, seed=5, workers=1, shares=shares) == serial
+  sharded = contextualize_parallel(pairs, db, seed=5, workers=2, shares=shares)
+  assert sharded == contextualize_parallel(pairs, db, seed=5, workers=2, shares=shares)
+  assert sorted(c.origin_ref for c in sharded) == sorted(c.origin_ref for c in serial)
 
 
 def test_teacher_pairs_from_held_out_laws_are_dropped() -> None:

@@ -1,16 +1,20 @@
-"""BM25 search over synthetic Planalto-like articles: ranking, names, unsafe queries."""
+"""BM25 search over synthetic Planalto-like articles: ranking, names, laws named by number."""
 
 import json
 from pathlib import Path
 
 from agavus.model.federal import PUBLIC_DOMAIN
 from agavus.model.law_search import (
+  EMENTA,
   SEARCH_FILE,
   Hit,
+  NamedLaw,
   article,
   build_index,
   index_counts,
   match_terms,
+  named_articles,
+  named_law,
   search,
 )
 from agavus.model.planalto import PLANALTO_DIR, SITE
@@ -58,6 +62,9 @@ def test_index_names_laws_and_rebuilds_in_place(tmp_path: Path) -> None:
   assert article(db, f"{LAW}, art. 2") == Hit(f"{LAW}, art. 2", NAME, "2º", ARTICLES[LAW][1])
   assert article(db, f"{OTHER}, art. 1") == Hit(f"{OTHER}, art. 1", OTHER, "1º", ARTICLES[OTHER][0])
   assert article(db, f"{LAW}, art. 9") is None
+  # Only LAW has a card, so only LAW has an ementa row, cited by its url.
+  assert article(db, LAW) == Hit(LAW, NAME, EMENTA, "Cria medidas fictícias.")
+  assert article(db, OTHER) is None
 
 
 def test_search_ranks_the_matching_article_first_without_accents(tmp_path: Path) -> None:
@@ -73,3 +80,29 @@ def test_search_survives_fts_syntax_and_empty_queries(tmp_path: Path) -> None:
   for query in ['"', "guarda AND OR NOT (", "art.: ^*", 'x" OR "y', "NEAR(guarda filhos)"]:
     search(db, query)
   assert search(db, "") == search(db, "de a o e?!") == search(db, "guarda", k=0) == []
+
+
+def test_a_law_named_by_number_puts_its_article_or_ementa_first(tmp_path: Path) -> None:
+  db = synthetic_index(tmp_path)
+  # Without the law's number, BM25 ranks OTHER's divorce article first for these words.
+  assert search(db, "O que diz o art. 3 sobre divórcio?")[0].origin_ref == f"{OTHER}, art. 1"
+  asked = search(db, "O que diz o art. 3 da Lei 99999 sobre divórcio?", k=6)
+  assert asked[0].origin_ref == f"{LAW}, art. 3"
+  assert f"{OTHER}, art. 1" in [hit.origin_ref for hit in asked]
+  assert search(db, "Do que trata a Lei nº 99.999?")[0] == article(db, LAW)
+  covered = search(db, "A Lei 99.999 fala de guarda?", k=5)
+  assert [hit.origin_ref for hit in covered[:2]] == [LAW, f"{LAW}, art. 2"]
+  assert len({hit.origin_ref for hit in covered}) == len(covered)
+  # An unknown law number falls back to plain BM25.
+  assert search(db, "Lei 12.345 e a pensão alimentícia")[0].origin_ref == f"{LAW}, art. 3"
+
+
+def test_law_and_article_numbers_are_read_the_way_names_write_them() -> None:
+  assert named_law("art. 49 da Lei 8078/90") == NamedLaw("Lei nº 8.078,", "8.078")
+  assert named_law("lei complementar n. 101") == NamedLaw("Lei Complementar nº 101,", "101")
+  assert named_law("Decreto-Lei nº 6.887") == NamedLaw("Decreto-Lei nº 6.887,", "6.887")
+  assert named_law("a lei de 1990") is None and named_law("Lei Maria da Penha") is None
+  assert named_articles("artigo 1.024 do Código") == ["1.024", "1.024º"]
+  assert named_articles("Art. 12-c") == ["12-C", "12º-C"]
+  assert named_articles("Do que trata a lei?") == []
+  assert match_terms("Art. 2 da Lei 8.078") == '"8.078"'

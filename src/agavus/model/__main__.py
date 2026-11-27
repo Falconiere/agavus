@@ -63,7 +63,13 @@ from agavus.model.sft import (
   save_conversations,
   tune,
 )
-from agavus.model.sft_context import NOT_FOUND, contextualize, teacher_for_training
+from agavus.model.sft_context import (
+  NOT_FOUND,
+  UNRELATED,
+  Deferrals,
+  contextualize_parallel,
+  teacher_for_training,
+)
 from agavus.model.sft_rules import law_of, load_rule_sources, rule_conversations, split_by_law
 from agavus.model.teacher import run_teach
 from agavus.model.tokenizer import (
@@ -331,6 +337,10 @@ def run_build_sft_context(arguments: list[str]) -> int:
   parser.add_argument("--teacher", type=Path, help="teacher JSONL, joins the train side only")
   parser.add_argument("--rules", type=int, help="seeded sample of training rule conversations")
   parser.add_argument("--eval", type=int, help="seeded sample of held-out rule conversations")
+  parser.add_argument("--workers", type=int, default=1, help="search processes (~0.2 s each)")
+  parser.add_argument(
+    "--unrelated", type=float, default=UNRELATED, help="share shown another question's hits"
+  )
   options = parser.parse_args(arguments)
   db, folder = data_dir / SEARCH_FILE, data_dir / SFT_DIR
   try:
@@ -346,7 +356,8 @@ def run_build_sft_context(arguments: list[str]) -> int:
     if not db.is_file():
       raise ValueError(f"no search index at {db}")
     for name, part in (("context-train", train), ("context-eval", evaluated)):
-      found = contextualize(part, db, seed=0, negatives=0.1)
+      shares = Deferrals(negatives=0.1, unrelated=options.unrelated)
+      found = contextualize_parallel(part, db, seed=0, workers=options.workers, shares=shares)
       save_conversations(folder / f"{name}.jsonl", found)
       negatives = sum(conversation.turns[-1][1] == NOT_FOUND for conversation in found)
       print(f"{name}: {len(found)} of {len(part)}, {negatives} not found ({_kinds(found)})")
