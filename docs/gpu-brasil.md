@@ -15,9 +15,10 @@ Status: **operational guide**, API docs read 2026-11-25. Used only by the
    `/gpubrasil-template.sh` (contains the disk URL). Select output fields by
    allowlist, never by pattern; never dump raw instance or disk JSON.
 5. **This repo is public**: no ids, IPs, balances or account data in git.
-6. **No DJEN, DataJud, `data/raw/` or `corpus.db` on a machine.** GPUs run
-   outside Brazil. Only allowlisted lab data ([llm-lab.md](llm-lab.md) §3).
-   No `.env`, HF or GitHub tokens either.
+6. **Only allowlisted lab data on a machine** ([llm-lab.md](llm-lab.md) §3). Case text
+   goes up only as an export of the anonymized, scan-filtered `corpus.db` text, never
+   `data/raw/` or `corpus.db` itself. GPUs run outside Brazil. No `.env`, HF or GitHub
+   tokens either.
 7. **Always save to `agavus-training`.** Every lab machine is created with
    `"diskId": "name:agavus-training"`; anything worth keeping goes to
    `/workspace/disco/agavus/`. If the disk is not attached or not `pronto`, do

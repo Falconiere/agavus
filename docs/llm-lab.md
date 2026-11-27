@@ -74,15 +74,18 @@ characters from the conversation supplied at the start of the reply.
 | Statute articles in the corpus (347; ~150 KB) | yes | yes |
 | Authored seed queries | yes (class head) | yes |
 | Openly licensed pt-BR text | training only; license recorded below first | yes, if license allows |
-| DJEN decisions, DataJud records, anything derived from them | **no** | **never** |
+| DJEN decisions as stored in `corpus.db` (anonymized at ingestion), minus texts the residual scan flags | training only | yes, exported from `corpus.db` |
+| Raw captures under `data/raw/` (not anonymized) | **no** | **never** |
 | Gold sets | evaluation only, never training | not needed there |
 
-Why DJEN is excluded: name removal is pattern-based and incomplete, a
-5,000-text sample had 9% flagged by the residual scan (some likely false
-positives), and language models memorize. Lifting the exclusion needs a
-privacy audit, deduplication, a memorization test and a change to this note.
+**Decision 2026-11-27 (project owner):** the DJEN exclusion is lifted for lab training,
+locally and on rented GPUs. Name removal is pattern-based and incomplete (a 5,000-text
+sample had 9% flagged by the residual scan, some likely false positives), and language
+models memorize, so three safeguards stay: train only on the anonymized `corpus.db` text,
+drop every text `contains_personal_data` flags, and keep §2's ban on publishing lab models.
+Run a memorization test before any lab model leaves the local machine or the training disk.
 
-Allowlist, not denylist: the loader selects `source = statute` explicitly.
+Allowlist, not denylist: loaders select `source = statute` or `source = djen` explicitly.
 
 Extra training text is kept under the gitignored data directory.
 
@@ -179,9 +182,8 @@ report counts and intervals, not just percentages.
 ## 6. Local training and GPU rental
 
 Use the local Mac with MPS first. CPU is the CLI default. The PyTorch wheel on macOS
-comes from PyPI. The CPU-only wheel index applies to other platforms. Local training
-excludes DJEN, DataJud and case-derived material because the model can memorize it.
-The location of the hardware does not change that risk.
+comes from PyPI. The CPU-only wheel index applies to other platforms. Case-derived text follows
+§3 on any hardware: anonymized `corpus.db` text only, never `data/raw/`.
 
 ```sh
 uv run --extra lab python -m agavus.model agathe civil federal --device mps \

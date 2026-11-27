@@ -68,8 +68,8 @@ to make a gate pass — fix the code.
   `os.environ` elsewhere.
 - **GPU Brasil**: approval before every create, start, stop, rename or delete;
   never print keys or `disk_token`; always attach disk `agavus-training` and
-  save all lab work to it; no case-derived data on rented machines
-  (`docs/gpu-brasil.md`).
+  save all lab work to it; case-derived text only as the anonymized,
+  scan-filtered export allowed by `docs/llm-lab.md` §3 (`docs/gpu-brasil.md`).
 - **Scope**: TJDFT, all dates the source holds (today backward until empty),
   domains F + M only
   (general criminal is out of scope). Do not widen scope without a design
