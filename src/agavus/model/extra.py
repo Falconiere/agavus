@@ -15,6 +15,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import httpx
@@ -108,12 +109,9 @@ def _runs(text: str) -> set[str]:
   return {flat[start : start + LEAK_RUN] for start in range(len(flat) - LEAK_RUN + 1)}
 
 
-def without_leaks(texts: Sequence[str], protected: Sequence[str]) -> tuple[str, ...]:
-  """Drop texts that share LEAK_RUN characters in a row with a protected text.
-
-  A shared run covers a SHINGLE-long piece starting at some multiple of the stride, so only
-  texts with such a piece in common get the exact (slow) comparison.
-  """
+@lru_cache(maxsize=4)
+def _guards(protected: tuple[str, ...]) -> tuple[frozenset[str], frozenset[str]]:
+  """Every LEAK_RUN-long run and every SHINGLE-long piece of the protected texts, built once."""
   guarded: set[str] = set()
   for text in protected:
     guarded |= _runs(text)
@@ -122,6 +120,16 @@ def without_leaks(texts: Sequence[str], protected: Sequence[str]) -> tuple[str, 
     for flat in (" ".join(text.split()) for text in protected)
     for start in range(len(flat) - SHINGLE + 1)
   }
+  return frozenset(guarded), frozenset(pieces)
+
+
+def without_leaks(texts: Sequence[str], protected: Sequence[str]) -> tuple[str, ...]:
+  """Drop texts that share LEAK_RUN characters in a row with a protected text.
+
+  A shared run covers a SHINGLE-long piece starting at some multiple of the stride, so only
+  texts with such a piece in common get the exact (slow) comparison.
+  """
+  guarded, pieces = _guards(tuple(protected))
   stride = LEAK_RUN - SHINGLE
 
   def suspect(text: str) -> bool:
