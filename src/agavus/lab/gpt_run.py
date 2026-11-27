@@ -21,6 +21,7 @@ from agavus.lab.data import Split, split_articles
 from agavus.lab.extra import without_leaks
 from agavus.lab.gpt import GptConfig, GptModel, train
 from agavus.lab.report import THREADS, chosen_steps, report
+from agavus.lab.training import synchronize
 
 STEPS = 6000
 CHECK_EVERY = 500
@@ -108,6 +109,7 @@ def run_gpt(arguments: Sequence[str]) -> int:
   config = GptConfig(
     layers=options.layers, check_every=options.check_every, device=options.device, seed=options.seed
   )
+  synchronize(config.device)
   began = time.monotonic()
   _, history = train(Split(inner.train + extra, inner.holdout), vocab, config, steps=options.steps)
   best = chosen_steps(history, len(history))
@@ -116,11 +118,15 @@ def run_gpt(arguments: Sequence[str]) -> int:
   training, holdout, sample = report(model, split)
   show_attention(model)
   if options.out:
+    synchronize(config.device)
+    gpu = "mps" if torch.device(config.device).type == "mps" else None
+    if torch.device(config.device).type == "cuda":
+      gpu = torch.cuda.get_device_name(config.device)
     record: dict[str, object] = {
       "config": dataclasses.asdict(config),
       "extras": list(options.extras),
       "data_sha256": digest(options.texts) if options.texts else "local corpus",
-      "gpu": torch.cuda.get_device_name() if options.device.startswith("cuda") else None,
+      "gpu": gpu,
       "torch": torch.__version__,
       "steps_tried": options.steps,
       "steps_chosen": best,

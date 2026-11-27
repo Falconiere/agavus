@@ -14,6 +14,15 @@ IGNORED = -100
 History = list[tuple[int, float, float]]
 
 
+def synchronize(device: str) -> None:
+  """Wait for queued accelerator work at a timing boundary."""
+  kind = torch.device(device).type
+  if kind == "mps":
+    torch.mps.synchronize()
+  elif kind == "cuda":
+    torch.cuda.synchronize(device)
+
+
 class Settings(Protocol):
   """How a model trains; both lab configs have these fields."""
 

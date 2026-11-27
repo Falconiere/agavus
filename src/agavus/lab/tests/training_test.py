@@ -2,6 +2,7 @@
 
 import math
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 
 import pytest
 import torch
@@ -11,7 +12,7 @@ from agavus.lab.bigram import Vocab, build_vocab, train_bigram, uniform_loss
 from agavus.lab.data import Split
 from agavus.lab.gpt import GptModel
 from agavus.lab.neural import NeuralModel
-from agavus.lab.training import History, Init
+from agavus.lab.training import History, Init, synchronize
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -71,3 +72,17 @@ def test_training_and_sampling_are_reproducible(trainer: Trainer) -> None:
   sample = first.sample(seed=1, max_chars=20)
   assert sample == first.sample(seed=1, max_chars=20)
   assert len(sample) <= len("x" * 20)
+
+
+@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="requires local MPS")
+def test_mps_training_validation_and_sampling() -> None:
+  vocab = build_vocab(TEXTS)
+  split = Split(TEXTS, TEXTS)
+  for model, history in (
+    neural.train(split, vocab, replace(NEURAL, device="mps", check_every=1), steps=1),
+    gpt.train(split, vocab, replace(GPT, device="mps", check_every=1), steps=1),
+  ):
+    synchronize("mps")
+    assert all(weight.device.type == "mps" for weight in model.parameters())
+    assert math.isfinite(history[0][2])
+    assert len(model.sample(seed=1, max_chars=2)) <= len("ab")
