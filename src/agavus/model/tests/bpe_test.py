@@ -2,8 +2,8 @@
 
 import pytest
 
-from agavus.language_model.bigram import CharVocab, build_vocab, loss_per_character, train_bigram
-from agavus.language_model.bpe import FIRST_MERGE, BpeVocab, byte_ids, glue, train_bpe
+from agavus.model.bigram import CharVocab, build_vocab, loss_per_character, train_bigram
+from agavus.model.bpe import FIRST_MERGE, BpeVocab, byte_ids, glue, train_bpe
 
 TEXT = "guarda guarda"
 

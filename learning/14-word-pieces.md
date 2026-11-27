@@ -20,7 +20,7 @@ Lesson 2 compared three bricks: letters (too small), words (too many), and
 **word pieces**. Now we build the pieces.
 
 ```sh
-uv run python -m agavus.language_model bpe
+uv run python -m agavus.model bpe
 ```
 
 The method is called **byte-pair encoding**, or BPE. It has one rule:
@@ -112,7 +112,7 @@ Train the existing BPE tokenizer on the lesson's authored text, inspect
 its pieces, and check that even unseen Unicode text survives a round trip.
 
 ```python
-from agavus.language_model.bpe import train_bpe  # Learn frequent adjacent byte-pair merges.
+from agavus.model.bpe import train_bpe  # Learn frequent adjacent byte-pair merges.
 
 texts = ("guarda guarda guardar",)  # Repetition supplies evidence for reusable pieces.
 vocab = train_bpe(texts, merges=5)  # Perform up to five frequent-pair merges.

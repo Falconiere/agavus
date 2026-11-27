@@ -3,9 +3,9 @@
 import pytest
 import torch
 
-from agavus.language_model.agathe import AgatheConfig, start, stream, windows
-from agavus.language_model.bigram import CharVocab, build_vocab
-from agavus.language_model.training import IGNORED
+from agavus.model.agathe import AgatheConfig, start, stream, windows
+from agavus.model.bigram import CharVocab, build_vocab
+from agavus.model.training import IGNORED
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -66,3 +66,26 @@ def test_lab_parameter_counts() -> None:
   vocab = CharVocab(tuple(chr(i) for i in range(97)))
   sizes = (start(vocab, AgatheConfig()).size(), start(vocab, AgatheConfig(layers=5)).size())
   assert (vocab.size, *sizes) == (99, 822_627, 1_019_875)
+
+
+def test_seeded_continuation_starts_after_the_prefix_and_stops_at_boundary() -> None:
+  vocab = build_vocab(["ab"])
+  model = start(vocab, AgatheConfig(width=vocab.size, heads=1, layers=1))
+  boundary, a, b, _ = vocab.encode("ab")
+  with torch.no_grad():
+    for weight in model.parameters():
+      weight.zero_()
+    model.tokens.copy_(torch.eye(vocab.size))
+    for current, following in ((boundary, a), (a, b), (b, boundary)):
+      model.out_weights[current, following] = 100
+  assert model.sample(seed=7, max_chars=200) == "ab"
+  assert list(model.continuation("a", seed=7, max_chars=1)) == [b]
+  assert list(model.continuation("b", seed=7, max_chars=200)) == []
+  assert model.sample(seed=7, max_chars=1) == "a"
+
+
+def test_same_context_suffix_has_the_same_seeded_continuation() -> None:
+  model = start(build_vocab(TEXTS), CONFIG)
+  suffix = "a guarda"
+  full = list(model.continuation("um começo diferente " + suffix, seed=7, max_chars=20))
+  assert full and full == list(model.continuation(suffix, seed=7, max_chars=20))

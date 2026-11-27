@@ -22,14 +22,14 @@ Non-goals:
 
 ## 2. Isolation rules
 
-For scripts written before the package rename, replace `agavus.lab` with
-`agavus.language_model` in imports and `python -m` commands. The installation
+For scripts written before the package rename, replace `agavus.lab` or
+`agavus.language_model` with `agavus.model` in imports and `python -m` commands. The installation
 extra is still `lab`, and existing run files are read from `data/lab/`.
 In older training commands, replace the `gpt` subcommand with `agathe`.
 
 | Rule | Why |
 | --- | --- |
-| Lab code lives in `src/agavus/language_model/`; no product package imports it | nothing experimental reaches a user |
+| Training and inference live in `src/agavus/model/`, with a local API in `src/agavus/server/`; no product package imports either | nothing experimental reaches a user |
 | The lab may read product code (evals, corpus readers); never the reverse | one-way dependency, checked by a test |
 | PyTorch goes in an optional `lab` extra; steps 1–2 use NumPy or stdlib | the product install stays small |
 | Every command runs on CPU; GPU only makes it faster (`--device`) | keeps "no GPU-required code" true |
@@ -38,6 +38,34 @@ In older training commands, replace the `gpt` subcommand with `agathe`.
 
 TF-IDF + logreg remains the router. M ceiling preserved: the loss matrix and
 decision rule are untouched.
+
+### Local Agathe chat
+
+```sh
+uv run --extra lab python -m agavus.server
+# To select a different checkpoint
+uv run --extra lab python -m agavus.server --run data/lab/runs/five-layer-civil-seed0
+```
+
+Open `http://127.0.0.1:7861`. One Python process serves the HTML, CSS and JavaScript
+in `chat/` and the model API. The lab command `uv run --extra dev python -m agavus.model chat`
+starts the same server. Both commands accept `--run DIRECTORY` and `--port PORT`.
+
+The default checkpoint is `data/lab/runs/long-civil`. The server restores `model.pt` on
+CPU and checks the exported bundle (`data/lab/export/texts.json`) against the SHA-256
+in `run.json` before serving. The default paths follow `AGAVUS_DATA_DIR`.
+
+`GET /api/model` returns the checkpoint name, parameter count and context capacity.
+`POST /api/continue` takes a JSON body such as `{"prefix":"Art. "}` and streams one
+JSON object per line. Each `text` object contains new characters. The final `metrics`
+object reports generation seconds, character count, initial context and capacity.
+
+Enter sends a message. Shift+Enter inserts a newline. The browser stores conversations
+and their last response metrics at this address. Clearing site data removes that history.
+Agathe generates up to 200 new characters and can end a reply immediately.
+The full transcript stays visible. For the two Civil Code checkpoints above,
+each prediction uses at most 64 recent characters. The context metric counts the
+characters from the conversation supplied at the start of the reply.
 
 ## 3. Data policy
 
@@ -62,14 +90,14 @@ Extra training text is kept under the gitignored data directory.
 | --- | --- | --- |
 | Civil Code articles outside the corpus's family book, from the page already fetched | public domain: laws aren't protected (Lei 9.610/1998, art. 8º, IV) | 1,817 articles, ~524 KB |
 | Portuguese Wikipedia, `wikimedia/wikipedia` 20231101.pt via the HF rows API: first 1,500 characters of 350 articles, URL kept per article | CC BY-SA 4.0; attribution kept; no model is published (§2), so nothing is redistributed | ~485 KB |
-| 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `language_model/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
+| 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `model/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
 
 Extra text only joins the training side. Validation, the exam and the letter
 vocabulary stay the statute articles', and any extra text sharing 100
 characters in a row with a statute article is dropped, so nothing leaks into
 the exam. Wikipedia mixes pt-BR and pt-PT.
 
-`uv run python -m agavus.language_model fetch-federal` uses the frozen statute reference bundle at
+`uv run python -m agavus.model fetch-federal` uses the frozen statute reference bundle at
 `data/lab/export/texts.json`. Keep this bundle when moving the lab to another Mac.
 The collector requests one allowlisted page at a time, with a two-second delay, and reuses
 HTML captures under `data/lab/text/federal/sources/`. If the portal times out, rerun the
@@ -156,7 +184,7 @@ excludes DJEN, DataJud and case-derived material because the model can memorize 
 The location of the hardware does not change that risk.
 
 ```sh
-uv run --extra lab python -m agavus.language_model agathe civil federal --device mps \
+uv run --extra lab python -m agavus.model agathe civil federal --device mps \
   --layers 5 --width 128 --heads 4 --context 64 --batch 32 --steps 1000 \
   --out data/lab/runs/federal-local
 ```

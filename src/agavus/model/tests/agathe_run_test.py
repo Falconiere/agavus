@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 import torch
 
-from agavus.language_model.agathe import AgatheConfig, start
-from agavus.language_model.agathe_run import extra_texts, parse, run_agathe
-from agavus.language_model.bigram import build_vocab
-from agavus.language_model.bundle import Texts, digest, write_bundle
-from agavus.language_model.data import split_articles
+from agavus.model.agathe import AgatheConfig, start
+from agavus.model.agathe_run import extra_texts, parse, run_agathe
+from agavus.model.bigram import build_vocab
+from agavus.model.bundle import Texts, digest, write_bundle
+from agavus.model.data import split_articles
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)

@@ -6,16 +6,16 @@ gathered (a small network). The last vectors score the next token.
 """
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy, dropout, gelu, layer_norm
 
-from agavus.language_model.bigram import BOUNDARY, Vocab
-from agavus.language_model.data import Split
-from agavus.language_model.training import IGNORED, History, Init, fit, mean_surprise, pick
+from agavus.model.bigram import BOUNDARY, Vocab
+from agavus.model.data import Split
+from agavus.model.training import IGNORED, History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 64
 # Typical size of a starting weight.
@@ -139,18 +139,22 @@ class AgatheModel:
       lambda part: self.scores(part.to(self.config.device)), inputs, answers, EVAL_BATCH
     )
 
-  def sample(self, *, seed: int, max_chars: int) -> str:
-    """Write one token at a time until a boundary or max_chars tokens."""
+  def continuation(self, prefix: str, *, seed: int, max_chars: int) -> Iterator[int]:
+    """Yield only new tokens, starting from the most recent window of the prefix."""
     generator = torch.Generator().manual_seed(seed)
-    ids = [BOUNDARY]
-    while len(ids) <= max_chars:
+    ids = self.vocab.encode(prefix)[:-1]
+    for _ in range(max_chars):
       recent = torch.tensor([ids[-self.config.context :]], device=self.config.device)
       with torch.no_grad():
         chosen = pick(self.scores(recent)[0, -1], generator)
       if chosen == BOUNDARY:
         break
       ids.append(chosen)
-    return self.vocab.decode(ids)
+      yield chosen
+
+  def sample(self, *, seed: int, max_chars: int) -> str:
+    """Decode a seeded continuation from the start boundary."""
+    return self.vocab.decode(list(self.continuation("", seed=seed, max_chars=max_chars)))
 
 
 def windows(texts: Sequence[str], vocab: Vocab, context: int) -> tuple[Tensor, Tensor]:

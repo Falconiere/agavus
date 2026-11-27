@@ -68,8 +68,8 @@ Use the real article-splitting helper with 15 synthetic strings. Split the
 study portion again for validation, before building the vocabulary.
 
 ```python
-from agavus.language_model.bigram import build_vocab, train_bigram  # Vocabulary and learner.
-from agavus.language_model.data import split_articles  # Keep whole articles on one side.
+from agavus.model.bigram import build_vocab, train_bigram  # Vocabulary and learner.
+from agavus.model.data import split_articles  # Keep whole articles on one side.
 
 articles = tuple(f"guarda exemplo {n}" for n in range(15))  # Invent 15 distinct texts.
 outer = split_articles(articles)  # Reserve every fifth text as the final test.

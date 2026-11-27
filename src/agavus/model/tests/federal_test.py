@@ -8,9 +8,9 @@ import pytest
 
 from agavus.corpus.httpfixtures import mock_client
 from agavus.corpus.statutes import STATUTES
-from agavus.language_model.bundle import BUNDLE_FILE, Texts, federal_texts, write_bundle
-from agavus.language_model.extra import LEAK_RUN
-from agavus.language_model.federal import (
+from agavus.model.bundle import BUNDLE_FILE, Texts, federal_texts, write_bundle
+from agavus.model.extra import LEAK_RUN
+from agavus.model.federal import (
   ADCT,
   CLT,
   FEDERAL_DIR,

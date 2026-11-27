@@ -21,7 +21,7 @@ mistakes. Put them together: a network that predicts the next letter from the
 last **4**.
 
 ```sh
-uv run python -m agavus.language_model neural
+uv run python -m agavus.model neural
 ```
 
 ## How it works
@@ -117,9 +117,9 @@ fit to its practice text, not generalization or the recorded statute experiment.
 ```python
 import torch  # Run the small neural model on CPU.
 
-from agavus.language_model.bigram import build_vocab  # Learn character IDs from this text.
-from agavus.language_model.data import Split  # Keep training and held-out inputs explicit.
-from agavus.language_model.neural import NeuralConfig, examples, start, train  # Reuse the lab.
+from agavus.model.bigram import build_vocab  # Learn character IDs from this text.
+from agavus.model.data import Split  # Keep training and held-out inputs explicit.
+from agavus.model.neural import NeuralConfig, examples, start, train  # Reuse the lab.
 
 torch.set_num_threads(1)  # Avoid thread overhead for this tiny, standalone example.
 texts = ("guarda guarda",)  # Use authored practice text, without the corpus.

@@ -241,5 +241,7 @@ and `agavus -p QUESTION` for cited answers. The CLI documents each output and ex
 
 The engine matches grounded facts to three area-scoped rules and retrieves the cited
 provision before delivering a rule conclusion. Language-model training takes place in
-an isolated lab. Its weights never supply user answers.
+an isolated lab. The local Python server in `src/agavus/server/` serves the static chat
+page and streams CPU continuations. Conversations belong to the browser. Production answers continue to
+use the cited retrieval and deferral pipeline.
 [Reasoning](reasoning.md) · [Lab isolation and data rules](llm-lab.md)

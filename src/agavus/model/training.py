@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy
 
-from agavus.language_model.data import Split
+from agavus.model.data import Split
 
 IGNORED = -100
 History = list[tuple[int, float, float]]

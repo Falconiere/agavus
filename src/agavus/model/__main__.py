@@ -1,7 +1,7 @@
-"""Run the lab: `uv run python -m agavus.language_model [experiment] [options]`.
+"""Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-fetch-wikipedia, fetch-federal, export.
+chat, fetch-wikipedia, fetch-federal, export.
 """
 
 import sys
@@ -11,20 +11,20 @@ import httpx
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.language_model.agathe_run import run_agathe
-from agavus.language_model.bigram import (
+from agavus.model.agathe_run import run_agathe
+from agavus.model.bigram import (
   CharVocab,
   build_vocab,
   loss_per_character,
   train_bigram,
   uniform_loss,
 )
-from agavus.language_model.bpe import FIRST_MERGE, BpeVocab, train_bpe
-from agavus.language_model.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
-from agavus.language_model.data import Split, load_articles, split_articles
-from agavus.language_model.extra import fetch_wikipedia, save_wikipedia
-from agavus.language_model.federal import fetch_federal
-from agavus.language_model.network import (
+from agavus.model.bpe import FIRST_MERGE, BpeVocab, train_bpe
+from agavus.model.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
+from agavus.model.data import Split, load_articles, split_articles
+from agavus.model.extra import fetch_wikipedia, save_wikipedia
+from agavus.model.federal import fetch_federal
+from agavus.model.network import (
   CLUES,
   REFUSED,
   TEXTS,
@@ -33,9 +33,10 @@ from agavus.language_model.network import (
   train,
   train_single_neuron,
 )
-from agavus.language_model.neural import NeuralConfig
-from agavus.language_model.neural import train as train_neural
-from agavus.language_model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.model.neural import NeuralConfig
+from agavus.model.neural import train as train_neural
+from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.server.__main__ import serve
 
 HIDDEN = 8
 NETWORK_SEED = 0
@@ -177,6 +178,7 @@ def main(arguments: list[str]) -> int:
     "neural": lambda _: run_neural(),
     "bpe": lambda _: run_bpe(),
     "agathe": run_agathe,
+    "chat": serve,
     "fetch-federal": lambda _: run_fetch_federal(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),

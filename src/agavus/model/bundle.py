@@ -9,9 +9,9 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agavus.language_model.data import load_articles
-from agavus.language_model.extra import civil_code_rest, load_wikipedia
-from agavus.language_model.federal import load_federal
+from agavus.model.data import load_articles
+from agavus.model.extra import civil_code_rest, load_wikipedia
+from agavus.model.federal import load_federal
 
 BUNDLE_FILE = Path("lab") / "export" / "texts.json"
 

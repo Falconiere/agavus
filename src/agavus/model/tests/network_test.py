@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from agavus.language_model.network import (
+from agavus.model.network import (
   CLUES,
   REFUSED,
   Network,

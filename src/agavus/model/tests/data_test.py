@@ -6,10 +6,11 @@ from pathlib import Path
 import agavus
 from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
-from agavus.language_model.bigram import build_vocab
-from agavus.language_model.data import load_articles, split_articles
+from agavus.model.bigram import build_vocab
+from agavus.model.data import load_articles, split_articles
 
 PACKAGE = Path(agavus.__file__).parent
+LAB_PACKAGES = {"model", "server"}
 
 
 def _document(name: str, source: TextSource, text: str) -> TextDocument:
@@ -52,23 +53,25 @@ def test_holdout_characters_never_enter_vocabulary() -> None:
   assert "z" not in build_vocab(split.train).chars
 
 
-def _imports_language_model(path: Path) -> bool:
+def _imports_lab(path: Path) -> bool:
   for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
     if isinstance(node, ast.Import):
-      if any(alias.name.startswith("agavus.language_model") for alias in node.names):
-        return True
+      names = [alias.name for alias in node.names]
     elif isinstance(node, ast.ImportFrom):
-      module = node.module or ""
-      if module.startswith("agavus.language_model"):
-        return True
-      if module == "agavus" and any(alias.name == "language_model" for alias in node.names):
+      names = [f"{node.module}.{alias.name}" for alias in node.names]
+    else:
+      continue
+    for name in names:
+      root, _, rest = name.partition(".")
+      if root == "agavus" and rest.partition(".")[0] in LAB_PACKAGES:
         return True
   return False
 
 
-def test_product_never_imports_language_model() -> None:
-  model_package = PACKAGE / "language_model"
-  product = [path for path in PACKAGE.rglob("*.py") if model_package not in path.parents]
+def test_product_never_imports_the_lab_or_its_server() -> None:
+  product = [
+    path for path in PACKAGE.rglob("*.py") if path.relative_to(PACKAGE).parts[0] not in LAB_PACKAGES
+  ]
   product += list((PACKAGE.parents[1] / "space").rglob("*.py"))
   assert product
-  assert [path for path in product if _imports_language_model(path)] == []
+  assert [path for path in product if _imports_lab(path)] == []

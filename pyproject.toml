@@ -46,6 +46,9 @@ agavus = "agavus.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agavus"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"chat" = "agavus/server/static"
+
 [tool.ruff]
 line-length = 100
 indent-width = 2

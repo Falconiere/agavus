@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from agavus.corpus.storage import CorpusStorage
-from agavus.language_model.bundle import Texts, digest, local_texts, read_bundle, write_bundle
+from agavus.model.bundle import Texts, digest, local_texts, read_bundle, write_bundle
 
 
 def test_bundle_round_trip_and_hash(tmp_path: Path) -> None:

@@ -36,6 +36,13 @@ The bootstrap builds and evaluates the document classifier locally. The first `e
 downloads the pinned encoder and indexes the statute articles on CPU. Without the encoder,
 `-p` defers. The lexical search and document classifier run independently.
 
+### Local Agathe chat
+
+With a trained Agathe checkpoint and its text bundle in `data/lab/`, run
+`uv run --extra lab python -m agavus.server` and open `http://127.0.0.1:7861`.
+The local server streams text continuations on CPU. The browser saves conversations
+and their metrics. [Checkpoints and REST endpoints](docs/llm-lab.md#local-agathe-chat)
+
 ## Data and research
 
 Real case material belongs in the private data directory. The public Space uses bundled

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agathe</title>
+  <link rel="stylesheet" href="/chat.css">
+  <script type="module" src="/chat.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Agathe</h1>
+    <p>Modelo experimental de continuação de texto.</p>
+  </header>
+  <main>
+    <aside id="history">
+      <details>
+        <summary>Histórico</summary>
+        <button id="new-chat">Nova conversa</button>
+        <nav aria-label="Conversas salvas"></nav>
+        <button id="delete-chat" disabled>Excluir conversa</button>
+      </details>
+    </aside>
+    <section class="conversation" aria-label="Conversa com Agathe">
+      <div id="transcript" role="log" aria-label="Transcrição">
+        <p class="empty">Escreva um trecho para o Agathe continuar.</p>
+      </div>
+      <form>
+        <label for="message">Mensagem</label>
+        <div class="compose">
+          <textarea id="message" rows="2" placeholder="Escreva uma mensagem…" required></textarea>
+          <button type="submit" disabled>Enviar</button>
+        </div>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+    <aside id="metrics">
+      <details>
+        <summary>Métricas</summary>
+        <dl>
+          <dt>Checkpoint ativo</dt><dd id="checkpoint">—</dd>
+          <dt>Parâmetros</dt><dd id="parameters">—</dd>
+          <dt>Tempo de geração</dt><dd id="elapsed">—</dd>
+          <dt>Caracteres gerados</dt><dd id="count">—</dd>
+          <dt>Caracteres por segundo</dt><dd id="rate">—</dd>
+          <dt>Contexto usado</dt><dd id="context">—</dd>
+        </dl>
+      </details>
+    </aside>
+  </main>
+</body>
+</html>

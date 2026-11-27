@@ -12,9 +12,9 @@ import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy
 
-from agavus.language_model.bigram import BOUNDARY, Vocab
-from agavus.language_model.data import Split
-from agavus.language_model.training import History, Init, fit, mean_surprise, pick
+from agavus.model.bigram import BOUNDARY, Vocab
+from agavus.model.data import Split
+from agavus.model.training import History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 8192
 
