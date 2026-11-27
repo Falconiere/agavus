@@ -268,6 +268,9 @@ Rules:
    verify checksums.
 6. Destroy the machine after each session and confirm billing stopped.
 7. Record GPU, hours, cost, seed, config, data hash and losses per run.
+   `agathe` and `sft` print a progress line every 100 steps, at every loss check and at the
+   last step (`step 1200/12000  batch 0.4120  0.180 s/step  eta 0h32m`, plus `train` and
+   `held-out` at checks), flushed, so `tail -f` on the run log shows where a run stands.
 
 ### Run log
 

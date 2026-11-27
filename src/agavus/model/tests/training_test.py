@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Callable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import pytest
 import torch
@@ -13,7 +13,15 @@ from agavus.model.bigram import build_vocab, train_bigram, uniform_loss
 from agavus.model.data import Split
 from agavus.model.neural import NeuralModel
 from agavus.model.tokenizer import train_tokenizer
-from agavus.model.training import History, Init, check_sample, synchronize
+from agavus.model.training import (
+  LOG_EVERY,
+  History,
+  Init,
+  Progress,
+  check_sample,
+  descend,
+  synchronize,
+)
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -104,3 +112,49 @@ def test_check_sample_keeps_small_text_and_spaces_out_large_text() -> None:
   sample = check_sample(large, chars=40)
   assert sample == large[::10]
   assert sum(map(len, sample)) == len("0000") * 10
+
+
+@dataclass(frozen=True)
+class _Steady:
+  """Settings for a short descent: checks every 150 steps, progress every LOG_EVERY."""
+
+  rate: float = 0.01
+  weight_decay: float = 0.0
+  check_every: int = 150
+  log_every: int = LOG_EVERY
+  seed: int = 0
+
+
+def test_descent_prints_progress_every_log_step_check_and_the_end(
+  capsys: pytest.CaptureFixture[str],
+) -> None:
+  weight = torch.zeros(2, requires_grad=True)
+
+  def mistake(_: torch.Generator) -> torch.Tensor:
+    return ((weight - 1.0) ** 2).sum()
+
+  steps = 2 * LOG_EVERY + 50
+  history = descend([weight], mistake, _Steady(), steps=steps, check=lambda: (0.5, 0.25))
+  lines = capsys.readouterr().out.splitlines()
+  assert [line.split()[1] for line in lines] == [
+    f"{n}/{steps}" for n in (LOG_EVERY, 150, 2 * LOG_EVERY, steps)
+  ]
+  assert [line.endswith("train 0.5000  held-out 0.2500") for line in lines] == [
+    False,
+    True,
+    False,
+    False,
+  ]
+  assert history == [(150, 0.5, 0.25)]
+  assert float(lines[-1].split()[3]) < float(lines[0].split()[3])
+  silent = replace(_Steady(), log_every=0)
+  assert descend([weight], mistake, silent, steps=3, check=None) == []
+  assert capsys.readouterr().out == ""
+
+
+def test_progress_line_shows_rate_eta_and_checks() -> None:
+  line = Progress(1200, 12000, 0.41234, 216.0, (0.3, 0.42)).line()
+  assert line == (
+    "step   1200/12000  batch 0.4123  0.180 s/step  eta 0h32m  train 0.3000  held-out 0.4200"
+  )
+  assert Progress(1, 2, 1.0, 7200.0).line().endswith("eta 2h00m")

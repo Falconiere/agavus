@@ -57,6 +57,7 @@ class AgatheConfig:
   rate: float = 3e-4
   weight_decay: float = 0.1
   check_every: int = 500
+  log_every: int = 0
   seed: int = 0
   device: str = "cpu"
   bf16: bool = False

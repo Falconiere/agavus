@@ -32,7 +32,7 @@ from agavus.model.data import Split, split_articles
 from agavus.model.extra import without_leaks
 from agavus.model.report import THREADS, chosen_steps, report
 from agavus.model.tokenizer import TOKENIZER_FILE, decode, encode, load_tokenizer
-from agavus.model.training import synchronize
+from agavus.model.training import LOG_EVERY, synchronize
 
 STEPS = 6000
 CHECK_EVERY = 500
@@ -94,6 +94,7 @@ def config_from(options: argparse.Namespace) -> AgatheConfig:
     rate=options.rate,
     bf16=options.bf16,
     check_every=options.check_every,
+    log_every=LOG_EVERY,
     device=options.device,
     seed=options.seed,
   )
@@ -205,6 +206,7 @@ def run_agathe(arguments: Sequence[str]) -> int:
       print(f"lab: validation was lowest at step {best}; keeping step {options.steps} (--once)")
     best = options.steps
   else:
+    print(f"lab: retraining on train + validation for {best} steps")
     model, _ = train(Split(split.train + extra, ()), tokenizer, config, steps=best)
   print(f"parameters: {model.size():,}")
   training, holdout, sample = report(model, split)

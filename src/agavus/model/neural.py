@@ -30,6 +30,7 @@ class NeuralConfig:
   rate: float = 2e-3
   weight_decay: float = 1e-2
   check_every: int = 250
+  log_every: int = 0
   seed: int = 0
   device: str = "cpu"
 

@@ -78,6 +78,7 @@ from agavus.model.tokenizer import (
   save_tokenizer,
   train_tokenizer,
 )
+from agavus.model.training import LOG_EVERY
 from agavus.server.__main__ import serve
 
 HIDDEN = 8
@@ -395,7 +396,8 @@ def run_sft(arguments: list[str]) -> int:
     print(f"lab: sft failed: {error} — run `python -m agavus.model build-sft` first?")
     return 1
   model = placed(base, replace(base.config, device=options.device, bf16=options.bf16))
-  settings = replace(defaults, rate=options.rate, batch=options.batch)
+  settings = replace(defaults, rate=options.rate, batch=options.batch, log_every=LOG_EVERY)
+  print(f"sft: {len(train_set)} train, {len(held_out)} held-out, {options.steps} steps", flush=True)
   model, history = tune(model, train_set, settings, steps=options.steps, held_out=held_out)
   loss = masked_loss(model, model.tokenizer, held_out)
   print(f"masked loss held-out: {loss:.4f} nats per answer token")

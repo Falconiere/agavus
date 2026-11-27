@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Protocol
 
 import torch
@@ -13,6 +14,8 @@ from agavus.model.data import Split
 IGNORED = -100
 CHECK_CHARS = 1_000_000
 History = list[tuple[int, float, float]]
+# Steps between progress lines when a run asks for them; checks and the last step print too.
+LOG_EVERY = 100
 
 
 def check_sample(texts: Sequence[str], chars: int = CHECK_CHARS) -> tuple[str, ...]:
@@ -46,6 +49,11 @@ class Settings(Protocol):
   @property
   def check_every(self) -> int:
     """Steps between loss checks."""
+    ...
+
+  @property
+  def log_every(self) -> int:
+    """Steps between progress lines; 0 prints none."""
     ...
 
   @property
@@ -88,6 +96,34 @@ class Init:
     return torch.zeros(length, device=self.device).requires_grad_()
 
 
+@dataclass(frozen=True)
+class Progress:
+  """Where a run stands: step of steps, the last batch's loss, wall seconds, latest check."""
+
+  step: int
+  steps: int
+  loss: float
+  seconds: float
+  checked: tuple[float, float] | None = None
+
+  def line(self) -> str:
+    """One log line: 'step 1200/12000  batch 0.4120  0.180 s/step  eta 0h32m  …'."""
+    per_step = self.seconds / self.step
+    minutes = round(per_step * (self.steps - self.step) / 60)
+    text = (
+      f"step {self.step:>6}/{self.steps}  batch {self.loss:.4f}  {per_step:.3f} s/step"
+      f"  eta {minutes // 60}h{minutes % 60:02d}m"
+    )
+    if self.checked is not None:
+      text += f"  train {self.checked[0]:.4f}  held-out {self.checked[1]:.4f}"
+    return text
+
+
+def print_progress(progress: Progress) -> None:
+  """Print the progress line at once, so a redirected log can be followed live."""
+  print(progress.line(), flush=True)
+
+
 def descend(
   weights: list[Tensor],
   mistake: Callable[[torch.Generator], Tensor],
@@ -96,7 +132,11 @@ def descend(
   steps: int,
   check: Callable[[], tuple[float, float]] | None,
 ) -> History:
-  """Nudge `weights` `steps` times with AdamW; every `check_every` steps, record `check()`."""
+  """Nudge `weights` `steps` times with AdamW; every `check_every` steps, record `check()`.
+
+  With `log_every`, a progress line prints every `log_every` steps, at every check and at the
+  last step; reading the batch loss waits for the device only then.
+  """
   generator = torch.Generator().manual_seed(settings.seed)
   # Decay pulls matrices toward zero; gains and biases keep their scale.
   matrices = [weight for weight in weights if weight.dim() > 1]
@@ -107,13 +147,20 @@ def descend(
   ]
   optimizer = torch.optim.AdamW(groups, lr=settings.rate)
   history: History = []
+  began = perf_counter()
   for number in range(1, steps + 1):
-    slopes = torch.autograd.grad(mistake(generator), weights)
+    loss = mistake(generator)
+    slopes = torch.autograd.grad(loss, weights)
     for weight, slope in zip(weights, slopes, strict=True):
       weight.grad = slope
     optimizer.step()
+    checked = None
     if check is not None and number % settings.check_every == 0:
-      history.append((number, *check()))
+      checked = check()
+      history.append((number, *checked))
+    every = settings.log_every
+    if every and (checked or number % every == 0 or number == steps):
+      print_progress(Progress(number, steps, float(loss.detach()), perf_counter() - began, checked))
   return history
 
 

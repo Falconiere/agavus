@@ -53,6 +53,7 @@ class TuneConfig:
   weight_decay: float = 0.1
   batch: int = 16
   check_every: int = 100
+  log_every: int = 0
   seed: int = 0
 
 
