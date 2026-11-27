@@ -14,6 +14,7 @@ from agavus.config.settings import load_settings
 from agavus.model.bundle import BUNDLE_FILE
 from agavus.model.checkpoint import load_checkpoint
 from agavus.model.report import THREADS
+from agavus.model.tokenizer import TOKENIZER_FILE
 from agavus.server.api import application
 
 
@@ -31,11 +32,14 @@ def serve(arguments: Sequence[str]) -> int:
   parser.add_argument(
     "--run", type=Path, default=data_dir / "lab/runs/long-civil", help="diretório do checkpoint"
   )
+  parser.add_argument(
+    "--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE, help="tokenizer do checkpoint"
+  )
   options = parser.parse_args(arguments)
   run: Path = options.run
   torch.set_num_threads(THREADS)
   try:
-    model = load_checkpoint(run, data_dir / BUNDLE_FILE, data_dir)
+    model = load_checkpoint(run, data_dir / BUNDLE_FILE, options.tokenizer, data_dir)
   except ValueError as error:
     parser.exit(1, f"{error}\n")
   with make_server(

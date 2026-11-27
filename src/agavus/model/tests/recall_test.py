@@ -2,24 +2,24 @@
 
 import torch
 
-from agavus.model.agathe import AgatheConfig, start, train
-from agavus.model.bigram import BOUNDARY, build_vocab
+from agavus.model.agathe import END_ID, AgatheConfig, start, train
 from agavus.model.data import Split
 from agavus.model.recall import greedy, recall, sample_texts
+from agavus.model.tokenizer import train_tokenizer
 
 torch.set_num_threads(1)
 
 TEXT = "a guarda do filho sera compartilhada entre os pais sempre que possivel no caso"
 PROMPT, ANSWER = 16, 16
 LIMIT = 5
-CONFIG = AgatheConfig(context=32, width=32, heads=2, layers=1, dropout=0.0, batch=8, rate=1e-2)
+CONFIG = AgatheConfig(context=32, width=32, heads=2, layers=1, batch=8, rate=1e-2)
+TOKENIZER = train_tokenizer([TEXT] * 3, 300)
 
 
 def _memorized() -> tuple[float, float, float]:
-  vocab = build_vocab([TEXT])
-  model, _ = train(Split((TEXT,) * 4, ()), vocab, CONFIG, steps=300)
+  model, _ = train(Split((TEXT,) * 4, ()), TOKENIZER, CONFIG, steps=150)
   trained = recall(model, [TEXT], prompt_chars=PROMPT, answer_chars=ANSWER)
-  blank = recall(start(vocab, CONFIG), [TEXT], prompt_chars=PROMPT, answer_chars=ANSWER)
+  blank = recall(start(TOKENIZER, CONFIG), [TEXT], prompt_chars=PROMPT, answer_chars=ANSWER)
   return trained.exact, trained.loss, blank.loss
 
 
@@ -30,7 +30,7 @@ def test_memorized_text_is_recalled() -> None:
 
 
 def test_short_texts_are_skipped() -> None:
-  model = start(build_vocab([TEXT]), CONFIG)
+  model = start(TOKENIZER, CONFIG)
   report = recall(model, ["short", TEXT[:20]], prompt_chars=PROMPT, answer_chars=ANSWER)
   assert (report.texts, report.exact, report.matched, report.loss) == (0, 0.0, 0.0, 0.0)
 
@@ -44,9 +44,12 @@ def test_sample_is_seeded_and_capped() -> None:
 
 
 def test_greedy_stops_at_boundary() -> None:
-  vocab = build_vocab([TEXT])
-  model = start(vocab, CONFIG)
-  # Make the boundary the certain next token.
-  model.out_bias.data[:] = -100.0
-  model.out_bias.data[BOUNDARY] = 100.0
+  model = start(TOKENIZER, CONFIG)
+  # Make the end token the most likely next token: the output reads the token table.
+  model.tokens.data[END_ID] = 0.0
+  assert greedy(model, "a guarda", 10) != ""
+  model.layers[0].down.data.zero_()
+  model.layers[0].mix.data.zero_()
+  model.tokens.data[:] = model.tokens.data[:, :1].abs() + 1.0
+  model.tokens.data[END_ID] = 10.0
   assert greedy(model, "a guarda", 10) == ""

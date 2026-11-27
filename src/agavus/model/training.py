@@ -102,7 +102,14 @@ def fit(
   """
   generator = torch.Generator().manual_seed(settings.seed)
   weights = model.parameters()
-  optimizer = torch.optim.AdamW(weights, lr=settings.rate, weight_decay=settings.weight_decay)
+  # Decay pulls matrices toward zero; gains and biases keep their scale.
+  matrices = [weight for weight in weights if weight.dim() > 1]
+  others = [weight for weight in weights if weight.dim() <= 1]
+  groups = [
+    {"params": matrices, "weight_decay": settings.weight_decay},
+    {"params": others, "weight_decay": 0.0},
+  ]
+  optimizer = torch.optim.AdamW(groups, lr=settings.rate)
   history: History = []
   checked = check_sample(watch.train)
   for number in range(1, steps + 1):

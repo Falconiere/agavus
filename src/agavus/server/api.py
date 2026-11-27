@@ -7,10 +7,12 @@ from secrets import randbits
 from time import perf_counter
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
-from agavus.model.agathe import AgatheModel
+from agavus.model.agathe import AgatheModel, framed
 from agavus.model.report import SAMPLE_CHARS
+from agavus.model.tokenizer import decode
 
 MAX_BODY = 1024 * 1024
+PARTIAL = "\ufffd"
 
 
 def _line(value: dict[str, object]) -> bytes:
@@ -18,30 +20,30 @@ def _line(value: dict[str, object]) -> bytes:
 
 
 def continuation(model: AgatheModel, prefix: str) -> Iterator[bytes]:
-  """Stream new characters, then inference metrics including initial context usage."""
+  """Stream new text, then inference metrics including initial context usage in tokens."""
   capacity = model.config.context
-  recent = prefix[-capacity:]
-  count = 0
+  used = min(len(framed(model.tokenizer, prefix)) - 1, capacity)
+  written: list[int] = []
+  sent = ""
   seconds = 0.0
-  tokens = model.continuation(recent, seed=randbits(63), max_chars=SAMPLE_CHARS)
+  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=SAMPLE_CHARS)
   while True:
     began = perf_counter()
     token = next(tokens, None)
     seconds += perf_counter() - began
-    if token is None:
+    if token is not None:
+      written.append(token)
+    text = decode(model.tokenizer, written)[:SAMPLE_CHARS]
+    # A character split across tokens waits for its last byte.
+    if text.endswith(PARTIAL) and token is not None:
+      continue
+    if len(text) > len(sent):
+      yield _line({"text": text[len(sent) :]})
+      sent = text
+    if token is None or len(sent) == SAMPLE_CHARS:
       break
-    text = model.vocab.decode([token])
-    count += len(text)
-    yield _line({"text": text})
   yield _line(
-    {
-      "metrics": {
-        "seconds": seconds,
-        "characters": count,
-        "used": len(recent),
-        "capacity": capacity,
-      }
-    }
+    {"metrics": {"seconds": seconds, "characters": len(sent), "used": used, "capacity": capacity}}
   )
 
 

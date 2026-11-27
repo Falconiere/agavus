@@ -228,10 +228,11 @@ def run_recall(arguments: list[str]) -> int:
   parser.add_argument("--limit", type=int, default=200)
   parser.add_argument("--prompt", type=int, default=64, help="prompt characters")
   parser.add_argument("--answer", type=int, default=64, help="answer characters")
+  parser.add_argument("--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE)
   options = parser.parse_args(arguments)
   torch.set_num_threads(THREADS)
   try:
-    model = load_checkpoint(options.run, data_dir / BUNDLE_FILE, data_dir)
+    model = load_checkpoint(options.run, data_dir / BUNDLE_FILE, options.tokenizer, data_dir)
     split = split_articles(read_bundle(data_dir / BUNDLE_FILE).statutes)
   except (OSError, ValueError) as error:
     print(f"lab: recall failed: {error}")

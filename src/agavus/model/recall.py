@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 import torch
 
-from agavus.model.agathe import AgatheModel
-from agavus.model.bigram import BOUNDARY
+from agavus.model.agathe import END_ID, AgatheModel, framed
+from agavus.model.tokenizer import decode, encode
 
 
 @dataclass(frozen=True)
@@ -24,35 +24,34 @@ class RecallReport:
   loss: float
 
 
-def _next_scores(model: AgatheModel, ids: Sequence[int]) -> torch.Tensor:
-  """Scores for the token after `ids`, seeing only the most recent `context` of them."""
-  recent = torch.tensor([list(ids[-model.config.context :])], device=model.config.device)
-  return model.scores(recent)[0, -1]
-
-
 def greedy(model: AgatheModel, prompt: str, chars: int) -> str:
-  """Deterministic most likely continuation, stopping early at the boundary."""
-  ids = model.vocab.encode(prompt)[:-1]
+  """Deterministic most likely continuation of `chars` characters, stopping at the end token."""
+  window = framed(model.tokenizer, prompt)[:-1][-model.config.context :]
+  cache: list[tuple[torch.Tensor, torch.Tensor]] = []
+  found = model.extend(window, 0, cache)
   written: list[int] = []
-  with torch.no_grad():
-    for _ in range(chars):
-      chosen = int(_next_scores(model, ids).argmax())
-      if chosen == BOUNDARY:
-        break
-      ids.append(chosen)
-      written.append(chosen)
-  return model.vocab.decode(written)
+  # A token holds at least one byte, so `chars` UTF-8 characters need at most 4 per char.
+  for position in range(len(window), len(window) + 4 * chars):
+    chosen = int(found.argmax())
+    if chosen == END_ID:
+      break
+    written.append(chosen)
+    if len(decode(model.tokenizer, written)) >= chars:
+      break
+    found = model.extend([chosen], position, cache)
+  return decode(model.tokenizer, written)[:chars]
 
 
 def _answer_loss(model: AgatheModel, prompt: str, answer: str) -> float:
   """Total -ln P of the answer tokens, each given everything before it (teacher-forced)."""
-  ids = model.vocab.encode(prompt)[:-1]
-  total = 0.0
+  ids = framed(model.tokenizer, prompt)[:-1]
+  answered = encode(model.tokenizer, answer)
+  row = torch.tensor([(ids + answered)[-model.config.context - 1 :]], device=model.config.device)
   with torch.no_grad():
-    for token in model.vocab.encode(answer)[1:-1]:
-      total -= float(torch.log_softmax(_next_scores(model, ids), dim=-1)[token])
-      ids.append(token)
-  return total
+    chances = torch.log_softmax(model.scores(row[:, :-1])[0], dim=-1)
+  told = row[0, 1:]
+  # shortcut: one window, so an answer longer than the context only counts its last tokens.
+  return -float(chances.gather(1, told[:, None])[max(0, len(told) - len(answered)) :].sum())
 
 
 def _matched(expected: str, got: str) -> int:

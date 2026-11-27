@@ -2,7 +2,8 @@
 
 Same command on a laptop and on a rented GPU (docs/llm-lab.md §6): there, the
 text comes from an exported bundle (`--texts`) and `--out` keeps a run record
-with config, seed, data hash, losses and timing, plus the weights.
+with config, seed, data and tokenizer hashes, losses and timing, plus the weights.
+Validation and exam are reported in bits per character, comparable across tokenizers.
 """
 
 import argparse
@@ -14,10 +15,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import torch
+from tokenizers import Tokenizer
 
 from agavus.config.settings import load_settings
-from agavus.model.agathe import AgatheConfig, AgatheModel, train
-from agavus.model.bigram import build_vocab
+from agavus.model.agathe import AgatheConfig, AgatheModel, check_config, train
 from agavus.model.bundle import (
   LOCAL,
   Texts,
@@ -30,6 +31,7 @@ from agavus.model.bundle import (
 from agavus.model.data import Split, split_articles
 from agavus.model.extra import without_leaks
 from agavus.model.report import THREADS, chosen_steps, report
+from agavus.model.tokenizer import TOKENIZER_FILE, decode, encode, load_tokenizer
 from agavus.model.training import synchronize
 
 STEPS = 6000
@@ -40,7 +42,7 @@ EXTRA_NAMES = ("civil", "wikipedia", "federal", "planalto", "djen")
 
 
 def parse(arguments: Sequence[str]) -> argparse.Namespace:
-  """Options; every one has a CPU-friendly default."""
+  """Options; the defaults are the GPU-sized model from docs/llm-lab.md §9."""
   parser = argparse.ArgumentParser(prog="python -m agavus.model agathe")
   parser.add_argument("extras", nargs="*", choices=EXTRA_NAMES, help="extra training text")
   parser.add_argument("--steps", type=int, default=STEPS, help="most steps to try on validation")
@@ -49,6 +51,10 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("--layers", type=int, default=defaults.layers, help="transformer blocks")
   parser.add_argument("--width", type=int, default=defaults.width, help="embedding width")
   parser.add_argument("--heads", type=int, default=defaults.heads, help="attention heads per block")
+  parser.add_argument(
+    "--kv-heads", type=int, default=defaults.kv_heads, help="key/value heads shared by queries"
+  )
+  parser.add_argument("--rope-base", type=float, default=defaults.rope_base, help="RoPE base")
   parser.add_argument("--context", type=int, default=defaults.context, help="tokens per window")
   parser.add_argument("--batch", type=int, default=defaults.batch, help="windows per update")
   parser.add_argument("--rate", type=float, default=defaults.rate, help="AdamW learning rate")
@@ -60,21 +66,45 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   )
   parser.add_argument("--texts", type=Path, help="exported bundle instead of the local corpus")
   parser.add_argument("--out", type=Path, help="folder for run.json and model.pt")
+  parser.add_argument(
+    "--tokenizer", type=Path, help=f"BPE tokenizer file (default: data dir / {TOKENIZER_FILE})"
+  )
   options = parser.parse_args(list(arguments))
-  if min(options.layers, options.width, options.heads, options.context, options.batch) < 1:
-    parser.error("layers, width, heads, context and batch must be positive integers")
-  if options.width % options.heads:
-    parser.error("--width must be divisible by --heads")
-  if not options.rate > 0:
-    parser.error("--rate must be positive")
+  if options.batch < 1:
+    parser.error("--batch must be a positive integer")
+  if not options.rate > 0 or not options.rope_base > 0:
+    parser.error("--rate and --rope-base must be positive")
+  try:
+    check_config(config_from(options))
+  except ValueError as error:
+    parser.error(str(error))
   return options
 
 
+def config_from(options: argparse.Namespace) -> AgatheConfig:
+  """The model and training settings the options ask for."""
+  return AgatheConfig(
+    layers=options.layers,
+    width=options.width,
+    heads=options.heads,
+    kv_heads=options.kv_heads,
+    rope_base=options.rope_base,
+    context=options.context,
+    batch=options.batch,
+    rate=options.rate,
+    bf16=options.bf16,
+    check_every=options.check_every,
+    device=options.device,
+    seed=options.seed,
+  )
+
+
 def show_attention(model: AgatheModel) -> None:
-  """For the last letter, the earlier letters each head of the last layer looks at most."""
+  """For the last token, the earlier tokens each head of the last layer looks at most."""
   looks = model.looks(ATTENTION_TEXT)[-1]
-  letters = ["⟨start⟩", *ATTENTION_TEXT][-looks.shape[-1] :]
-  print(f"text: {ATTENTION_TEXT!r}; who the last letter {letters[-1]!r} looks at:")
+  pieces = [decode(model.tokenizer, [token]) for token in encode(model.tokenizer, ATTENTION_TEXT)]
+  letters = ["⟨start⟩", *pieces][-looks.shape[-1] :]
+  print(f"text: {ATTENTION_TEXT!r}; who the last token {letters[-1]!r} looks at:")
   for head, row in enumerate(looks[:, -1]):
     top = torch.topk(row, min(SHOWN_LOOKS, len(row)))
     shown = ", ".join(
@@ -111,61 +141,77 @@ def save_run(out: Path, model: AgatheModel, record: dict[str, object]) -> None:
   print(f"saved: {out / 'run.json'}, {out / 'model.pt'}")
 
 
-def run_agathe(arguments: Sequence[str]) -> int:
-  """Steps chosen on validation, exam opened once at the end.
-
-  Extra text only joins the training side; validation, exam and the letter
-  vocabulary stay the statute articles', so losses stay comparable.
-  """
-  options = parse(arguments)
+def _inputs(options: argparse.Namespace) -> tuple[Texts, Tokenizer, Path] | None:
+  """The texts and tokenizer the options name, or None after saying what is missing."""
+  data_dir = load_settings().data_dir
   if options.texts:
     texts = read_bundle(options.texts)
   elif set(options.extras) & LOCAL.keys():
-    texts = with_local(load_settings().data_dir, options.extras)
+    texts = with_local(data_dir, options.extras)
   else:
-    texts = local_texts(load_settings().data_dir)
+    texts = local_texts(data_dir)
   if not texts.statutes:
     print("lab: no statute articles — ingest statutes first")
+    return None
+  path: Path = options.tokenizer or data_dir / TOKENIZER_FILE
+  if not path.is_file():
+    print(f"lab: no tokenizer at {path} — run `python -m agavus.model train-tokenizer` first")
+    return None
+  return texts, load_tokenizer(path), path
+
+
+def _bits(model: AgatheModel, name: str, texts: Sequence[str]) -> float:
+  """Print and return bits per character on `texts`."""
+  bits = model.bits_per_char(texts)
+  print(f"bits/char {name}: {bits:.4f}")
+  return bits
+
+
+def _gpu(device: str) -> str | None:
+  """The accelerator a run used, for the record."""
+  kind = torch.device(device).type
+  if kind == "cuda":
+    return torch.cuda.get_device_name(device)
+  return "mps" if kind == "mps" else None
+
+
+def run_agathe(arguments: Sequence[str]) -> int:
+  """Steps chosen on validation, exam opened once at the end.
+
+  Extra text only joins the training side; validation and exam stay the statute
+  articles', so bits per character stay comparable.
+  """
+  options = parse(arguments)
+  found = _inputs(options)
+  if found is None:
     return 1
+  texts, tokenizer, tokenizer_path = found
   extra = extra_texts(texts, options.extras)
   if extra is None:
     return 1
   torch.set_num_threads(THREADS)
   split = split_articles(texts.statutes)
   inner = split_articles(split.train)
-  vocab = build_vocab(split.train)
-  config = AgatheConfig(
-    layers=options.layers,
-    width=options.width,
-    heads=options.heads,
-    context=options.context,
-    batch=options.batch,
-    rate=options.rate,
-    bf16=options.bf16,
-    check_every=options.check_every,
-    device=options.device,
-    seed=options.seed,
-  )
+  config = config_from(options)
   synchronize(config.device)
   began = time.monotonic()
   model, history = train(
-    Split(inner.train + extra, inner.holdout), vocab, config, steps=options.steps
+    Split(inner.train + extra, inner.holdout), tokenizer, config, steps=options.steps
   )
+  validation = _bits(model, "validation", inner.holdout)
   best = chosen_steps(history, len(history))
   if options.once:
     if history and best != options.steps:
       print(f"lab: validation was lowest at step {best}; keeping step {options.steps} (--once)")
     best = options.steps
   else:
-    model, _ = train(Split(split.train + extra, ()), vocab, config, steps=best)
+    model, _ = train(Split(split.train + extra, ()), tokenizer, config, steps=best)
   print(f"parameters: {model.size():,}")
   training, holdout, sample = report(model, split)
+  exam = _bits(model, "exam", split.holdout)
   show_attention(model)
   if options.out:
     synchronize(config.device)
-    gpu = "mps" if torch.device(config.device).type == "mps" else None
-    if torch.device(config.device).type == "cuda":
-      gpu = torch.cuda.get_device_name(config.device)
     record: dict[str, object] = {
       "config": dataclasses.asdict(config),
       "parameters": model.size(),
@@ -173,13 +219,16 @@ def run_agathe(arguments: Sequence[str]) -> int:
       "data_sha256": digest(options.texts)
       if options.texts
       else hashlib.sha256(bundle_bytes(texts)).hexdigest(),
-      "gpu": gpu,
+      "tokenizer_sha256": digest(tokenizer_path),
+      "gpu": _gpu(config.device),
       "torch": torch.__version__,
       "steps_tried": options.steps,
       "steps_chosen": best,
       "history": history,
       "loss_train": training,
       "loss_holdout": holdout,
+      "bits_per_char_validation": validation,
+      "bits_per_char_holdout": exam,
       "sample": sample,
       "seconds": round(time.monotonic() - began),
     }

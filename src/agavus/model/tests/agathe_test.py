@@ -1,123 +1,191 @@
-"""Agathe: windows, attention never looks ahead, learning (synthetic text)."""
+"""Agathe: windows, causality, RoPE, GQA, tied output, cache, learning (synthetic text)."""
+
+import math
+from dataclasses import replace
 
 import pytest
 import torch
+from torch import Tensor
 
-from agavus.model.agathe import AgatheConfig, attend, start, stream, windows
-from agavus.model.bigram import BOUNDARY, CharVocab, build_vocab
+from agavus.model.agathe import (
+  END_ID,
+  AgatheConfig,
+  AgatheModel,
+  check_config,
+  framed,
+  hidden_size,
+  rotary,
+  rotate,
+  start,
+  stream,
+  train,
+  windows,
+)
+from agavus.model.data import Split
+from agavus.model.tokenizer import encode, train_tokenizer
 from agavus.model.training import IGNORED, pick
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
 
-TEXTS = ["guarda guarda", "a guarda do filho"]
-CONFIG = AgatheConfig(context=8, width=8, heads=2, layers=2)
-STEPS = 200
+TEXTS = [
+  "Art. 22. Constatada a prática de violência doméstica contra a mulher, o juiz decide.",
+  "Art. 19. As medidas protetivas de urgência poderão ser concedidas pelo juiz.",
+  "A guarda do filho será compartilhada entre os pais.",
+] * 10
+TOKENIZER = train_tokenizer(TEXTS, 300)
+CONFIG = AgatheConfig(context=16, width=32, heads=4, kv_heads=2, layers=2)
 
 
-@pytest.mark.parametrize("context", [1, 2, 4, 8, 64])
-@pytest.mark.parametrize("text", ["", "ab", "guarda guarda guarda guarda"])
+@pytest.mark.parametrize("context", [1, 2, 4, 16, 64])
+@pytest.mark.parametrize("text", ["", "ab", TEXTS[0]])
 def test_windows_score_every_token_once(text: str, context: int) -> None:
-  vocab = build_vocab([text])
-  inputs, answers = windows([text], vocab, context)
+  inputs, answers = windows([text], TOKENIZER, context)
   scored = [int(token) for token in answers.flatten() if token != IGNORED]
-  assert scored == vocab.encode(text)[1:]
+  assert scored == framed(TOKENIZER, text)[1:]
   assert inputs.shape == answers.shape
 
 
-def test_windows_inputs_sit_one_token_before_answers() -> None:
-  vocab = build_vocab(TEXTS)
-  inputs, answers = windows(TEXTS, vocab, 4)
-  ids = vocab.encode(TEXTS[0])
-  assert inputs[0].tolist() == ids[:4]
-  assert answers[0].tolist() == ids[1:5]
+def test_stream_joins_texts_with_one_end_token_in_two_bytes() -> None:
+  first, second = (framed(TOKENIZER, text) for text in TEXTS[:2])
+  ids = stream(TEXTS[:2], TOKENIZER)
+  assert ids.long().tolist() == first + second[1:]
+  assert ids.dtype == torch.uint16
 
 
-def test_stream_joins_texts_with_one_boundary() -> None:
-  vocab = build_vocab(TEXTS)
-  first, second = (vocab.encode(text) for text in TEXTS)
-  ids = stream(TEXTS, vocab)
-  assert ids.tolist() == first + second[1:]
-  assert ids.dtype == torch.uint8
+@pytest.mark.parametrize(
+  ("width", "heads", "kv_heads"), [(30, 4, 2), (32, 4, 3), (12, 4, 2), (0, 4, 2)]
+)
+def test_config_refuses_sizes_heads_or_rope_cannot_split(
+  width: int, heads: int, kv_heads: int
+) -> None:
+  with pytest.raises(ValueError):
+    check_config(AgatheConfig(width=width, heads=heads, kv_heads=kv_heads))
 
 
-def test_attention_never_looks_ahead() -> None:
-  model = start(build_vocab(TEXTS), CONFIG)
-  for looks in model.looks("guarda"):
+def test_changing_a_later_token_leaves_earlier_scores_alone() -> None:
+  model = start(TOKENIZER, CONFIG)
+  first = torch.tensor([framed(TOKENIZER, TEXTS[0])[:12]])
+  second = first.clone()
+  second[0, 8:] = (second[0, 8:] + 5) % TOKENIZER.get_vocab_size()
+  with torch.no_grad():
+    assert torch.allclose(model.scores(first)[0, :8], model.scores(second)[0, :8])
+    assert not torch.allclose(model.scores(first)[0, 8:], model.scores(second)[0, 8:])
+
+
+def test_attention_never_looks_ahead_and_matches_the_fused_scores() -> None:
+  model = start(TOKENIZER, CONFIG)
+  shown = model.looks(TEXTS[1])
+  assert [layer.shape[:2] for layer in shown] == [(CONFIG.heads, CONFIG.context)] * 2
+  for looks in shown:
     ahead = torch.ones_like(looks[0], dtype=torch.bool).triu(1)
     assert torch.all(looks[:, ahead] == 0)
     assert torch.allclose(looks.sum(-1), torch.ones(looks.shape[:2]))
 
 
-def test_changing_a_later_token_leaves_earlier_scores_alone() -> None:
-  vocab = build_vocab(TEXTS)
-  model = start(vocab, CONFIG)
-  first = torch.tensor([vocab.encode("guarda")])
-  second = torch.tensor([vocab.encode("guardo")])
+def test_rope_dot_products_depend_only_on_the_distance() -> None:
+  size, shift = 8, 37
+  query, key = torch.randn(2, 1, 1, 1, size, generator=torch.Generator().manual_seed(1))
+
+  def dot(at_query: int, at_key: int) -> Tensor:
+    cos, sin = rotary(size, torch.tensor([at_query, at_key]), 10000.0)
+    turned = rotate(torch.cat((query, key), dim=2), cos, sin)
+    return (turned[..., 0, :] * turned[..., 1, :]).sum()
+
+  assert torch.allclose(dot(5, 2), dot(5 + shift, 2 + shift), atol=1e-5)
+  assert not torch.allclose(dot(5, 2), dot(5, 4), atol=1e-5)
+
+
+def _shared_heads(model: AgatheModel, heads: int) -> AgatheModel:
+  """The same model with each key/value head copied for every query head in its group."""
+  group = heads // model.config.kv_heads
+  size = model.config.width // heads
+
+  def copied(weights: Tensor) -> Tensor:
+    split = weights.view(model.config.width, model.config.kv_heads, size)
+    return split.repeat_interleave(group, dim=1).reshape(model.config.width, heads * size)
+
+  layers = tuple(
+    replace(layer, key=copied(layer.key), value=copied(layer.value)) for layer in model.layers
+  )
+  return replace(model, config=replace(model.config, kv_heads=heads), layers=layers)
+
+
+def test_grouped_heads_equal_full_heads_with_copied_keys_and_values() -> None:
+  model = start(TOKENIZER, CONFIG)
+  full = _shared_heads(model, CONFIG.heads)
+  assert full.layers[0].key.shape == (CONFIG.width, CONFIG.width)
+  assert model.layers[0].key.shape == (CONFIG.width, CONFIG.width // 2)
+  ids = torch.tensor([framed(TOKENIZER, TEXTS[2])[:16]])
   with torch.no_grad():
-    assert torch.allclose(model.scores(first)[0, :5], model.scores(second)[0, :5])
+    assert torch.allclose(model.scores(ids), full.scores(ids), atol=1e-6)
 
 
-def test_looks_cover_the_start_and_each_letter() -> None:
-  model = start(build_vocab(TEXTS), CONFIG)
-  assert [layer.shape for layer in model.looks("guarda")] == [(2, 7, 7)] * 2
-  assert model.looks("guarda guarda")[0].shape == (2, 8, 8)
+def test_tied_output_and_parameter_count_formula() -> None:
+  vocab = TOKENIZER.get_vocab_size()
+  for config in (CONFIG, replace(CONFIG, kv_heads=4, layers=3), AgatheConfig()):
+    model = start(TOKENIZER, config)
+    width, hidden = config.width, hidden_size(config.width)
+    shared = config.kv_heads * width // config.heads
+    per_layer = 2 * width + 2 * width * width + 2 * width * shared + 3 * width * hidden
+    assert model.size() == vocab * width + config.layers * per_layer + width
+    assert sum(weight.shape[-1] == vocab for weight in model.parameters()) == 0
+  assert hidden_size(512) == 21 * 64
 
 
-def test_lab_parameter_counts() -> None:
-  vocab = CharVocab(tuple(chr(i) for i in range(97)))
-  sizes = (start(vocab, AgatheConfig()).size(), start(vocab, AgatheConfig(layers=5)).size())
-  assert (vocab.size, *sizes) == (99, 822_627, 1_019_875)
-
-
-def test_seeded_continuation_starts_after_the_prefix_and_stops_at_boundary() -> None:
-  vocab = build_vocab(["ab"])
-  model = start(vocab, AgatheConfig(width=vocab.size, heads=1, layers=1))
-  boundary, a, b, _ = vocab.encode("ab")
+def test_seeded_continuation_starts_after_the_prefix_and_stops_at_the_end_token() -> None:
+  model = start(TOKENIZER, CONFIG)
+  # Layers add nothing; every token points the same way, the end token ten times further.
   with torch.no_grad():
-    for weight in model.parameters():
-      weight.zero_()
-    model.tokens.copy_(torch.eye(vocab.size))
-    for current, following in ((boundary, a), (a, b), (b, boundary)):
-      model.out_weights[current, following] = 100
-  assert model.sample(seed=7, max_chars=200) == "ab"
-  assert list(model.continuation("a", seed=7, max_chars=1)) == [b]
-  assert list(model.continuation("b", seed=7, max_chars=200)) == []
-  assert model.sample(seed=7, max_chars=1) == "a"
-
-
-def test_same_context_suffix_has_the_same_seeded_continuation() -> None:
-  model = start(build_vocab(TEXTS), CONFIG)
-  suffix = "a guarda"
-  full = list(model.continuation("um começo diferente " + suffix, seed=7, max_chars=20))
-  assert full and full == list(model.continuation(suffix, seed=7, max_chars=20))
-
-
-def test_fused_attention_matches_the_shown_attention() -> None:
-  model = start(build_vocab(["abcdef ghij"]), AgatheConfig(context=16, width=12, heads=3, layers=1))
-  vectors = torch.randn(2, 16, 12, generator=torch.Generator().manual_seed(0))
+    for layer in model.layers:
+      layer.mix.zero_()
+      layer.down.zero_()
+    model.tokens.zero_()
+    model.tokens[:, 0] = 1.0
+    model.tokens[END_ID, 0] = 10.0
+    model.gain.fill_(10.0)
+  assert list(model.continuation("a guarda", seed=7, max_tokens=50)) == []
+  assert model.sample(seed=7, max_chars=50) == ""
   with torch.no_grad():
-    shown, looks = attend(model.layers[0], vectors, 3, show=True)
-    fused, none = attend(model.layers[0], vectors, 3, show=False)
-  assert looks is not None
-  assert none is None
-  assert torch.allclose(shown, fused, atol=1e-6)
+    model.tokens[END_ID, 0] = -10.0
+  assert len(list(model.continuation("a guarda", seed=7, max_tokens=5))) == len("abcde")
 
 
-def test_cached_continuation_matches_reading_the_whole_window_each_time() -> None:
-  model = start(build_vocab(TEXTS), AgatheConfig(context=8, width=12, heads=3, layers=2))
-  prefix, seed, chars = "a guarda", 3, 30
-  with torch.no_grad():
-    model.out_bias[BOUNDARY] = -1e9  # never stop early, so the window must slide
+def _recomputed(model: AgatheModel, prefix: str, seed: int, count: int) -> list[int]:
+  """Seeded tokens read from the whole recent window each step, without a cache."""
   generator = torch.Generator().manual_seed(seed)
-  ids = model.vocab.encode(prefix)[:-1]
-  expected: list[int] = []
+  ids = framed(TOKENIZER, prefix)[:-1]
+  written: list[int] = []
   with torch.no_grad():
-    while len(expected) < chars:
-      chosen = pick(model.scores(torch.tensor([ids[-8:]]))[0, -1], generator)
-      if chosen == BOUNDARY:
+    while len(written) < count:
+      chosen = pick(model.scores(torch.tensor([ids[-model.config.context :]]))[0, -1], generator)
+      if chosen == END_ID:
         break
       ids.append(chosen)
-      expected.append(chosen)
-  assert len(expected) == chars
-  assert list(model.continuation(prefix, seed=seed, max_chars=chars)) == expected
+      written.append(chosen)
+  return written
+
+
+def test_cached_continuation_matches_reading_the_whole_window_until_it_slides() -> None:
+  model = start(TOKENIZER, CONFIG)
+  with torch.no_grad():
+    model.tokens[END_ID] = -model.tokens[1:].sum(0)  # never stop early
+  prefix, seed = "a guarda", 3
+  fill = CONFIG.context - len(encode(TOKENIZER, prefix))
+  assert list(model.continuation(prefix, seed=seed, max_tokens=fill)) == _recomputed(
+    model, prefix, seed, fill
+  )
+  long = list(model.continuation(prefix, seed=seed, max_tokens=3 * CONFIG.context))
+  assert len(long) == 3 * CONFIG.context
+  assert long[:fill] == _recomputed(model, prefix, seed, fill)
+
+
+def test_training_reduces_loss_and_reports_bits_per_character() -> None:
+  config = replace(CONFIG, batch=8, rate=1e-2, check_every=10)
+  split = Split(tuple(TEXTS), tuple(TEXTS[:3]))
+  blank = start(TOKENIZER, config)
+  model, history = train(split, TOKENIZER, config, steps=30)
+  assert len(history) == 30 // config.check_every
+  assert model.loss(TEXTS[:3]) < blank.loss(TEXTS[:3]) - 1
+  bits = model.bits_per_char(TEXTS[:3])
+  assert 0 < bits < blank.bits_per_char(TEXTS[:3]) and math.isfinite(bits)

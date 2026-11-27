@@ -9,9 +9,10 @@ import torch
 
 from agavus.model import agathe, neural
 from agavus.model.agathe import AgatheModel
-from agavus.model.bigram import Vocab, build_vocab, train_bigram, uniform_loss
+from agavus.model.bigram import build_vocab, train_bigram, uniform_loss
 from agavus.model.data import Split
 from agavus.model.neural import NeuralModel
+from agavus.model.tokenizer import train_tokenizer
 from agavus.model.training import History, Init, check_sample, synchronize
 
 # Many threads only fight over work this small.
@@ -21,19 +22,28 @@ TEXTS = ("guarda guarda", "a guarda do filho")
 STEPS = 200
 NEURAL = neural.NeuralConfig(context=3, vector=8, hidden=32, batch=32, rate=1e-2, check_every=50)
 AGATHE = agathe.AgatheConfig(
-  context=8, width=16, heads=2, layers=1, batch=16, rate=1e-2, check_every=50
+  context=8, width=16, heads=2, kv_heads=1, layers=1, batch=16, rate=1e-2, check_every=50
 )
+VOCAB = build_vocab(TEXTS)
+TOKENIZER = train_tokenizer(TEXTS * 3, 300)
 
 Model = NeuralModel | AgatheModel
-Trainer = Callable[[Vocab, int, Sequence[str]], tuple[Model, History]]
+Trainer = Callable[[int, Sequence[str]], tuple[Model, History]]
 
 
-def _neural(vocab: Vocab, steps: int, validation: Sequence[str]) -> tuple[Model, History]:
-  return neural.train(Split(TEXTS, tuple(validation)), vocab, NEURAL, steps=steps)
+def _neural(steps: int, validation: Sequence[str]) -> tuple[Model, History]:
+  return neural.train(Split(TEXTS, tuple(validation)), VOCAB, NEURAL, steps=steps)
 
 
-def _agathe(vocab: Vocab, steps: int, validation: Sequence[str]) -> tuple[Model, History]:
-  return agathe.train(Split(TEXTS, tuple(validation)), vocab, AGATHE, steps=steps)
+def _agathe(steps: int, validation: Sequence[str]) -> tuple[Model, History]:
+  return agathe.train(Split(TEXTS, tuple(validation)), TOKENIZER, AGATHE, steps=steps)
+
+
+def _nats_per_char(model: Model) -> float:
+  """Surprise per character, so a BPE model compares with the character bigram."""
+  if isinstance(model, AgatheModel):
+    return model.bits_per_char(TEXTS) * math.log(2)
+  return model.loss(TEXTS)
 
 
 TRAINERS = pytest.mark.parametrize("trainer", [_neural, _agathe], ids=["neural", "agathe"])
@@ -46,30 +56,28 @@ def test_init_is_reproducible_and_biases_start_at_zero() -> None:
 
 
 def test_untrained_models_are_near_uniform() -> None:
-  vocab = build_vocab(TEXTS)
-  for model in (neural.start(vocab, NEURAL), agathe.start(vocab, AGATHE)):
-    assert model.loss(TEXTS) == pytest.approx(uniform_loss(vocab), abs=0.1)
+  assert neural.start(VOCAB, NEURAL).loss(TEXTS) == pytest.approx(uniform_loss(VOCAB), abs=0.1)
+  blank = agathe.start(TOKENIZER, AGATHE).loss(TEXTS)
+  assert blank == pytest.approx(math.log(TOKENIZER.get_vocab_size()), abs=0.1)
 
 
 @TRAINERS
 def test_learns_more_than_the_bigram(trainer: Trainer) -> None:
-  vocab = build_vocab(TEXTS)
-  model, history = trainer(vocab, STEPS, TEXTS)
-  assert model.loss(TEXTS) < train_bigram(TEXTS).loss(TEXTS)
+  model, history = trainer(STEPS, TEXTS)
+  assert _nats_per_char(model) < train_bigram(TEXTS).loss(TEXTS)
   assert [number for number, _, _ in history] == [50, 100, 150, 200]
 
 
 @TRAINERS
 def test_no_validation_means_no_history(trainer: Trainer) -> None:
-  _, history = trainer(build_vocab(TEXTS), STEPS // 4, ())
+  _, history = trainer(STEPS // 4, ())
   assert history == []
 
 
 @TRAINERS
 def test_training_and_sampling_are_reproducible(trainer: Trainer) -> None:
-  vocab = build_vocab(TEXTS)
-  first, _ = trainer(vocab, STEPS // 4, ())
-  second, _ = trainer(vocab, STEPS // 4, ())
+  first, _ = trainer(STEPS // 4, ())
+  second, _ = trainer(STEPS // 4, ())
   assert math.isclose(first.loss(TEXTS), second.loss(TEXTS), rel_tol=1e-4)
   sample = first.sample(seed=1, max_chars=20)
   assert sample == first.sample(seed=1, max_chars=20)
@@ -78,11 +86,10 @@ def test_training_and_sampling_are_reproducible(trainer: Trainer) -> None:
 
 @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="requires local MPS")
 def test_mps_training_validation_and_sampling() -> None:
-  vocab = build_vocab(TEXTS)
   split = Split(TEXTS, TEXTS)
   for model, history in (
-    neural.train(split, vocab, replace(NEURAL, device="mps", check_every=1), steps=1),
-    agathe.train(split, vocab, replace(AGATHE, device="mps", check_every=1), steps=1),
+    neural.train(split, VOCAB, replace(NEURAL, device="mps", check_every=1), steps=1),
+    agathe.train(split, TOKENIZER, replace(AGATHE, device="mps", check_every=1), steps=1),
   ):
     synchronize("mps")
     assert all(weight.device.type == "mps" for weight in model.parameters())

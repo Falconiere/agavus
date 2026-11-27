@@ -12,14 +12,15 @@ import httpx
 import pytest
 
 from agavus.model.agathe import AgatheConfig, start
-from agavus.model.bigram import build_vocab
 from agavus.model.report import SAMPLE_CHARS
+from agavus.model.tokenizer import train_tokenizer
 from agavus.server.api import application
 
 
 @pytest.fixture
 def api() -> Iterator[httpx.Client]:
-  model = start(build_vocab(["papel"]), AgatheConfig(width=8, heads=2, context=4, layers=1))
+  tokenizer = train_tokenizer(["um papel ção", "papel"] * 3, 300)
+  model = start(tokenizer, AgatheConfig(width=8, heads=2, kv_heads=1, context=4, layers=1))
   with make_server("127.0.0.1", 0, application(model, "pequeno")) as server:
     thread = Thread(target=server.serve_forever)
     thread.start()
@@ -34,7 +35,8 @@ def api() -> Iterator[httpx.Client]:
 def test_model_and_stream(api: httpx.Client) -> None:
   metadata = api.get("/api/model").json()
   assert metadata["name"] == "pequeno" and metadata["parameters"] > 0
-  with api.stream("POST", "/api/continue", json={"prefix": "um papel"}) as response:
+  prefix = {"prefix": "um papel, outro papel e mais um papel"}
+  with api.stream("POST", "/api/continue", json=prefix) as response:
     assert response.headers["content-type"] == "application/x-ndjson"
     events = [json.loads(line) for line in response.iter_lines()]
   metrics = events.pop()["metrics"]

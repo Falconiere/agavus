@@ -132,7 +132,8 @@ $("form").onsubmit = async (event) => {
   let answer = "";
   try {
     const full = chat.messages.map((message) => message.text).join("\n");
-    const prefix = Array.from(full).slice(-model.context).join("");
+    // The server keeps the last `context` tokens; a token rarely spans more than 8 characters.
+    const prefix = Array.from(full).slice(-model.context * 8).join("");
     chat.metrics = await generate(prefix, (piece) => {
       answer += piece;
       body.textContent = answer.trimStart();

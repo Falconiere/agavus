@@ -1,4 +1,4 @@
-"""Restore a saved Agathe run for CPU inference using its original text bundle."""
+"""Restore a saved Agathe run for CPU inference, checking its text bundle and tokenizer."""
 
 import json
 import pickle
@@ -8,10 +8,11 @@ from pathlib import Path
 
 import torch
 
-from agavus.model.agathe import AgatheConfig, AgatheModel, start
-from agavus.model.bigram import build_vocab
+from agavus.model.agathe import AgatheConfig, AgatheModel, check_config, start
 from agavus.model.bundle import LOCAL, Texts, bundle_bytes, digest, merged, read_bundle
-from agavus.model.data import split_articles
+from agavus.model.tokenizer import load_tokenizer
+
+DIMENSIONS = ("context", "width", "heads", "kv_heads", "layers")
 
 
 def _inputs_sha256(bundle: Path, texts: Texts, extras: Sequence[str], data_dir: Path | None) -> str:
@@ -21,20 +22,30 @@ def _inputs_sha256(bundle: Path, texts: Texts, extras: Sequence[str], data_dir: 
   return sha256(bundle_bytes(merged(texts, data_dir, extras))).hexdigest()
 
 
-def load_checkpoint(run: Path, bundle: Path, data_dir: Path | None = None) -> AgatheModel:
-  """Validate the three artifacts before exposing the model to a chat session."""
+def _hash(record: dict[str, object], key: str) -> str:
+  """A recorded SHA-256, refused unless it is one."""
+  found = record[key]
+  if not isinstance(found, str) or len(bytes.fromhex(found)) != sha256().digest_size:
+    raise ValueError(f"SHA-256 inválido em {key}")
+  return found
+
+
+def load_checkpoint(
+  run: Path, bundle: Path, tokenizer: Path, data_dir: Path | None = None
+) -> AgatheModel:
+  """Validate the four artifacts before exposing the model to a chat session."""
   record_path = run / "run.json"
   try:
     record = json.loads(record_path.read_bytes())
     config = record["config"]
-    dimensions = {key: config[key] for key in ("context", "width", "heads", "layers")}
-    if any(type(value) is not int or value < 1 for value in dimensions.values()):
+    dimensions = {key: config[key] for key in DIMENSIONS}
+    if any(type(value) is not int for value in dimensions.values()):
       raise ValueError("dimensões inválidas")
-    if dimensions["width"] % dimensions["heads"]:
-      raise ValueError("largura incompatível com o número de cabeças")
-    expected = record["data_sha256"]
-    if not isinstance(expected, str) or len(bytes.fromhex(expected)) != sha256().digest_size:
-      raise ValueError("SHA-256 inválido")
+    if type(config["rope_base"]) is not float or not config["rope_base"] > 0:
+      raise ValueError("base RoPE inválida")
+    settings = AgatheConfig(**dimensions, rope_base=config["rope_base"])
+    check_config(settings)
+    expected, words = _hash(record, "data_sha256"), _hash(record, "tokenizer_sha256")
   except (OSError, TypeError, KeyError, ValueError) as error:
     raise ValueError(f"Confira {record_path}: {error}") from error
 
@@ -42,13 +53,15 @@ def load_checkpoint(run: Path, bundle: Path, data_dir: Path | None = None) -> Ag
     texts = read_bundle(bundle)
     if _inputs_sha256(bundle, texts, record.get("extras", ()), data_dir) != expected:
       raise ValueError(f"o SHA-256 difere do registrado em {record_path}")
-    training = split_articles(texts.statutes).train
-    if not training:
-      raise ValueError("faltam artigos de treino")
   except (OSError, AttributeError, KeyError, TypeError, ValueError) as error:
     raise ValueError(f"Confira {bundle}: {error}") from error
 
-  model = start(build_vocab(training), AgatheConfig(**dimensions))
+  try:
+    if digest(tokenizer) != words:
+      raise ValueError(f"o SHA-256 difere do registrado em {record_path}")
+    model = start(load_tokenizer(tokenizer), settings)
+  except (OSError, ValueError) as error:
+    raise ValueError(f"Confira {tokenizer}: {error}") from error
   weights = run / "model.pt"
   try:
     saved = torch.load(weights, map_location="cpu", weights_only=True)
