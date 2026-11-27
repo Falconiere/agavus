@@ -1,19 +1,24 @@
 """Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export.
+chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export,
+build-sft, sft.
 """
 
 import argparse
+import json
 import sys
+from collections import Counter
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 import torch
 
 from agavus.config.settings import load_settings
-from agavus.model.agathe_run import run_agathe
+from agavus.model.agathe import placed
+from agavus.model.agathe_run import run_agathe, save_run
 from agavus.model.bigram import (
   CharVocab,
   build_vocab,
@@ -41,6 +46,8 @@ from agavus.model.neural import train as train_neural
 from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
 from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.model.sft import TuneConfig, load_conversations, masked_loss, save_conversations, tune
+from agavus.model.sft_rules import law_of, load_rule_sources, rule_conversations, split_by_law
 from agavus.model.tokenizer import (
   TOKENIZER_FILE,
   chars_per_token,
@@ -66,6 +73,10 @@ WIKIPEDIA_CHARS = 1500
 WIKIPEDIA_TIMEOUT = 60.0
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
+SFT_DIR = Path("lab/sft")
+SFT_STEPS = 2000
+# What load_checkpoint needs from the base run to load the tuned one.
+BASE_FIELDS = ("config", "data_sha256", "tokenizer_sha256", "extras")
 
 
 def _statutes() -> Split | None:
@@ -254,6 +265,74 @@ def run_recall(arguments: list[str]) -> int:
   return 0
 
 
+def run_build_sft() -> int:
+  """Rule conversations from the Planalto crawl, whole laws held out, saved for `sft`."""
+  data_dir = load_settings().data_dir
+  try:
+    cards, articles = load_rule_sources(data_dir)
+  except (OSError, KeyError, ValueError) as error:
+    print(f"lab: build-sft failed: {error}")
+    return 1
+  conversations = rule_conversations(cards, articles, seed=0)
+  if not conversations:
+    print("lab: no Planalto laws — run `python -m agavus.model fetch-planalto` first")
+    return 1
+  print(f"build-sft: {len(cards)} law cards, {sum(map(len, articles.values()))} articles")
+  for name, part in zip(("rules-train", "rules-eval"), split_by_law(conversations), strict=True):
+    save_conversations(data_dir / SFT_DIR / f"{name}.jsonl", part)
+    kinds = ", ".join(
+      f"{kind} {count}" for kind, count in sorted(Counter(c.source for c in part).items())
+    )
+    laws = len({law_of(conversation) for conversation in part})
+    print(f"{name}: {len(part)} conversations from {laws} laws ({kinds})")
+  return 0
+
+
+def run_sft(arguments: list[str]) -> int:
+  """Chat-tune a saved Agathe run on the rule conversations; the result serves as a chat."""
+  data_dir = load_settings().data_dir
+  defaults = TuneConfig()
+  parser = argparse.ArgumentParser(prog="python -m agavus.model sft")
+  parser.add_argument("--run", type=Path, required=True, help="base run folder")
+  parser.add_argument("--out", type=Path, required=True, help="folder for the tuned run")
+  parser.add_argument("--steps", type=int, default=SFT_STEPS)
+  parser.add_argument("--rate", type=float, default=defaults.rate, help="AdamW learning rate")
+  parser.add_argument("--batch", type=int, default=defaults.batch, help="conversations per step")
+  parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
+  parser.add_argument("--bf16", action="store_true", help="bfloat16 mixed precision")
+  parser.add_argument("--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE)
+  options = parser.parse_args(arguments)
+  if options.steps < 1 or options.batch < 1 or not options.rate > 0:
+    parser.error("--steps, --batch and --rate must be positive")
+  torch.set_num_threads(THREADS)
+  try:
+    base = load_checkpoint(options.run, data_dir / BUNDLE_FILE, options.tokenizer, data_dir)
+    record = json.loads((options.run / "run.json").read_bytes())
+    train_set = load_conversations(data_dir / SFT_DIR / "rules-train.jsonl")
+    held_out = load_conversations(data_dir / SFT_DIR / "rules-eval.jsonl")
+  except (OSError, ValueError) as error:
+    print(f"lab: sft failed: {error} — run `python -m agavus.model build-sft` first?")
+    return 1
+  model = placed(base, replace(base.config, device=options.device, bf16=options.bf16))
+  settings = replace(defaults, rate=options.rate, batch=options.batch)
+  model, history = tune(model, train_set, settings, steps=options.steps, held_out=held_out)
+  loss = masked_loss(model, model.tokenizer, held_out)
+  print(f"masked loss held-out: {loss:.4f} nats per answer token")
+  tuned: dict[str, object] = {key: record[key] for key in BASE_FIELDS if key in record}
+  tuned |= {
+    "chat": True,
+    "base": options.run.resolve().name,
+    "parameters": model.size(),
+    "steps": options.steps,
+    "tune": {"rate": settings.rate, "batch": settings.batch, "seed": settings.seed},
+    "conversations": {"train": len(train_set), "held_out": len(held_out)},
+    "history": history,
+    "masked_loss_held_out": loss,
+  }
+  save_run(options.out, model, tuned)
+  return 0
+
+
 def main(arguments: list[str]) -> int:
   """Choose the experiment; the bigram is the default."""
   experiments: dict[str, Callable[[list[str]], int]] = {
@@ -269,6 +348,8 @@ def main(arguments: list[str]) -> int:
     "fetch-planalto": lambda _: run_fetch_planalto(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
+    "build-sft": lambda _: run_build_sft(),
+    "sft": run_sft,
   }
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:

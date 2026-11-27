@@ -84,11 +84,11 @@ function select(id) {
   input.focus();
 }
 
-async function generate(prefix, append) {
+async function generate(request, append) {
   const response = await fetch("/api/continue", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix }),
+    body: JSON.stringify(request),
   });
   if (!response.ok) throw new Error("Falha na geração.");
   let pending = "";
@@ -134,7 +134,10 @@ $("form").onsubmit = async (event) => {
     const full = chat.messages.map((message) => message.text).join("\n");
     // The server keeps the last `context` tokens; a token rarely spans more than 8 characters.
     const prefix = Array.from(full).slice(-model.context * 8).join("");
-    chat.metrics = await generate(prefix, (piece) => {
+    // A chat-tuned model gets the turns and answers in turn format.
+    const turns = chat.messages.map(({ role, text }) => ({ role, text }));
+    const request = model.chat ? { messages: turns } : { prefix };
+    chat.metrics = await generate(request, (piece) => {
       answer += piece;
       body.textContent = answer.trimStart();
       transcript.scrollTop = transcript.scrollHeight;

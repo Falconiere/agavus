@@ -14,6 +14,7 @@ from agavus.model.agathe import (
   check_config,
   framed,
   hidden_size,
+  placed,
   rotary,
   rotate,
   start,
@@ -189,3 +190,10 @@ def test_training_reduces_loss_and_reports_bits_per_character() -> None:
   assert model.loss(TEXTS[:3]) < blank.loss(TEXTS[:3]) - 1
   bits = model.bits_per_char(TEXTS[:3])
   assert 0 < bits < blank.bits_per_char(TEXTS[:3]) and math.isfinite(bits)
+
+
+def test_placed_copies_the_weights_into_a_model_for_another_config() -> None:
+  model = start(TOKENIZER, CONFIG)
+  moved = placed(model, replace(CONFIG, seed=1, bf16=True))
+  assert moved.config.bf16 and moved is not model
+  assert all(torch.equal(a, b) for a, b in zip(moved.parameters(), model.parameters(), strict=True))

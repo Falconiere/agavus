@@ -9,6 +9,7 @@ from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from agavus.model.agathe import AgatheModel, framed
 from agavus.model.report import SAMPLE_CHARS
+from agavus.model.sft import ROLES, prompt, render_turns
 from agavus.model.tokenizer import decode
 
 MAX_BODY = 1024 * 1024
@@ -47,8 +48,29 @@ def continuation(model: AgatheModel, prefix: str) -> Iterator[bytes]:
   )
 
 
-def application(model: AgatheModel, name: str) -> WSGIApplication:
-  """Serve checkpoint metadata and newline-delimited continuations from the same model."""
+def chat_prefix(messages: object) -> str:
+  """Earlier turns in turn format, then the last user message as a prompt.
+
+  Raises ValueError unless `messages` is a non-empty list of {"role", "text"} objects
+  ending with the user's.
+  """
+  if not isinstance(messages, list) or not messages:
+    raise ValueError("messages must be a non-empty list")
+  turns = [(message["role"], message["text"]) for message in messages]
+  if any(role not in ROLES or not isinstance(text, str) for role, text in turns):
+    raise ValueError("each message needs a known role and a text")
+  *earlier, (role, text) = turns
+  if role != "user":
+    raise ValueError("the last message must be the user's")
+  return render_turns(earlier) + prompt(text)
+
+
+def application(model: AgatheModel, name: str, *, chat: bool = False) -> WSGIApplication:
+  """Serve checkpoint metadata and newline-delimited continuations from the same model.
+
+  A chat-tuned run (`chat`) takes {"messages": [...]} and answers in turn format; others
+  take {"prefix": "..."} and continue it.
+  """
   assets = Path(__file__).with_name("static")
   if not assets.is_dir():
     assets = Path(__file__).resolve().parents[3] / "chat"
@@ -57,7 +79,9 @@ def application(model: AgatheModel, name: str) -> WSGIApplication:
     "/chat.js": (assets / "chat.js", "text/javascript"),
     "/chat.css": (assets / "chat.css", "text/css"),
   }
-  info = _line({"name": name, "parameters": model.size(), "context": model.config.context})
+  info = _line(
+    {"name": name, "parameters": model.size(), "context": model.config.context, "chat": chat}
+  )
 
   def handle(env: WSGIEnvironment, respond: StartResponse) -> Iterable[bytes]:
     headers = [("Content-Type", "application/json"), ("Cache-Control", "no-store")]
@@ -78,12 +102,14 @@ def application(model: AgatheModel, name: str) -> WSGIApplication:
       media_type = env.get("CONTENT_TYPE", "").partition(";")[0].strip().lower()
       if not 0 < length <= MAX_BODY or media_type != "application/json":
         raise ValueError
-      prefix = json.loads(env["wsgi.input"].read(length))["prefix"]
+      body = json.loads(env["wsgi.input"].read(length))
+      prefix = chat_prefix(body["messages"]) if chat else body["prefix"]
       if not isinstance(prefix, str):
         raise ValueError
     except (ValueError, TypeError, KeyError):
       respond("400 Bad Request", headers)
-      return [_line({"error": "Envie um prefixo de texto em JSON."})]
+      wanted = "as mensagens da conversa" if chat else "um prefixo de texto"
+      return [_line({"error": f"Envie {wanted} em JSON."})]
     respond("200 OK", [("Content-Type", "application/x-ndjson"), ("Cache-Control", "no-store")])
     return continuation(model, prefix)
 

@@ -88,6 +88,35 @@ class Init:
     return torch.zeros(length, device=self.device).requires_grad_()
 
 
+def descend(
+  weights: list[Tensor],
+  mistake: Callable[[torch.Generator], Tensor],
+  settings: Settings,
+  *,
+  steps: int,
+  check: Callable[[], tuple[float, float]] | None,
+) -> History:
+  """Nudge `weights` `steps` times with AdamW; every `check_every` steps, record `check()`."""
+  generator = torch.Generator().manual_seed(settings.seed)
+  # Decay pulls matrices toward zero; gains and biases keep their scale.
+  matrices = [weight for weight in weights if weight.dim() > 1]
+  others = [weight for weight in weights if weight.dim() <= 1]
+  groups = [
+    {"params": matrices, "weight_decay": settings.weight_decay},
+    {"params": others, "weight_decay": 0.0},
+  ]
+  optimizer = torch.optim.AdamW(groups, lr=settings.rate)
+  history: History = []
+  for number in range(1, steps + 1):
+    slopes = torch.autograd.grad(mistake(generator), weights)
+    for weight, slope in zip(weights, slopes, strict=True):
+      weight.grad = slope
+    optimizer.step()
+    if check is not None and number % settings.check_every == 0:
+      history.append((number, *check()))
+  return history
+
+
 def fit(
   model: Trainable,
   mistake: Callable[[torch.Generator], Tensor],
@@ -100,26 +129,14 @@ def fit(
 
   When `watch.holdout` has texts, history holds (step, training loss, validation loss).
   """
-  generator = torch.Generator().manual_seed(settings.seed)
-  weights = model.parameters()
-  # Decay pulls matrices toward zero; gains and biases keep their scale.
-  matrices = [weight for weight in weights if weight.dim() > 1]
-  others = [weight for weight in weights if weight.dim() <= 1]
-  groups = [
-    {"params": matrices, "weight_decay": settings.weight_decay},
-    {"params": others, "weight_decay": 0.0},
-  ]
-  optimizer = torch.optim.AdamW(groups, lr=settings.rate)
-  history: History = []
   checked = check_sample(watch.train)
-  for number in range(1, steps + 1):
-    slopes = torch.autograd.grad(mistake(generator), weights)
-    for weight, slope in zip(weights, slopes, strict=True):
-      weight.grad = slope
-    optimizer.step()
-    if watch.holdout and number % settings.check_every == 0:
-      history.append((number, model.loss(checked), model.loss(watch.holdout)))
-  return history
+
+  def check() -> tuple[float, float]:
+    return model.loss(checked), model.loss(watch.holdout)
+
+  return descend(
+    model.parameters(), mistake, settings, steps=steps, check=check if watch.holdout else None
+  )
 
 
 def mean_surprise(

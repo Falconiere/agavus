@@ -222,6 +222,13 @@ class AgatheModel:
     """One score per next token at every position 0..T-1: batch x positions x vocab."""
     return self.run(ids, training=training)
 
+  def learning_scores(self, ids: Tensor) -> Tensor:
+    """Training-mode scores in float32, computed under bf16 autocast when configured."""
+    kind = torch.device(self.config.device).type
+    with torch.autocast(kind, dtype=torch.bfloat16, enabled=self.config.bf16):
+      found = self.scores(ids, training=True)
+    return found.float()
+
   def extend(self, ids: Sequence[int], offset: int, cache: Cache) -> Tensor:
     """Next-token scores after `ids`, placed at `offset` after what `cache` holds."""
     with torch.no_grad():
@@ -342,6 +349,15 @@ def start(tokenizer: Tokenizer, config: AgatheConfig) -> AgatheModel:
   return AgatheModel(config, tokenizer, tokens, layers, ones())
 
 
+def placed(model: AgatheModel, config: AgatheConfig) -> AgatheModel:
+  """The same weights in a model built for `config`, e.g. on another device."""
+  copy = start(model.tokenizer, config)
+  with torch.no_grad():
+    for target, source in zip(copy.parameters(), model.parameters(), strict=True):
+      target.copy_(source)
+  return copy
+
+
 def train(
   split: Split, tokenizer: Tokenizer, config: AgatheConfig, *, steps: int
 ) -> tuple[AgatheModel, History]:
@@ -356,9 +372,7 @@ def train(
   def mistake(generator: torch.Generator) -> Tensor:
     starts = torch.randint(last_start, (config.batch, 1), generator=generator)
     rows = ids[(starts + offsets).clamp(max=len(ids) - 1)].long().to(config.device)
-    kind = torch.device(config.device).type
-    with torch.autocast(kind, dtype=torch.bfloat16, enabled=config.bf16):
-      scores = model.scores(rows[:, :-1], training=True)
-    return cross_entropy(scores.float().flatten(0, 1), rows[:, 1:].flatten())
+    scores = model.learning_scores(rows[:, :-1])
+    return cross_entropy(scores.flatten(0, 1), rows[:, 1:].flatten())
 
   return model, fit(model, mistake, config, steps=steps, watch=split)

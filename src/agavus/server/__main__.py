@@ -1,6 +1,7 @@
 """Start the local Agathe REST service with python -m agavus.server."""
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from contextlib import suppress
@@ -40,11 +41,12 @@ def serve(arguments: Sequence[str]) -> int:
   torch.set_num_threads(THREADS)
   try:
     model = load_checkpoint(run, data_dir / BUNDLE_FILE, options.tokenizer, data_dir)
-  except ValueError as error:
+    # Chat-tuned runs (`python -m agavus.model sft`) answer in turn format.
+    chat = json.loads((run / "run.json").read_bytes()).get("chat") is True
+  except (OSError, ValueError) as error:
     parser.exit(1, f"{error}\n")
-  with make_server(
-    "127.0.0.1", options.port, application(model, run.resolve().name), server_class=LocalServer
-  ) as server:
+  app = application(model, run.resolve().name, chat=chat)
+  with make_server("127.0.0.1", options.port, app, server_class=LocalServer) as server:
     print(f"Agathe · http://127.0.0.1:{server.server_port}", flush=True)
     with suppress(KeyboardInterrupt):
       server.serve_forever()
