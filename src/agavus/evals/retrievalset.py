@@ -17,6 +17,8 @@ class RetrievalItem:
   id: str
   text: str
   relevant: tuple[str, ...]
+  area: str = ""
+  passages: tuple[str, ...] = ()
 
 
 DEV: tuple[RetrievalItem, ...] = (

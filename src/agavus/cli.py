@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
-from agavus.answer.compose import compose, unavailable
+from agavus.answer.compose import Answer, compose, unavailable
 from agavus.classify.pipeline import TrainedClassifier, train_classifier, training_set
 from agavus.classify.router_store import ensure_router
 from agavus.classify.store import load_model, save_model
@@ -23,8 +23,9 @@ from agavus.corpus.ingest import import_statute_file, ingest_datajud, ingest_sta
 from agavus.corpus.storage import CorpusStorage
 from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
-from agavus.evals.retrieval import TOP_K, evaluate_retrieval
-from agavus.evals.retrievalset import DEV, RETRIEVAL_VERSION
+from agavus.evals.passageset import FRESH
+from agavus.evals.retrieval import TOP_K, evaluate_citations, evaluate_retrieval
+from agavus.evals.retrievalset import DEV
 from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
 from agavus.publish.bootstrap import bootstrap_corpus
@@ -194,20 +195,36 @@ def _run_embed(settings: Settings) -> int:
   return 0
 
 
-def _run_retrieval_eval(settings: Settings) -> int:
+def _run_retrieval_eval(settings: Settings, split: str) -> int:
   storage = CorpusStorage(settings.data_dir)
   encoder = load_encoder(settings.data_dir)
+  items = FRESH if split == "fresh" else DEV
+  answerable = [item for item in items if item.relevant]
+  router = ensure_router(_models_db(settings), encoder) if encoder is not None else None
+
+  def respond(question: str) -> Answer:
+    if router is None:
+      return unavailable()
+    return compose(question, router.probabilities([question])[0], storage, encoder)
+
   report = evaluate_retrieval(
-    DEV,
+    answerable,
     lambda question: [
       hit.origin_ref for hit in search_statutes(storage, question, RETRIEVAL_DEPTH, encoder)
     ],
   )
+  outcomes = evaluate_citations(items, respond)
   mode = "meaning" if encoder is not None else "words"
   print(
-    f"retrieval ({RETRIEVAL_VERSION} dev, {len(DEV)} items, by {mode}): "
+    f"retrieval ({split}, {len(answerable)} answerable, by {mode}): "
     f"first {report.first} · top-{TOP_K} {report.in_top_k} · MRR {report.mrr:.3f}"
   )
+  print(
+    f"answers ({len(items)}): correct primary {outcomes.correct} · wrong primary {outcomes.wrong}"
+    f" · deferred {outcomes.deferred} · rejected {outcomes.rejected}"
+  )
+  if split == "fresh":
+    print(f"passage-supported {outcomes.supported} · unsafe M decisions {outcomes.unsafe_m}")
   return 0
 
 
@@ -304,8 +321,8 @@ def _run_publish(
   return 0
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-  """Entry point: no args greets; subcommands run corpus pipelines."""
+def _parser() -> argparse.ArgumentParser:
+  """Build the CLI parser and its subcommands."""
   parser = argparse.ArgumentParser(prog="agavus", description="agavus legal engine")
   parser.add_argument("-p", "--pergunta", default=None, help="ask a legal question")
   parser.add_argument("--explain", action="store_true", help="show the decision trace")
@@ -334,7 +351,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     "eval", parents=[common], help="evaluate the trained model on the gold set"
   )
   evaluation.add_argument(
-    "--retrieval", action="store_true", help="evaluate article retrieval (dev questions)"
+    "--retrieval",
+    nargs="?",
+    const="dev",
+    choices=("dev", "fresh"),
+    help="evaluate article ranking and delivered primary citations",
   )
   sub.add_parser("embed", parents=[common], help="download the encoder and index statutes")
   search_cmd = sub.add_parser(
@@ -357,7 +378,12 @@ def main(argv: Sequence[str] | None = None) -> int:
   publish.add_argument(
     "--bootstrap", type=Path, default=None, help="assets dir for an offline public-corpus build"
   )
-  args = parser.parse_args(argv)
+  return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+  """Entry point: no args greets; subcommands run corpus pipelines."""
+  args = _parser().parse_args(argv)
   settings = load_settings()
   if args.pergunta is not None:
     return _run_ask(settings, args.pergunta, args.explain, args.as_json)
@@ -367,7 +393,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     "train": lambda: _run_train(settings),
     "classify": lambda: _run_classify(settings, args.text, args.explain, args.as_json),
     "eval": lambda: (
-      _run_retrieval_eval(settings) if args.retrieval else _run_eval(settings, args.as_json)
+      _run_retrieval_eval(settings, args.retrieval)
+      if args.retrieval
+      else _run_eval(settings, args.as_json)
     ),
     "embed": lambda: _run_embed(settings),
     "search": lambda: _run_search(settings, args.query, args.limit, args.as_json),

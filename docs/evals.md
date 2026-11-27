@@ -13,7 +13,11 @@ outcome prediction. [Model gate](../src/agavus/publish/export.py) ·
 - `agavus eval --json` measures document routing and decision coverage on the authored
   routing gold set.
 - `agavus eval --retrieval` reports first-hit, top-k and mean reciprocal rank for statute
-  retrieval on development questions.
+  retrieval on development questions, plus correct and wrong primary citations, deferrals and
+  rejections after routing, reasoning and verification. Context references earn no credit.
+- `agavus eval --retrieval fresh` measures the same outcomes on 40 frozen Portuguese questions.
+  Rank metrics use questions with an acceptable reference. Passage credit requires the annotated
+  text in the displayed primary excerpt or premise, allowing differences in whitespace.
 
 The design targets accepted precision of at least 0.95, ECE at most 0.05 and retrieval
 recall@5 of at least 0.90. The dated evaluations below identify which benchmarks were

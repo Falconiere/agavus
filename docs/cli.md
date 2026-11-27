@@ -15,7 +15,7 @@ prints a greeting. The [quickstart](../README.md#run-locally) builds a public de
 | `train` | Fits the document classifier, calibrates it and saves its holdout report. |
 | `embed` | Downloads the encoder and indexes the statutes in the selected data directory. Rerun after changing them. |
 | `eval` | Evaluates the document classifier on the authored routing gold set. |
-| `eval --retrieval` | Evaluates statute ranking on development questions and prints first-hit, top-k and reciprocal-rank metrics. |
+| `eval --retrieval` | Reports statute ranking and final primary citation outcomes on development questions. Add `fresh` to score the frozen passage annotations and count unsafe M decisions. |
 | `publish` | Evaluates and stages release files locally. See [publishing](publishing.md) for bootstrap and upload options. |
 
 ## Reading the output
