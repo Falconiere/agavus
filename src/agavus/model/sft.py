@@ -121,7 +121,8 @@ def masked_loss(
     )
     scored = int((targets != IGNORED).sum())
     if scored:
-      mean = mean_surprise(lambda ids: model.scores(ids.to(device)), inputs, targets, EVAL_BATCH)
+      scored = model.eval_rows()
+      mean = mean_surprise(lambda ids: model.scores(ids.to(device)), inputs, targets, scored)
       total, count = total + mean * scored, count + scored
   return total / max(1, count)
 

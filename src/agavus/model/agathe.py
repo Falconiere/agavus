@@ -27,6 +27,8 @@ from agavus.model.tokenizer import END, SPECIAL, decode, encode
 from agavus.model.training import IGNORED, History, Init, fit, mean_surprise, pick
 
 EVAL_BATCH = 64
+# Scores held at once while measuring loss: 2**27 floats is 512 MiB in float32.
+EVAL_SCORES = 1 << 27
 # Typical size of a starting weight.
 SPREAD = 0.02
 EPSILON = 1e-6
@@ -247,11 +249,17 @@ class AgatheModel:
       self.run(torch.tensor([ids], device=self.config.device), looks=found)
     return [layer[0].cpu() for layer in found]
 
+  def eval_rows(self) -> int:
+    """Windows scored together: up to EVAL_BATCH, fewer when context x vocabulary is large."""
+    per_row = self.config.context * self.tokenizer.get_vocab_size()
+    return max(1, min(EVAL_BATCH, EVAL_SCORES // per_row))
+
   def surprise(self, texts: Sequence[str]) -> tuple[float, int]:
     """Mean nats per scored token over `texts`, and how many tokens were scored."""
     inputs, answers = windows(texts, self.tokenizer, self.config.context)
     device = self.config.device
-    mean = mean_surprise(lambda rows: self.scores(rows.to(device)), inputs, answers, EVAL_BATCH)
+    rows = self.eval_rows()
+    mean = mean_surprise(lambda part: self.scores(part.to(device)), inputs, answers, rows)
     return mean, int((answers != IGNORED).sum())
 
   def loss(self, texts: Sequence[str]) -> float:

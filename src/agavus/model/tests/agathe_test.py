@@ -9,6 +9,8 @@ from torch import Tensor
 
 from agavus.model.agathe import (
   END_ID,
+  EVAL_BATCH,
+  EVAL_SCORES,
   AgatheConfig,
   AgatheModel,
   check_config,
@@ -197,3 +199,12 @@ def test_placed_copies_the_weights_into_a_model_for_another_config() -> None:
   moved = placed(model, replace(CONFIG, seed=1, bf16=True))
   assert moved.config.bf16 and moved is not model
   assert all(torch.equal(a, b) for a, b in zip(moved.parameters(), model.parameters(), strict=True))
+
+
+def test_eval_rows_keep_scores_within_the_memory_budget() -> None:
+  small = start(TOKENIZER, AgatheConfig(context=16, width=16, heads=4, kv_heads=2, layers=1))
+  assert small.eval_rows() == EVAL_BATCH
+  wide = start(TOKENIZER, AgatheConfig(context=8192, width=16, heads=4, kv_heads=2, layers=1))
+  assert wide.eval_rows() < EVAL_BATCH
+  assert wide.eval_rows() * wide.config.context * TOKENIZER.get_vocab_size() <= EVAL_SCORES
+  assert wide.eval_rows() >= 1
