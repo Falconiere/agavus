@@ -39,9 +39,14 @@ MIN_ARTICLE_CHARS = 200
 ATTEMPTS = 3
 SYSTEM = (
   "Você é professor de Direito brasileiro. Usando SOMENTE o texto do artigo fornecido, escreva "
-  "{pairs} pares de pergunta e resposta em português do Brasil. As perguntas devem soar como as "
-  "de um cidadão; as respostas devem ser fiéis ao texto, completas e sem inventar nada que não "
-  "esteja no artigo. Não cite a fonte nem o nome da lei nas respostas. "
+  "até {pairs} pares de pergunta e resposta em português do Brasil. As perguntas devem soar como "
+  "as de um cidadão e ser compreensíveis sozinhas, por quem nunca leu o artigo: diga do que se "
+  "trata (o assunto, o órgão, o direito, o prazo) e nunca escreva 'este artigo', 'esta lei', "
+  "'esse texto', 'esses alunos' ou referências parecidas. As respostas devem ser fiéis ao texto, "
+  "completas e sem inventar nada que não esteja no artigo. Não pergunte sobre assinaturas, local "
+  "ou data de assinatura, nomes de autoridades nem avisos de publicação. Se o artigo não tiver "
+  "regra que interesse a um cidadão, devolva menos pares ou nenhum. Não cite a fonte nem o nome "
+  "da lei nas respostas. "
   'Responda apenas com JSON: {{"pares":[{{"pergunta":"...","resposta":"..."}}]}}'
 )
 FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
