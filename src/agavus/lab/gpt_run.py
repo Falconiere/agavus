@@ -1,4 +1,4 @@
-"""Run the tiny GPT: `python -m agavus.lab gpt [civil] [wikipedia] [options]`.
+"""Run the tiny GPT: `python -m agavus.lab gpt [civil] [wikipedia] [federal] [options]`.
 
 Same command on a laptop and on a rented GPU (docs/llm-lab.md §6): there, the
 text comes from an exported bundle (`--texts`) and `--out` keeps a run record
@@ -7,6 +7,7 @@ with config, seed, data hash, losses and timing, plus the weights.
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import time
 from collections.abc import Sequence
@@ -16,7 +17,7 @@ import torch
 
 from agavus.config.settings import load_settings
 from agavus.lab.bigram import build_vocab
-from agavus.lab.bundle import Texts, digest, local_texts, read_bundle
+from agavus.lab.bundle import Texts, bundle_bytes, digest, federal_texts, local_texts, read_bundle
 from agavus.lab.data import Split, split_articles
 from agavus.lab.extra import without_leaks
 from agavus.lab.gpt import GptConfig, GptModel, train
@@ -27,7 +28,7 @@ STEPS = 6000
 CHECK_EVERY = 500
 ATTENTION_TEXT = "Art. 22. Constatada a prática de violência doméstica"
 SHOWN_LOOKS = 3
-EXTRA_NAMES = ("civil", "wikipedia")
+EXTRA_NAMES = ("civil", "wikipedia", "federal")
 
 
 def parse(arguments: Sequence[str]) -> argparse.Namespace:
@@ -74,7 +75,7 @@ def extra_texts(texts: Texts, names: Sequence[str]) -> tuple[str, ...] | None:
   for name in names:
     found = texts.extras.get(name, ())
     if not found:
-      print(f"lab: no {name} text found (wikipedia needs: python -m agavus.lab fetch-wikipedia)")
+      print(f"lab: no {name} text in the selected inputs")
       return None
     chosen.extend(found)
   clean = without_leaks(chosen, texts.statutes)
@@ -102,7 +103,12 @@ def run_gpt(arguments: Sequence[str]) -> int:
   vocabulary stay the statute articles', so losses stay comparable.
   """
   options = parse(arguments)
-  texts = read_bundle(options.texts) if options.texts else local_texts(load_settings().data_dir)
+  if options.texts:
+    texts = read_bundle(options.texts)
+  elif "federal" in options.extras:
+    texts = federal_texts(load_settings().data_dir)
+  else:
+    texts = local_texts(load_settings().data_dir)
   if not texts.statutes:
     print("lab: no statute articles — ingest statutes first")
     return 1
@@ -140,7 +146,9 @@ def run_gpt(arguments: Sequence[str]) -> int:
       "config": dataclasses.asdict(config),
       "parameters": model.size(),
       "extras": list(options.extras),
-      "data_sha256": digest(options.texts) if options.texts else "local corpus",
+      "data_sha256": digest(options.texts)
+      if options.texts
+      else hashlib.sha256(bundle_bytes(texts)).hexdigest(),
       "gpu": gpu,
       "torch": torch.__version__,
       "steps_tried": options.steps,

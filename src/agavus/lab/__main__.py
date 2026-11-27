@@ -1,7 +1,7 @@
 """Run the lab: `uv run python -m agavus.lab [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, gpt (see gpt_run.py),
-fetch-wikipedia, export.
+fetch-wikipedia, fetch-federal, export.
 """
 
 import sys
@@ -13,9 +13,10 @@ import torch
 from agavus.config.settings import load_settings
 from agavus.lab.bigram import CharVocab, build_vocab, loss_per_character, train_bigram, uniform_loss
 from agavus.lab.bpe import FIRST_MERGE, BpeVocab, train_bpe
-from agavus.lab.bundle import BUNDLE_FILE, local_texts, write_bundle
+from agavus.lab.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
 from agavus.lab.data import Split, load_articles, split_articles
 from agavus.lab.extra import fetch_wikipedia, save_wikipedia
+from agavus.lab.federal import fetch_federal
 from agavus.lab.gpt_run import run_gpt
 from agavus.lab.network import CLUES, REFUSED, TEXTS, forward, start, train, train_single_neuron
 from agavus.lab.neural import NeuralConfig
@@ -129,6 +130,19 @@ def run_fetch_wikipedia() -> int:
   return 0
 
 
+def run_fetch_federal() -> int:
+  """Cache public-domain Planalto articles, using the exported statutes as the leak guard."""
+  data_dir = load_settings().data_dir
+  try:
+    statutes = read_bundle(data_dir / BUNDLE_FILE).statutes
+    with httpx.Client(timeout=60) as client:
+      fetch_federal(data_dir, client, statutes)
+  except (OSError, ValueError, httpx.HTTPError) as error:
+    print(f"lab: federal fetch failed: {error}")
+    return 1
+  return 0
+
+
 def run_export() -> int:
   """Write the allowlisted lab text to one file, to inspect and then upload."""
   data_dir = load_settings().data_dir
@@ -149,6 +163,7 @@ def main(arguments: list[str]) -> int:
     "neural": lambda _: run_neural(),
     "bpe": lambda _: run_bpe(),
     "gpt": run_gpt,
+    "fetch-federal": lambda _: run_fetch_federal(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
   }

@@ -14,7 +14,8 @@ from agavus.taxonomy.lexicon import normalize
 
 SOURCE = "statutes"
 # Case-sensitive: articles open with "Art."; a line starting "art. 129 do ..." is a reference.
-ART_MARKER = re.compile(r"(?m)^\s*Art\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?")
+# Compiled pages can print "Art. . 154" or put the ordinal before a suffix ("3º-A").
+ART_MARKER = re.compile(r"(?m)^\s*Art\.?(?:\s*\.)?\s*(\d+(?:\.\d{3})*)(?:\s*[ºo°])?(-[A-Za-z]+)?")
 ART_REF = re.compile(r"\bart\.?\s*(\d+(?:\.\d{3})*(?:-[A-Za-z])?)\s*[ºo°]?", re.IGNORECASE)
 HEADING = re.compile(r"(?m)^\s*(?:CAPÍTULO|TÍTULO|SEÇÃO|SUBSEÇÃO)\b", re.IGNORECASE)
 LAW_REF = re.compile(r"\bLei\s+(?:n[ºo°.]?\s*)?(\d{1,3}(?:\.\d{3})*/\d{2,4})", re.IGNORECASE)
@@ -131,7 +132,7 @@ def segment_articles(text: str) -> list[tuple[str, str]]:
   seen: set[str] = set()
   articles: list[tuple[str, str]] = []
   for index, marker in enumerate(markers):
-    number = marker.group(1)
+    number = marker.group(1) + (marker.group(2) or "")
     if number in seen:
       continue
     seen.add(number)
