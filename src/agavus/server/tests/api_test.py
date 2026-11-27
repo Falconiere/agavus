@@ -19,7 +19,7 @@ from agavus.model.agathe import END_ID, AgatheConfig, AgatheModel, framed, start
 from agavus.model.law_search import search
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import prompt, render_turns
-from agavus.model.sft_context import SEARCHED, with_context
+from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
 from agavus.model.tests.law_search_test import LAW, NAME, synthetic_index
 from agavus.model.tokenizer import encode, train_tokenizer
 from agavus.server.api import LOOP_REPEATS, LOOPED, application, chat_prefix, looping
@@ -95,6 +95,13 @@ def test_browser_page_and_assets_share_the_api_origin(api: httpx.Client) -> None
   assert api.get("/run.json").is_client_error
 
 
+def _lines(app: WSGIApplication, messages: list[dict[str, str]]) -> list[str]:
+  """Every JSON line `app` streams for one chat request."""
+  body = {"messages": messages}
+  with serving(app) as client, client.stream("POST", "/api/continue", json=body) as response:
+    return list(response.iter_lines())
+
+
 def _silent(context: int, favorite: int = END_ID) -> AgatheModel:
   """A model that always picks `favorite`; by default it answers nothing (the end token)."""
   model = start(TOKENIZER, replace(CONFIG, context=context))
@@ -132,9 +139,10 @@ def test_chat_with_a_search_index_answers_from_the_articles_found(tmp_path: Path
   assert chat_prefix(messages, db) == (expected, hits)
   model = _silent(4096)
   app = application(model, "conversa", chat=True, db=db)
-  body = {"messages": messages}
-  with serving(app) as client, client.stream("POST", "/api/continue", json=body) as response:
-    (event,) = [json.loads(line) for line in response.iter_lines()]
+  answer, event = [json.loads(line) for line in _lines(app, messages)]
+  # An empty answer is grounded in nothing, so the chat defers.
+  assert answer == {"text": NOT_FOUND}
+  assert event["metrics"]["grounded"] is False and event["metrics"]["coverage"] == 0.0
   assert event["metrics"]["used"] == len(framed(TOKENIZER, expected)) - 1
   assert event["sources"][0] == {"name": NAME, "number": "2º", "origin_ref": f"{LAW}, art. 2"}
   assert len(event["sources"]) == len(hits) <= SEARCHED
@@ -145,9 +153,18 @@ def test_a_looping_answer_stops_with_a_notice() -> None:
   assert not looping([7] * (LOOP_REPEATS - 1)) and not looping(list(range(40)))
   favorite = encode(TOKENIZER, "papel")[0]
   app = application(_silent(64, favorite), "eco", chat=True)
-  body = {"messages": MESSAGES}
-  with serving(app) as client, client.stream("POST", "/api/continue", json=body) as response:
-    events = [json.loads(line) for line in response.iter_lines()]
+  events = [json.loads(line) for line in _lines(app, MESSAGES)]
   texts = [event["text"] for event in events if "text" in event]
   assert texts[-1] == LOOPED and "papel" in "".join(texts[:-1])
   assert events[-1]["metrics"]["looped"] is True
+
+
+def test_a_looping_answer_from_the_articles_defers_without_streaming(tmp_path: Path) -> None:
+  db = synthetic_index(tmp_path)
+  favorite = encode(TOKENIZER, "papel")[0]
+  app = application(_silent(4096, favorite), "eco", chat=True, db=db)
+  question = [{"role": "user", "text": "Quem fica com a guarda dos filhos?"}]
+  answer, event = [json.loads(line) for line in _lines(app, question)]
+  assert answer == {"text": NOT_FOUND}
+  assert event["metrics"]["looped"] is True and event["metrics"]["grounded"] is False
+  assert event["metrics"]["characters"] == len(NOT_FOUND)

@@ -2,16 +2,18 @@
 
 import json
 from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from secrets import randbits
 from time import perf_counter
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from agavus.model.agathe import AgatheModel, framed
+from agavus.model.grounding import checked, coverage
 from agavus.model.law_search import Hit, search
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import ROLES, prompt, render_turns
-from agavus.model.sft_context import SEARCHED, with_context
+from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
 from agavus.model.tokenizer import decode
 
 MAX_BODY = 1024 * 1024
@@ -37,45 +39,89 @@ def looping(ids: Sequence[int]) -> bool:
   return False
 
 
-def continuation(
-  model: AgatheModel, prefix: str, sources: Sequence[Hit] = (), max_chars: int = SAMPLE_CHARS
-) -> Iterator[bytes]:
-  """Stream new text, then inference metrics including initial context usage in tokens.
+@dataclass
+class _Tally:
+  """What one generation spent: decoding seconds and whether it ended in a loop."""
 
-  A loop of repeated tokens ends the text with the LOOPED notice. The last line also lists
-  the articles placed in context (`sources`).
-  """
-  capacity = model.config.context
-  used = min(len(framed(model.tokenizer, prefix)) - 1, capacity)
+  seconds: float = 0.0
+  looped: bool = False
+
+
+def _pieces(
+  model: AgatheModel, prefix: str, max_chars: int, greedy: bool, tally: _Tally
+) -> Iterator[str]:
+  """New text as it decodes, at most `max_chars`; stops at the end token or a loop."""
   written: list[int] = []
   sent = ""
-  seconds = 0.0
-  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=max_chars)
-  looped = False
+  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=max_chars, greedy=greedy)
   while True:
     began = perf_counter()
     token = next(tokens, None)
-    seconds += perf_counter() - began
+    tally.seconds += perf_counter() - began
     if token is not None:
       written.append(token)
-      looped = looping(written)
+      tally.looped = looping(written)
     text = decode(model.tokenizer, written)[:max_chars]
     # A character split across tokens waits for its last byte.
     if text.endswith(PARTIAL) and token is not None:
       continue
     if len(text) > len(sent):
-      yield _line({"text": text[len(sent) :]})
+      yield text[len(sent) :]
       sent = text
-    if token is None or looped or len(sent) == max_chars:
-      break
-  if looped:
-    yield _line({"text": LOOPED})
-  metrics = {"seconds": seconds, "characters": len(sent), "used": used, "capacity": capacity}
-  metrics |= {"looped": looped}
+    if token is None or tally.looped or len(sent) == max_chars:
+      return
+
+
+def _closing(
+  model: AgatheModel, prefix: str, sources: Sequence[Hit], shown: str, extra: dict[str, object]
+) -> bytes:
+  """The last line: inference metrics with initial context use in tokens, and the sources."""
+  capacity = model.config.context
+  used = min(len(framed(model.tokenizer, prefix)) - 1, capacity)
+  metrics = {"characters": len(shown), "used": used, "capacity": capacity} | extra
   cited = [
     {"name": hit.name, "number": hit.number, "origin_ref": hit.origin_ref} for hit in sources
   ]
-  yield _line({"metrics": metrics, "sources": cited})
+  return _line({"metrics": metrics, "sources": cited})
+
+
+def continuation(
+  model: AgatheModel,
+  prefix: str,
+  sources: Sequence[Hit] = (),
+  max_chars: int = SAMPLE_CHARS,
+  greedy: bool = False,
+) -> Iterator[bytes]:
+  """Stream new text, then inference metrics including initial context usage in tokens.
+
+  A loop of repeated tokens ends the text with the LOOPED notice. The last line also lists
+  the articles placed in context (`sources`). `greedy` decodes the likeliest tokens.
+  """
+  tally = _Tally()
+  sent = ""
+  for piece in _pieces(model, prefix, max_chars, greedy, tally):
+    sent += piece
+    yield _line({"text": piece})
+  if tally.looped:
+    yield _line({"text": LOOPED})
+  yield _closing(model, prefix, sources, sent, {"seconds": tally.seconds, "looped": tally.looped})
+
+
+def grounded_answer(
+  model: AgatheModel, prefix: str, sources: Sequence[Hit], question: str
+) -> Iterator[bytes]:
+  """The whole greedy answer once it passes the grounding check, else the NOT_FOUND deferral.
+
+  Nothing streams before the check, so an invented answer is never shown. Metrics add
+  `grounded` and the answer's `coverage` of the shown articles; a looped answer defers.
+  """
+  tally = _Tally()
+  answer = "".join(_pieces(model, prefix, CHAT_CHARS, True, tally))
+  shown = NOT_FOUND if tally.looped else checked(answer, sources, question)
+  extra: dict[str, object] = {"seconds": tally.seconds, "looped": tally.looped}
+  extra |= {"grounded": shown == answer, "coverage": coverage(answer, sources)}
+  yield _line({"text": shown})
+  yield _closing(model, prefix, sources, shown, extra)
 
 
 def chat_prefix(messages: object, db: Path | None = None) -> tuple[str, list[Hit]]:
@@ -103,8 +149,9 @@ def application(
 ) -> WSGIApplication:
   """Serve checkpoint metadata and newline-delimited continuations from the same model.
 
-  A chat-tuned run (`chat`) takes {"messages": [...]} and answers in turn format, from the
-  articles the search index `db` finds when given; others take {"prefix": "..."}.
+  A chat-tuned run (`chat`) takes {"messages": [...]} and answers greedily in turn format;
+  with a search index `db`, from the articles found, shown only when grounded in them.
+  Others take {"prefix": "..."} and sample.
   """
   assets = Path(__file__).with_name("static")
   if not assets.is_dir():
@@ -146,6 +193,8 @@ def application(
       wanted = "as mensagens da conversa" if chat else "um prefixo de texto"
       return [_line({"error": f"Envie {wanted} em JSON."})]
     respond("200 OK", [("Content-Type", "application/x-ndjson"), ("Cache-Control", "no-store")])
-    return continuation(model, prefix, sources, CHAT_CHARS if chat else SAMPLE_CHARS)
+    if chat and db is not None:
+      return grounded_answer(model, prefix, sources, body["messages"][-1]["text"])
+    return continuation(model, prefix, sources, CHAT_CHARS if chat else SAMPLE_CHARS, chat)
 
   return handle
