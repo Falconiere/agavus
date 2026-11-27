@@ -23,9 +23,9 @@ CLT = "CONSOLIDAÇÃO DAS LEIS DO TRABALHO"
 # Where a law's text ends: the place and date of signing, at a line start or opening a
 # sentence; an annex; or Planalto's "not the official text" footer.
 END = re.compile(
-  r"(?m)(?:^|(?<=[.;])[ \t]+)\s*(?:Brasília|Rio de Janeiro),\s*(?:em\s+)?\d{1,2}\.?º?\s+de\s"
+  r"(?m)(?:^|(?<=[.;,])\s+)\s*(?:Brasília|Rio\s+de\s+Janeiro),\s*(?:em\s+)?\d{1,2}\.?º?\s+de\s"
   r"|^\s*ANEXO\s*$"
-  r"|Este texto não substitui o publicado"
+  r"|Este\s+texto\s+não\s+substitui\s+o\s+publicado"
 )
 
 

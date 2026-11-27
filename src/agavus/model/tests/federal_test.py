@@ -119,9 +119,12 @@ def test_local_federal_inputs_use_only_the_reference_bundle(tmp_path: Path) -> N
   ("text", "kept"),
   [
     ("em contrário. Rio de Janeiro, 16 de Setembro de 1946, 125º", "em contrário."),
-    ("Art. 3º Vigência.\nBrasília, 7 de agosto de 2006; 185º", "Art. 3º Vigência.\n"),
+    ("Art. 3º Vigência.\nBrasília, 7 de agosto de 2006; 185º", "Art. 3º Vigência."),
     ("fim. Brasília, 1º de março de 2020.", "fim."),
     ("Art. 9º Fim. Este texto não substitui o publicado no DOU", "Art. 9º Fim. "),
+    ("em contrário.\xa0Rio de Janeiro, 6 de Setembro de 1946", "em contrário."),
+    ("Fim.\xa0Este\xa0texto\xa0não substitui o publicado", "Fim.\xa0"),
+    ("em contrário, Rio de Janeiro, 28 de Agôsto de 1946, 125º", "em contrário,"),
     ("promulgada em Brasília, 5 de outubro de 1988, nos termos", None),
     ("com sede no Rio de Janeiro, onde funcionará", None),
   ],
