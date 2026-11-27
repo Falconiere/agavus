@@ -43,7 +43,7 @@ class Crawl:
   """How politely to fetch: pause between requests, and the client to use."""
 
   client: httpx.Client
-  interval: float = 1.0
+  interval: float = 0.5
 
 
 def links(html: str, base: str) -> Iterator[str]:

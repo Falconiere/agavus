@@ -102,7 +102,7 @@ Extra training text is kept under the gitignored data directory.
 page to its `compilado`/`cons` version when one exists, and keeps the raw HTML with the ETag
 and Last-Modified Planalto sent. A rerun sends conditional requests, so it downloads only laws
 that changed. Planalto refuses default HTTP clients; the crawler identifies itself as
-`Mozilla/5.0 (compatible; agavus-lab/0.1)` and waits one second between requests. The new
+`Mozilla/5.0 (compatible; agavus-lab/0.1)` and waits half a second between requests. The new
 legislation portal lists decree-laws but accepts only browsers: save its two decree-law listing
 pages under `data/lab/text/planalto/indexes/` with a browser before crawling.
 
