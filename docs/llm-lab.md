@@ -377,16 +377,33 @@ the turns and stops at `<|end|>`.
 Agathe answers from retrieved articles placed in its context, not from memory
 (`model/law_search.py`, `model/sft_context.py`). `build-search` indexes every crawled Planalto
 article in SQLite FTS5 (BM25, accents folded) at `data/lab/text/planalto/search.db`, keeping
-each row's `origin_ref` and law name. `build-sft-context [--teacher FILE]` searches each rule
-(and teacher) question, puts the top three articles, at most 1,200 characters each, numbered
-before `Pergunta:` in the user turn, and adds the cited article when search misses it. One
-conversation in ten, seeded, has the cited article taken out and answers "Os textos
-encontrados não respondem a essa pergunta.", so the model learns to defer. Teacher pairs join
-the train side only, and pairs from held-out laws are dropped. It writes
-`data/lab/sft/context-train.jsonl` and `context-eval.jsonl`; tune with
+each row's `origin_ref` and law name; each law's ementa is a row too, cited by the law's url
+and labeled "<lei>, ementa". Words in every name or article ("lei", "art", "nº") are not
+searched. A question that names a law by kind and number ("art. 49 da Lei 8.078", "Lei
+Complementar nº 101") gets that law's asked article first, or its ementa when no article is
+asked, then BM25 within that law, then BM25 over all laws. `build-sft-context [--teacher FILE]`
+searches each rule (and teacher) question, puts the top three hits, at most 1,200 characters
+each, numbered before `Pergunta:` in the user turn, and adds the cited article or ementa when
+search misses it, so ementa and "which law" pairs train too. Two seeded shares answer "Os
+textos encontrados não respondem a essa pergunta.", so the model learns to defer: one in ten
+has the cited text taken out, and one in twenty (`--unrelated`) is shown the hits for another
+law's question. Search costs about 0.25 s per rule question on one core; `--workers N` splits
+the build into N interleaved shards, shard i seeded `seed + 1000·i` (one worker equals the
+serial build). Teacher pairs join the train side only, and pairs from held-out laws are
+dropped. It writes `data/lab/sft/context-train.jsonl` and `context-eval.jsonl`; tune with
 `sft --run <base> --out <dir> --train <context-train> --eval <context-eval>`. The chat
 server (`--search PATH`, this index by default) wraps the last question the same way when the
-run is chat-tuned and the index exists, and lists the articles as "Fontes consultadas".
+run is chat-tuned and the index exists, lists the articles as "Fontes consultadas", allows
+answers up to 2,000 characters, and stops an answer that repeats one short token cycle six
+times, saying so.
+
+First context run (2026-11-27, `q-chat-context-100m`, 12k steps on q-planalto-djen-100m-60k,
+RTX 4090, ~40 min): masked held-out loss 0.281 nats per answer token on 1,621 held-out article
+questions. Chat test: art. 49 da Lei 8.078 quoted correctly; "Do que trata a Lei 8.078" and
+férias do servidor answered from the wrong law (search ranked Leis 14.078 and 4.078 first and
+missed Lei 8.112; ementa pairs were absent); "como revogar uma medida protetiva" looped
+("de, de, …") instead of deferring. The changes above target the ementa, wrong-law and looping
+failures; plain-language questions such as férias still miss Lei 8.112 in BM25.
 
 Agathe in `model/agathe.py` now uses this architecture; character-level runs before
 2026-11-27 are archived (loadable from git history). Parameters: `V·d + L·(2d + 2d² +
