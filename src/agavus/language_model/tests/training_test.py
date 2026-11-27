@@ -7,10 +7,10 @@ from dataclasses import replace
 import pytest
 import torch
 
-from agavus.language_model import gpt, neural
+from agavus.language_model import agathe, neural
+from agavus.language_model.agathe import AgatheModel
 from agavus.language_model.bigram import Vocab, build_vocab, train_bigram, uniform_loss
 from agavus.language_model.data import Split
-from agavus.language_model.gpt import GptModel
 from agavus.language_model.neural import NeuralModel
 from agavus.language_model.training import History, Init, synchronize
 
@@ -20,9 +20,11 @@ torch.set_num_threads(1)
 TEXTS = ("guarda guarda", "a guarda do filho")
 STEPS = 200
 NEURAL = neural.NeuralConfig(context=3, vector=8, hidden=32, batch=32, rate=1e-2, check_every=50)
-GPT = gpt.GptConfig(context=8, width=16, heads=2, layers=1, batch=16, rate=1e-2, check_every=50)
+AGATHE = agathe.AgatheConfig(
+  context=8, width=16, heads=2, layers=1, batch=16, rate=1e-2, check_every=50
+)
 
-Model = NeuralModel | GptModel
+Model = NeuralModel | AgatheModel
 Trainer = Callable[[Vocab, int, Sequence[str]], tuple[Model, History]]
 
 
@@ -30,11 +32,11 @@ def _neural(vocab: Vocab, steps: int, validation: Sequence[str]) -> tuple[Model,
   return neural.train(Split(TEXTS, tuple(validation)), vocab, NEURAL, steps=steps)
 
 
-def _gpt(vocab: Vocab, steps: int, validation: Sequence[str]) -> tuple[Model, History]:
-  return gpt.train(Split(TEXTS, tuple(validation)), vocab, GPT, steps=steps)
+def _agathe(vocab: Vocab, steps: int, validation: Sequence[str]) -> tuple[Model, History]:
+  return agathe.train(Split(TEXTS, tuple(validation)), vocab, AGATHE, steps=steps)
 
 
-TRAINERS = pytest.mark.parametrize("trainer", [_neural, _gpt], ids=["neural", "gpt"])
+TRAINERS = pytest.mark.parametrize("trainer", [_neural, _agathe], ids=["neural", "agathe"])
 
 
 def test_init_is_reproducible_and_biases_start_at_zero() -> None:
@@ -45,7 +47,7 @@ def test_init_is_reproducible_and_biases_start_at_zero() -> None:
 
 def test_untrained_models_are_near_uniform() -> None:
   vocab = build_vocab(TEXTS)
-  for model in (neural.start(vocab, NEURAL), gpt.start(vocab, GPT)):
+  for model in (neural.start(vocab, NEURAL), agathe.start(vocab, AGATHE)):
     assert model.loss(TEXTS) == pytest.approx(uniform_loss(vocab), abs=0.1)
 
 
@@ -80,7 +82,7 @@ def test_mps_training_validation_and_sampling() -> None:
   split = Split(TEXTS, TEXTS)
   for model, history in (
     neural.train(split, vocab, replace(NEURAL, device="mps", check_every=1), steps=1),
-    gpt.train(split, vocab, replace(GPT, device="mps", check_every=1), steps=1),
+    agathe.train(split, vocab, replace(AGATHE, device="mps", check_every=1), steps=1),
   ):
     synchronize("mps")
     assert all(weight.device.type == "mps" for weight in model.parameters())

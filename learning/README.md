@@ -33,7 +33,7 @@ conclusion supported by premises. None of these outputs establishes the other tw
 
 Agavus has a TF-IDF classifier; its query router uses encoder vectors and
 learned weights. The isolated lab builds a bigram, a neural language model,
-and a tiny GPT. The product's `reason/` package checks supported chains;
+and Agathe, a small causal transformer. The product's `reason/` package checks supported chains;
 `answer/` delivers cited excerpts.
 
 Predicting a likely continuation doesn't verify its truth. Choosing an area
@@ -60,7 +60,7 @@ uv run python /tmp/agavus-example.py
 
 The examples use authored strings, hand-chosen vectors, or explicitly marked
 recorded scores. They need no corpus, model download, network, or GPU. The
-small training examples measure practice loss; the GPT construction example
+small training examples measure practice loss; the Agathe construction example
 starts with untrained weights and makes no accuracy claim.
 
 Read the illustration, run the code, and change one value to see what happens.
@@ -83,7 +83,7 @@ flowchart LR
   L --> M["13. Neural<br/>language model"]
   M --> N["14. Word<br/>pieces"]
   N --> O["15. Attention"]
-  O --> P["16. A tiny<br/>GPT"]
+  O --> P["16. Agathe"]
   P --> Q["17. More<br/>text"]
 ```
 
@@ -104,7 +104,7 @@ flowchart LR
 | [13. Neural language model](13-a-neural-language-model.md) | What if it sees more letters? |
 | [14. Word pieces](14-word-pieces.md) | Why not letters or whole words? |
 | [15. Attention](15-attention.md) | How does the model gather context? |
-| [16. A tiny GPT](16-a-tiny-gpt.md) | What is a GPT, piece by piece? |
+| [16. Agathe, a tiny transformer](16-a-tiny-gpt.md) | How does Agathe predict the next letter? |
 | [17. More text](17-more-text.md) | Does more text help, and which text? |
 
 Run the real thing at any time:

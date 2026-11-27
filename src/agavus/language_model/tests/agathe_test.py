@@ -1,17 +1,17 @@
-"""Tiny GPT: windows, attention never looks ahead, learning (synthetic text)."""
+"""Agathe: windows, attention never looks ahead, learning (synthetic text)."""
 
 import pytest
 import torch
 
+from agavus.language_model.agathe import AgatheConfig, start, stream, windows
 from agavus.language_model.bigram import CharVocab, build_vocab
-from agavus.language_model.gpt import GptConfig, start, stream, windows
 from agavus.language_model.training import IGNORED
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
 
 TEXTS = ["guarda guarda", "a guarda do filho"]
-CONFIG = GptConfig(context=8, width=8, heads=2, layers=2)
+CONFIG = AgatheConfig(context=8, width=8, heads=2, layers=2)
 STEPS = 200
 
 
@@ -64,5 +64,5 @@ def test_looks_cover_the_start_and_each_letter() -> None:
 
 def test_lab_parameter_counts() -> None:
   vocab = CharVocab(tuple(chr(i) for i in range(97)))
-  sizes = (start(vocab, GptConfig()).size(), start(vocab, GptConfig(layers=5)).size())
+  sizes = (start(vocab, AgatheConfig()).size(), start(vocab, AgatheConfig(layers=5)).size())
   assert (vocab.size, *sizes) == (99, 822_627, 1_019_875)

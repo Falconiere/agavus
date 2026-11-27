@@ -1,4 +1,4 @@
-"""Tiny GPT: attention over the whole context (docs/llm-lab.md §4, step 4).
+"""Agathe: attention over the whole context (docs/llm-lab.md §4, step 4).
 
 Each token becomes a vector plus a position vector. Every layer lets each
 position look back at all earlier ones (attention), then thinks about what it
@@ -24,7 +24,7 @@ GROWTH = 4
 
 
 @dataclass(frozen=True)
-class GptConfig:
+class AgatheConfig:
   """Size of the model and how it trains."""
 
   context: int = 64
@@ -84,10 +84,10 @@ def attend(layer: Layer, vectors: Tensor, heads: int) -> tuple[Tensor, Tensor]:
 
 
 @dataclass(frozen=True)
-class GptModel:
+class AgatheModel:
   """Token and position vectors, layers, and the output scores."""
 
-  config: GptConfig
+  config: AgatheConfig
   vocab: Vocab
   tokens: Tensor
   positions: Tensor
@@ -183,7 +183,7 @@ def stream(texts: Sequence[str], vocab: Vocab) -> Tensor:
   return torch.tensor(ids)
 
 
-def start(vocab: Vocab, config: GptConfig) -> GptModel:
+def start(vocab: Vocab, config: AgatheConfig) -> AgatheModel:
   """Random small weights, reproducible by seed."""
   init = Init.seeded(config.seed, config.device)
   width, wide = config.width, config.width * GROWTH
@@ -202,7 +202,7 @@ def start(vocab: Vocab, config: GptConfig) -> GptModel:
     )
     for _ in range(config.layers)
   )
-  return GptModel(
+  return AgatheModel(
     config=config,
     vocab=vocab,
     tokens=init.matrix(vocab.size, width, SPREAD),
@@ -213,7 +213,9 @@ def start(vocab: Vocab, config: GptConfig) -> GptModel:
   )
 
 
-def train(split: Split, vocab: Vocab, config: GptConfig, *, steps: int) -> tuple[GptModel, History]:
+def train(
+  split: Split, vocab: Vocab, config: AgatheConfig, *, steps: int
+) -> tuple[AgatheModel, History]:
   """Learn from split.train; history is checked on split.holdout, if any (see `fit`)."""
   model = start(vocab, config)
   ids = stream(split.train, vocab)

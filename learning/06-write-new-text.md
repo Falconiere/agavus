@@ -52,7 +52,7 @@ exist, because **it remembers only one letter**.
 flowchart LR
   A["Bigram<br/>1 letter back"] --> B["Better tokens<br/>pieces of words"]
   B --> C["Small neural model<br/>several tokens back"]
-  C --> D["Tiny GPT<br/>mixes context with attention"]
+  C --> D["Agathe<br/>mixes context with attention"]
 ```
 
 ## Python: try it

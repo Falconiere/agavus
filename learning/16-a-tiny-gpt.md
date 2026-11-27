@@ -1,4 +1,4 @@
-# 16. A tiny GPT
+# 16. Agathe, a tiny transformer
 
 ![Four transformer layers](illustrations/transformer-stack.webp)
 
@@ -14,14 +14,14 @@ transforms each position's vector with a small network. Four layers mean
 four successive transformations of the representations.
 
 **Where the analogy stops:** layers aren't conscious thinking stages or
-written reasoning steps. This GPT is trained to predict letters. A lower loss
+written reasoning steps. Agathe is trained to predict letters. A lower loss
 doesn't establish that a generated claim follows from cited evidence.
 
 Attention (lesson 15) is the new idea. A GPT is attention plus pieces you
 already know, stacked a few times.
 
 ```sh
-uv run python -m agavus.language_model gpt
+uv run python -m agavus.language_model agathe
 ```
 
 (About 15 minutes on our CPU, with 4 threads. This is the first lab model where
@@ -96,7 +96,7 @@ Two things to see:
 | knows nothing | 4.595 | 99 |
 | bigram (1 letter back) | 2.305 | 10.0 |
 | neural (4 letters back) | 1.364 | 3.9 |
-| **tiny GPT (64 letters back)** | **1.181** | **3.3** |
+| **Agathe (64 letters back)** | **1.181** | **3.3** |
 
 Same letters, same articles, same exam: the comparison is fair. Training
 stopped at step 3,500, where validation was lowest.
@@ -117,7 +117,7 @@ memorizes; it just memorizes *usefully* for longer.
 | --- | --- |
 | bigram | Ass cr prece denúntídana elulhe ... |
 | neural | particulares do regirá em sito, adminda que ... |
-| tiny GPT | A administração dos bens ... quando houverem da convivência familiar |
+| Agathe | A administração dos bens ... quando houverem da convivência familiar |
 
 Longer stretches are real Portuguese, with law-like phrases ("convivência
 familiar", "administração dos bens"). It still means nothing. "Art. 1.577"
@@ -151,18 +151,18 @@ pattern, near first and far later, is common in real models too.
 
 ## Python: try it
 
-Build an **untrained** four-layer GPT with much narrower vectors than the
+Build an **untrained** four-layer version of Agathe with much narrower vectors than the
 recorded model. Inspect its forward pass; random predictions aren't learned language.
 
 ```python
 import torch  # Provide CPU tensors and softmax.
 
 from agavus.language_model.bigram import build_vocab  # Turn the toy characters into IDs.
-from agavus.language_model.gpt import GptConfig, start  # Construct the actual transformer.
+from agavus.language_model.agathe import AgatheConfig, start  # Construct the actual transformer.
 
 vocab = build_vocab(("guarda guarda",))  # Use only the authored example's characters.
 # Keep four layers/heads, but shrink context and width for a fast CPU demonstration.
-config = GptConfig(context=8, width=16, layers=4, heads=4, dropout=0.0)
+config = AgatheConfig(context=8, width=16, layers=4, heads=4, dropout=0.0)
 model = start(vocab, config)  # Initialize random weights; this does not train them.
 ids = torch.tensor([vocab.encode("guarda")[:-1]])  # One row; remove the final boundary.
 with torch.no_grad():  # Inspect predictions without building a training-gradient graph.

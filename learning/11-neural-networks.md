@@ -143,7 +143,7 @@ a small change to each weight would affect loss; the optimizer updates weights.
 | Router | one layer (logistic regression) |
 | Encoder (lesson 10) | yes, deep; trained by others |
 | Bigram | no, only counts |
-| Tiny GPT we'll build | yes, deep; trained by us |
+| Agathe | yes, deep; trained by us |
 
 ## Python: try it
 

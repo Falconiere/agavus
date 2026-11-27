@@ -1,6 +1,6 @@
 """Run the lab: `uv run python -m agavus.language_model [experiment] [options]`.
 
-Experiments: bigram (default), network, neural, bpe, gpt (see gpt_run.py),
+Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
 fetch-wikipedia, fetch-federal, export.
 """
 
@@ -11,6 +11,7 @@ import httpx
 import torch
 
 from agavus.config.settings import load_settings
+from agavus.language_model.agathe_run import run_agathe
 from agavus.language_model.bigram import (
   CharVocab,
   build_vocab,
@@ -23,7 +24,6 @@ from agavus.language_model.bundle import BUNDLE_FILE, local_texts, read_bundle, 
 from agavus.language_model.data import Split, load_articles, split_articles
 from agavus.language_model.extra import fetch_wikipedia, save_wikipedia
 from agavus.language_model.federal import fetch_federal
-from agavus.language_model.gpt_run import run_gpt
 from agavus.language_model.network import (
   CLUES,
   REFUSED,
@@ -176,7 +176,7 @@ def main(arguments: list[str]) -> int:
     "network": lambda _: run_network(),
     "neural": lambda _: run_neural(),
     "bpe": lambda _: run_bpe(),
-    "gpt": run_gpt,
+    "agathe": run_agathe,
     "fetch-federal": lambda _: run_fetch_federal(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),

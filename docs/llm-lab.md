@@ -1,8 +1,8 @@
 # LLM lab — learn by building a tiny legal language model
 
 Status: **approved 2026-11-25; steps 1–4 done (CPU, GPU repeat 2026-11-26).**
-An isolated learning track that builds a tiny transformer with two outputs:
-next token (LM) and a proposed area head (step 5). The lab is isolated from user answers.
+Agathe is the lab’s first named model, a small causal transformer trained to predict the next token.
+Step 5 proposes adding an area head. The lab is isolated from user answers.
 
 ## 1. Goals and non-goals
 
@@ -25,6 +25,7 @@ Non-goals:
 For scripts written before the package rename, replace `agavus.lab` with
 `agavus.language_model` in imports and `python -m` commands. The installation
 extra is still `lab`, and existing run files are read from `data/lab/`.
+In older training commands, replace the `gpt` subcommand with `agathe`.
 
 | Rule | Why |
 | --- | --- |
@@ -78,7 +79,7 @@ pages as UTF-8 raw HTML. Keeping the original markup lets the parser remove stru
 Each law gets a JSONL file with its license and the Planalto URL and article number per row.
 The collector reports overlap by law and counts unknown characters among the accepted texts.
 This snapshot dropped 29 articles and mapped 788 characters to `<unk>` (0.0237%).
-Use `gpt federal` or `gpt civil federal` to add the selected sources to training.
+Use `agathe federal` or `agathe civil federal` to add the selected sources to training.
 An explicit `--texts` selects a self-contained bundle with its own named extras.
 
 ## 4. Build order
@@ -93,8 +94,8 @@ runs with the same tokenizer and split; after BPE, report bits per character.
 | 1 | Character bigram, NumPy | CPU | beats uniform, `ln(vocab)` |
 | 2 | BPE tokenizer | CPU | encode → decode is lossless |
 | 3 | Small neural LM, PyTorch | CPU | beats the bigram |
-| 4 | Tiny GPT, 822,627 parameters | CPU, then GPU | beats step 3; GPU repeats the CPU result |
-| 4b | Five-layer GPT, 1,019,875 parameters | CPU or local MPS | lower mean exam loss than step 4 across the same three seeds |
+| 4 | Agathe, 822,627 parameters | CPU, then GPU | beats step 3; GPU repeats the CPU result |
+| 4b | Five-layer Agathe, 1,019,875 parameters | CPU or local MPS | lower mean exam loss than step 4 across the same three seeds |
 | 5 | Same body + area head | CPU or GPU | compared with TF-IDF (§5) |
 
 Stop and review after step 5. Pretrained encoders, RAG and LoRA are separate
@@ -155,7 +156,7 @@ excludes DJEN, DataJud and case-derived material because the model can memorize 
 The location of the hardware does not change that risk.
 
 ```sh
-uv run --extra lab python -m agavus.language_model gpt civil federal --device mps \
+uv run --extra lab python -m agavus.language_model agathe civil federal --device mps \
   --layers 5 --width 128 --heads 4 --context 64 --batch 32 --steps 1000 \
   --out data/lab/runs/federal-local
 ```
@@ -171,7 +172,7 @@ the same 99-token vocabulary and the frozen statute plus Civil Code inputs from 
 `0cada48c…`. Each run trained for 1,000 updates on the inner training split with the
 filtered Civil Code extra. Width was 128, context 64, heads 4, dropout 0.2 and CPU threads 4.
 The timer covered model initialization and training, with synchronization at both boundaries.
-Validation was scored once afterward. The normal GPT command also selects a checkpoint,
+Validation was scored once afterward. The `agathe` command also selects a checkpoint,
 retrains and scores the exam, which adds wall time.
 
 | Device | Layers | Parameters | Batch | Training minutes | Validation loss at 1,000 |
@@ -198,7 +199,7 @@ Page checked 2026-11-25; confirm before paying. Prices are per hour:
 
 | GPU | VRAM | R$/h | Use |
 | --- | --- | --- | --- |
-| RTX 3070 | 8 GB | 0.99 | enough for the ~1M-parameter GPT |
+| RTX 3070 | 8 GB | 0.99 | enough for the five-layer Agathe model |
 | RTX 3090 | 24 GB | 2.43 | default if the 3070 is unavailable |
 | RTX 4090 | 24 GB | 3.60 (also shown as 4.95) | only if measured time justifies it |
 
@@ -225,7 +226,7 @@ Rules:
 ### Run log
 
 **Session 1, 2026-11-26.** RTX 3070 8 GB, PyTorch 2.15.0+cu132, ~55 min,
-R$ 1.03. Default `GptConfig` (822,627 parameters, context 64, width 128,
+R$ 1.03. Default `AgatheConfig` (822,627 parameters, context 64, width 128,
 4 layers, 4 heads, dropout 0.2). Data: exported bundle, sha256 `0cada48c…`.
 Runs on `agavus-training` under `runs/`, copies in `data/lab/runs/`
 (checksums verified). The GPU repeats the CPU result within seed noise.
@@ -240,7 +241,7 @@ CPU references, seed 0: statutes 1.181, + Civil Code 1.174 (6,000 steps).
 Lessons: one run can be off by ~0.05, so compare seed averages; extra text
 only pays off with more steps.
 
-**CPU depth comparison, 2026-11-26.** The lab GPT accepts `--layers` and defaults
+**CPU depth comparison, 2026-11-26.** Agathe accepts `--layers` and defaults
 to four blocks. Both depths used the same statute and Civil Code bundle
 (`0cada48c…`), article splits, 6,000-step budget and 500-step validation interval.
 Each checkpoint was reloaded and scored on the held-out statute articles.

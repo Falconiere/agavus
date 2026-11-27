@@ -153,7 +153,7 @@ assert shares[3] == 0.0  # Future information must have exactly zero contributio
 ```
 
 Like the worked example, this omits division by the square root of key
-width. The full GPT includes that scaling. No weights are updated by this calculation.
+width. Agathe includes that scaling. No weights are updated by this calculation.
 
 ## Check yourself
 
@@ -169,4 +169,4 @@ width. The full GPT includes that scaling. No weights are updated by this calcul
 
 </details>
 
-Next: [16. A tiny GPT](16-a-tiny-gpt.md). Back to the [lesson list](README.md)
+Next: [16. Agathe, a tiny transformer](16-a-tiny-gpt.md). Back to the [lesson list](README.md)

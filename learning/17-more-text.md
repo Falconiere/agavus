@@ -16,12 +16,12 @@ practises and how often it revisits each example.
 We choose the data, steps, and stopping point. A smaller training–exam gap
 can also mean worse training performance; compare the exam scores themselves.
 
-The tiny GPT (lesson 16) memorized: loss 0.87 on the articles it studied, 1.18
+Agathe (lesson 16) memorized: loss 0.87 on the articles it studied, 1.18
 on the exam. The usual cure is more text. So we tried three kinds.
 
 ```sh
 uv run python -m agavus.language_model fetch-wikipedia   # once
-uv run python -m agavus.language_model gpt civil         # or: gpt wikipedia, gpt civil wikipedia
+uv run python -m agavus.language_model agathe civil         # or: agathe wikipedia, agathe civil wikipedia
 ```
 
 ## Where the text came from

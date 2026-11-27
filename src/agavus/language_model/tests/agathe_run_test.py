@@ -1,4 +1,4 @@
-"""GPT runner: options, extra text, and a tiny end-to-end run (synthetic text)."""
+"""Agathe runner: options, extra text, and a tiny end-to-end run (synthetic text)."""
 
 import json
 from pathlib import Path
@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 import torch
 
+from agavus.language_model.agathe import AgatheConfig, start
+from agavus.language_model.agathe_run import extra_texts, parse, run_agathe
 from agavus.language_model.bigram import build_vocab
 from agavus.language_model.bundle import Texts, digest, write_bundle
 from agavus.language_model.data import split_articles
-from agavus.language_model.gpt import GptConfig, start
-from agavus.language_model.gpt_run import extra_texts, parse, run_gpt
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -60,14 +60,14 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   out = tmp_path / "run"
   arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3", "--texts", str(bundle)]
   shape = ["--layers", "5", "--width", "12", "--heads", "3", "--context", "2", "--batch", "8"]
-  assert run_gpt([*arguments, *shape, "--out", str(out)]) == 0
+  assert run_agathe([*arguments, *shape, "--out", str(out)]) == 0
   record = json.loads((out / "run.json").read_text(encoding="utf-8"))
   assert record["data_sha256"] == digest(bundle)
   assert record["steps_chosen"] in {1, 2}
   assert (record["config"]["device"], record["config"]["seed"]) == ("cpu", len("abc"))
   assert len(record["history"]) == len("12")
   assert record["config"]["layers"] == FIVE_LAYERS
-  config = GptConfig(layers=5, width=12, heads=3, context=2, batch=8)
+  config = AgatheConfig(layers=5, width=12, heads=3, context=2, batch=8)
   expected = start(build_vocab(split_articles(STATUTES).train), config)
   assert record["parameters"] == expected.size()
   assert record["config"]["batch"] == config.batch

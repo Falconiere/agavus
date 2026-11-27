@@ -1,4 +1,4 @@
-"""Run the tiny GPT: `python -m agavus.language_model gpt [civil] [wikipedia] [federal] [options]`.
+"""Run Agathe: `python -m agavus.language_model agathe [civil] [wikipedia] [federal] [options]`.
 
 Same command on a laptop and on a rented GPU (docs/llm-lab.md §6): there, the
 text comes from an exported bundle (`--texts`) and `--out` keeps a run record
@@ -16,6 +16,7 @@ from pathlib import Path
 import torch
 
 from agavus.config.settings import load_settings
+from agavus.language_model.agathe import AgatheConfig, AgatheModel, train
 from agavus.language_model.bigram import build_vocab
 from agavus.language_model.bundle import (
   Texts,
@@ -27,7 +28,6 @@ from agavus.language_model.bundle import (
 )
 from agavus.language_model.data import Split, split_articles
 from agavus.language_model.extra import without_leaks
-from agavus.language_model.gpt import GptConfig, GptModel, train
 from agavus.language_model.report import THREADS, chosen_steps, report
 from agavus.language_model.training import synchronize
 
@@ -40,11 +40,11 @@ EXTRA_NAMES = ("civil", "wikipedia", "federal")
 
 def parse(arguments: Sequence[str]) -> argparse.Namespace:
   """Options; every one has a CPU-friendly default."""
-  parser = argparse.ArgumentParser(prog="python -m agavus.language_model gpt")
+  parser = argparse.ArgumentParser(prog="python -m agavus.language_model agathe")
   parser.add_argument("extras", nargs="*", choices=EXTRA_NAMES, help="extra training text")
   parser.add_argument("--steps", type=int, default=STEPS, help="most steps to try on validation")
   parser.add_argument("--check-every", type=int, default=CHECK_EVERY)
-  defaults = GptConfig()
+  defaults = AgatheConfig()
   parser.add_argument("--layers", type=int, default=defaults.layers, help="transformer blocks")
   parser.add_argument("--width", type=int, default=defaults.width, help="embedding width")
   parser.add_argument("--heads", type=int, default=defaults.heads, help="attention heads per block")
@@ -62,7 +62,7 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   return options
 
 
-def show_attention(model: GptModel) -> None:
+def show_attention(model: AgatheModel) -> None:
   """For the last letter, the earlier letters each head of the last layer looks at most."""
   looks = model.looks(ATTENTION_TEXT)[-1]
   letters = ["⟨start⟩", *ATTENTION_TEXT][-looks.shape[-1] :]
@@ -91,7 +91,7 @@ def extra_texts(texts: Texts, names: Sequence[str]) -> tuple[str, ...] | None:
   return clean
 
 
-def save_run(out: Path, model: GptModel, record: dict[str, object]) -> None:
+def save_run(out: Path, model: AgatheModel, record: dict[str, object]) -> None:
   """run.json and model.pt, each written whole before it takes its final name."""
   out.mkdir(parents=True, exist_ok=True)
   weights = out / "model.pt.partial"
@@ -103,7 +103,7 @@ def save_run(out: Path, model: GptModel, record: dict[str, object]) -> None:
   print(f"saved: {out / 'run.json'}, {out / 'model.pt'}")
 
 
-def run_gpt(arguments: Sequence[str]) -> int:
+def run_agathe(arguments: Sequence[str]) -> int:
   """Steps chosen on validation, exam opened once at the end.
 
   Extra text only joins the training side; validation, exam and the letter
@@ -126,7 +126,7 @@ def run_gpt(arguments: Sequence[str]) -> int:
   split = split_articles(texts.statutes)
   inner = split_articles(split.train)
   vocab = build_vocab(split.train)
-  config = GptConfig(
+  config = AgatheConfig(
     layers=options.layers,
     width=options.width,
     heads=options.heads,
