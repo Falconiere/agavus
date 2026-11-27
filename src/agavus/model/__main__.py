@@ -1,7 +1,7 @@
 """Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-chat, fetch-wikipedia, fetch-federal, export.
+chat, fetch-wikipedia, fetch-federal, fetch-planalto, export.
 """
 
 import sys
@@ -35,6 +35,7 @@ from agavus.model.network import (
 )
 from agavus.model.neural import NeuralConfig
 from agavus.model.neural import train as train_neural
+from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 from agavus.server.__main__ import serve
 
@@ -158,6 +159,24 @@ def run_fetch_federal() -> int:
   return 0
 
 
+def run_fetch_planalto() -> int:
+  """Refresh every indexed federal law to its newest consolidated text."""
+  data_dir = load_settings().data_dir
+  try:
+    statutes = read_bundle(data_dir / BUNDLE_FILE).statutes
+    captured = sorted((data_dir / PLANALTO_DIR / "indexes").glob("*.html"))
+    with httpx.Client(timeout=60) as client:
+      crawl = Crawl(client)
+      laws = discover(crawl, captured)
+      print(f"planalto: {len(laws)} law pages from {len(captured)} saved listings", flush=True)
+      counts = fetch_planalto(data_dir, crawl, statutes, laws)
+  except (OSError, ValueError, httpx.HTTPError) as error:
+    print(f"lab: planalto fetch failed: {error}")
+    return 1
+  print("planalto: " + ", ".join(f"{key} {value}" for key, value in counts.items()))
+  return 0
+
+
 def run_export() -> int:
   """Write the allowlisted lab text to one file, to inspect and then upload."""
   data_dir = load_settings().data_dir
@@ -180,6 +199,7 @@ def main(arguments: list[str]) -> int:
     "agathe": run_agathe,
     "chat": serve,
     "fetch-federal": lambda _: run_fetch_federal(),
+    "fetch-planalto": lambda _: run_fetch_planalto(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
   }

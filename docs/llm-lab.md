@@ -95,6 +95,17 @@ Extra training text is kept under the gitignored data directory.
 | Portuguese Wikipedia, `wikimedia/wikipedia` 20231101.pt via the HF rows API: first 1,500 characters of 350 articles, URL kept per article | CC BY-SA 4.0; attribution kept; no model is published (§2), so nothing is redistributed | ~485 KB |
 | 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `model/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
 
+| Every federal law Planalto indexes: ordinary, complementary and delegated laws, decree-laws, codes and the Constitution, each in its newest consolidated text (`model/planalto.py`) | Public domain under Lei 9.610/1998, art. 8º, IV | 18,707 law pages found on 2026-11-27; first crawl in progress |
+| Portuguese Wikipedia 20231101.pt, all six Parquet shards from `wikimedia/wikipedia` | CC BY-SA 4.0; local only, not yet wired into training | 1.58 GB compressed, SHA-256 verified against Hugging Face |
+
+`uv run python -m agavus.model fetch-planalto` walks Planalto's index pages, follows each law
+page to its `compilado`/`cons` version when one exists, and keeps the raw HTML with the ETag
+and Last-Modified Planalto sent. A rerun sends conditional requests, so it downloads only laws
+that changed. Planalto refuses default HTTP clients; the crawler identifies itself as
+`Mozilla/5.0 (compatible; agavus-lab/0.1)` and waits one second between requests. The new
+legislation portal lists decree-laws but accepts only browsers: save its two decree-law listing
+pages under `data/lab/text/planalto/indexes/` with a browser before crawling.
+
 Extra text only joins the training side. Validation, the exam and the letter
 vocabulary stay the statute articles', and any extra text sharing 100
 characters in a row with a statute article is dropped, so nothing leaks into

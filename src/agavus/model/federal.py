@@ -60,7 +60,8 @@ LAWS = (
 )
 
 
-def _articles(law: FederalLaw, payload: bytes) -> Iterator[tuple[str, str]]:
+def articles(law: FederalLaw, payload: bytes) -> Iterator[tuple[str, str]]:
+  """(origin_ref, text) per article of a captured Planalto page, struck-out text removed."""
   text = html_to_text(decode_html(payload))
   if law.name == "CLT":
     _, heading, text = text.partition(f"\n{CLT}\n")
@@ -75,7 +76,8 @@ def _articles(law: FederalLaw, payload: bytes) -> Iterator[tuple[str, str]]:
       yield f"{law.url}, {prefix}art. {number}", " ".join(article.split())
 
 
-def _save(path: Path, payload: bytes) -> None:
+def save_bytes(path: Path, payload: bytes) -> None:
+  """Write whole or not at all, so an interrupted run never leaves half a file."""
   path.parent.mkdir(parents=True, exist_ok=True)
   with TemporaryDirectory(dir=path.parent) as directory:
     staged = Path(directory) / path.name
@@ -106,15 +108,15 @@ def fetch_federal(
       response = client.get(law.url)
       response.raise_for_status()
       payload = response.content
-    articles = dict(_articles(law, payload))
-    if not articles or any("\ufffd" in body for body in articles.values()):
+    found = dict(articles(law, payload))
+    if not found or any("\ufffd" in body for body in found.values()):
       raise ValueError(f"{law.url}: missing or undecodable article text")
     if not source.exists():
-      _save(source, payload)
-    clean = set(without_leaks(tuple(articles.values()), statutes))
+      save_bytes(source, payload)
+    clean = set(without_leaks(tuple(found.values()), statutes))
     lines = []
     kept = chars = size = unknown = 0
-    for ref, body in articles.items():
+    for ref, body in found.items():
       if body in clean:
         row = {"law": law.name, "license": law.license, "origin_ref": ref, "text": body}
         lines.append(json.dumps(row, ensure_ascii=False) + "\n")
@@ -122,8 +124,8 @@ def fetch_federal(
         chars += len(body)
         size += len(body.encode())
         unknown += vocab.encode(body).count(UNKNOWN)
-    _save(folder / f"{law.stem}.jsonl", "".join(lines).encode())
-    dropped = len(articles) - kept
+    save_bytes(folder / f"{law.stem}.jsonl", "".join(lines).encode())
+    dropped = len(found) - kept
     print(f"{law.name}: {kept} kept, {dropped} dropped, {chars} characters, {size} bytes")
     total_kept += kept
     total_dropped += dropped
