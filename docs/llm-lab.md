@@ -51,17 +51,31 @@ privacy audit, deduplication, a memorization test and a change to this note.
 
 Allowlist, not denylist: the loader selects `source = statute` explicitly.
 
-Extra training text (`src/agavus/lab/extra.py`, kept in gitignored `data/`):
+Extra training text is kept under the gitignored data directory.
 
 | Source | License | Size used |
 | --- | --- | --- |
 | Civil Code articles outside the corpus's family book, from the page already fetched | public domain: laws aren't protected (Lei 9.610/1998, art. 8º, IV) | 1,817 articles, ~524 KB |
 | Portuguese Wikipedia, `wikimedia/wikipedia` 20231101.pt via the HF rows API: first 1,500 characters of 350 articles, URL kept per article | CC BY-SA 4.0; attribution kept; no model is published (§2), so nothing is redistributed | ~485 KB |
+| 14 federal laws from Planalto, including the Constitution and its transitional provisions. The catalog in `lab/federal.py` records each URL. | Public domain under Lei 9.610/1998, art. 8º, IV | 5,257 accepted articles, 3,468,207 UTF-8 bytes, 3,328,868 characters |
 
 Extra text only joins the training side. Validation, the exam and the letter
 vocabulary stay the statute articles', and any extra text sharing 100
 characters in a row with a statute article is dropped, so nothing leaks into
 the exam. Wikipedia mixes pt-BR and pt-PT.
+
+`uv run python -m agavus.lab fetch-federal` uses the frozen statute reference bundle at
+`data/lab/export/texts.json`. Keep this bundle when moving the lab to another Mac.
+The collector requests one allowlisted page at a time, with a two-second delay, and reuses
+HTML captures under `data/lab/text/federal/sources/`. If the portal times out, rerun the
+command. For the first snapshot, direct HTTPS timed out and Firecrawl supplied the official
+pages as UTF-8 raw HTML. Keeping the original markup lets the parser remove struck-out text.
+
+Each law gets a JSONL file with its license and the Planalto URL and article number per row.
+The collector reports overlap by law and counts unknown characters among the accepted texts.
+This snapshot dropped 29 articles and mapped 788 characters to `<unk>` (0.0237%).
+Use `gpt federal` or `gpt civil federal` to add the selected sources to training.
+An explicit `--texts` selects a self-contained bundle with its own named extras.
 
 ## 4. Build order
 
@@ -75,7 +89,8 @@ runs with the same tokenizer and split; after BPE, report bits per character.
 | 1 | Character bigram, NumPy | CPU | beats uniform, `ln(vocab)` |
 | 2 | BPE tokenizer | CPU | encode → decode is lossless |
 | 3 | Small neural LM, PyTorch | CPU | beats the bigram |
-| 4 | Tiny GPT, ~1M parameters | CPU, then GPU | beats step 3; GPU repeats the CPU result |
+| 4 | Tiny GPT, 822,627 parameters | CPU, then GPU | beats step 3; GPU repeats the CPU result |
+| 4b | Five-layer GPT, 1,019,875 parameters | CPU or local MPS | lower mean exam loss than step 4 across the same three seeds |
 | 5 | Same body + area head | CPU or GPU | compared with TF-IDF (§5) |
 
 Stop and review after step 5. Pretrained encoders, RAG and LoRA are separate
@@ -90,6 +105,18 @@ decisions requiring separate evaluation before any production use.
 - Output: train and held-out loss, uniform baseline, seeded text sample.
 - Tests: rows sum to 1; a hand-worked example matches; same seed gives the
   same sample; no held-out article is counted; non-statute sources are refused.
+
+### Step 4b comparison
+
+Use identical study text, tokenizer, article splits, optimizer, update budget and checkpoint
+selection for both depths. Choose the step on validation for each seed and compare the mean
+held-out exam loss. The existing three-seed Civil Code comparison is recorded in §6.
+A change in study text requires a new comparison before claiming a win on that mix.
+
+With layer count `L`, width `w`, vocabulary `V` and context `C`, the parameter count is
+`L × (12w² + 5w) + 2Vw + Cw + V`. At width 128 with 99 tokens and context 64, an extra
+block adds 197,248 parameters. Both depths default to four heads and batch 32.
+The head count must divide the width.
 
 ## 5. Step 5: the shared model
 
@@ -116,7 +143,50 @@ seeds (distinct from gold) before this step, or the result means little.
 A win permits a proposal for shadow mode, not deployment. With few gold items,
 report counts and intervals, not just percentages.
 
-## 6. GPU rental (gpubrasil.com.br)
+## 6. Local training and GPU rental
+
+Use the local Mac with MPS first. CPU is the CLI default. The PyTorch wheel on macOS
+comes from PyPI. The CPU-only wheel index applies to other platforms. Local training
+excludes DJEN, DataJud and case-derived material because the model can memorize it.
+The location of the hardware does not change that risk.
+
+```sh
+uv run --extra lab python -m agavus.lab gpt civil federal --device mps \
+  --layers 5 --width 128 --heads 4 --context 64 --batch 32 --steps 1000 \
+  --out data/lab/runs/federal-local
+```
+
+Seeded initialization, window selection and sampling use CPU generators. Model tensors
+run on the selected device. If a PyTorch version lacks an MPS operation, prefix the command
+with `PYTORCH_ENABLE_MPS_FALLBACK=1` to allow that operation to use the CPU.
+
+### Short local benchmark
+
+Apple M2 Max, 96 GiB unified memory, PyTorch 2.15.0. All five measurements used seed 0,
+the same 99-token vocabulary and the frozen statute plus Civil Code inputs from bundle
+`0cada48c…`. Each run trained for 1,000 updates on the inner training split with the
+filtered Civil Code extra. Width was 128, context 64, heads 4, dropout 0.2 and CPU threads 4.
+The timer covered model initialization and training, with synchronization at both boundaries.
+Validation was scored once afterward. The normal GPT command also selects a checkpoint,
+retrains and scores the exam, which adds wall time.
+
+| Device | Layers | Parameters | Batch | Training minutes | Validation loss at 1,000 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| CPU | 4 | 822,627 | 32 | 0.579 | 1.8292 |
+| MPS | 4 | 822,627 | 32 | 0.227 | 1.8287 |
+| CPU | 5 | 1,019,875 | 32 | 0.729 | 1.7907 |
+| MPS | 5 | 1,019,875 | 32 | 0.273 | 1.7792 |
+| MPS | 5 | 1,019,875 | 128 | 0.527 | 1.3189 |
+
+At 64 targets per window, batches of 32 and 128 present 2,048 and 8,192 targets per update.
+For 20 million presentations on the five-layer MPS model, the measured rates imply 9,766
+updates in 0.044 hours or 2,442 updates in 0.021 hours, respectively, plus evaluation and
+checkpoint overhead. Random windows can repeat. Batch 128 saw four times as many targets
+during this benchmark. These single-seed measurements serve as timing estimates.
+
+### GPU Brasil
+
+Consider renting only when local capacity or measured training time is insufficient.
 
 Operations, disks and safety: **[gpu-brasil.md](gpu-brasil.md)**.
 
