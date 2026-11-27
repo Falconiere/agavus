@@ -28,9 +28,15 @@ def test_defaults_run_on_cpu() -> None:
   assert options.layers == BASELINE_LAYERS
 
 
-def test_zero_layers_is_refused() -> None:
+@pytest.mark.parametrize("flag", ["--layers", "--width", "--heads", "--context", "--batch"])
+def test_zero_dimension_is_refused(flag: str) -> None:
   with pytest.raises(SystemExit):
-    parse(["--layers", "0"])
+    parse([flag, "0"])
+
+
+def test_width_must_divide_into_heads() -> None:
+  with pytest.raises(SystemExit):
+    parse(["--width", "127", "--heads", "4"])
 
 
 def test_unknown_extra_is_refused() -> None:
@@ -53,13 +59,17 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   write_bundle(bundle, TEXTS)
   out = tmp_path / "run"
   arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3", "--texts", str(bundle)]
-  assert run_gpt([*arguments, "--layers", str(FIVE_LAYERS), "--out", str(out)]) == 0
+  shape = ["--layers", "5", "--width", "12", "--heads", "3", "--context", "2", "--batch", "8"]
+  assert run_gpt([*arguments, *shape, "--out", str(out)]) == 0
   record = json.loads((out / "run.json").read_text(encoding="utf-8"))
   assert record["data_sha256"] == digest(bundle)
   assert record["steps_chosen"] in {1, 2}
   assert (record["config"]["device"], record["config"]["seed"]) == ("cpu", len("abc"))
   assert len(record["history"]) == len("12")
   assert record["config"]["layers"] == FIVE_LAYERS
-  expected = start(build_vocab(split_articles(STATUTES).train), GptConfig(layers=FIVE_LAYERS))
+  config = GptConfig(layers=5, width=12, heads=3, context=2, batch=8)
+  expected = start(build_vocab(split_articles(STATUTES).train), config)
+  assert record["parameters"] == expected.size()
+  assert record["config"]["batch"] == config.batch
   assert [w.shape for w in torch.load(out / "model.pt")] == [w.shape for w in expected.parameters()]
   assert not list(out.glob("*.partial"))

@@ -36,14 +36,21 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("extras", nargs="*", choices=EXTRA_NAMES, help="extra training text")
   parser.add_argument("--steps", type=int, default=STEPS, help="most steps to try on validation")
   parser.add_argument("--check-every", type=int, default=CHECK_EVERY)
-  parser.add_argument("--layers", type=int, default=GptConfig().layers, help="transformer blocks")
+  defaults = GptConfig()
+  parser.add_argument("--layers", type=int, default=defaults.layers, help="transformer blocks")
+  parser.add_argument("--width", type=int, default=defaults.width, help="embedding width")
+  parser.add_argument("--heads", type=int, default=defaults.heads, help="attention heads per block")
+  parser.add_argument("--context", type=int, default=defaults.context, help="tokens per window")
+  parser.add_argument("--batch", type=int, default=defaults.batch, help="windows per update")
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--seed", type=int, default=0, help="starting weights, batches, dropout")
   parser.add_argument("--texts", type=Path, help="exported bundle instead of the local corpus")
   parser.add_argument("--out", type=Path, help="folder for run.json and model.pt")
   options = parser.parse_args(list(arguments))
-  if options.layers < 1:
-    parser.error("--layers must be a positive integer")
+  if min(options.layers, options.width, options.heads, options.context, options.batch) < 1:
+    parser.error("layers, width, heads, context and batch must be positive integers")
+  if options.width % options.heads:
+    parser.error("--width must be divisible by --heads")
   return options
 
 
@@ -53,7 +60,7 @@ def show_attention(model: GptModel) -> None:
   letters = ["⟨start⟩", *ATTENTION_TEXT][-looks.shape[-1] :]
   print(f"text: {ATTENTION_TEXT!r}; who the last letter {letters[-1]!r} looks at:")
   for head, row in enumerate(looks[:, -1]):
-    top = torch.topk(row, SHOWN_LOOKS)
+    top = torch.topk(row, min(SHOWN_LOOKS, len(row)))
     shown = ", ".join(
       f"{letters[int(where)]!r} at {int(where)} ({float(share):.0%})"
       for share, where in zip(top.values, top.indices, strict=True)
@@ -107,7 +114,14 @@ def run_gpt(arguments: Sequence[str]) -> int:
   inner = split_articles(split.train)
   vocab = build_vocab(split.train)
   config = GptConfig(
-    layers=options.layers, check_every=options.check_every, device=options.device, seed=options.seed
+    layers=options.layers,
+    width=options.width,
+    heads=options.heads,
+    context=options.context,
+    batch=options.batch,
+    check_every=options.check_every,
+    device=options.device,
+    seed=options.seed,
   )
   synchronize(config.device)
   began = time.monotonic()
@@ -124,6 +138,7 @@ def run_gpt(arguments: Sequence[str]) -> int:
       gpu = torch.cuda.get_device_name(config.device)
     record: dict[str, object] = {
       "config": dataclasses.asdict(config),
+      "parameters": model.size(),
       "extras": list(options.extras),
       "data_sha256": digest(options.texts) if options.texts else "local corpus",
       "gpu": gpu,

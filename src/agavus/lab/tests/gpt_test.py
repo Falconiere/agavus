@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from agavus.lab.bigram import build_vocab
+from agavus.lab.bigram import CharVocab, build_vocab
 from agavus.lab.gpt import GptConfig, start, stream, windows
 from agavus.lab.training import IGNORED
 
@@ -60,3 +60,9 @@ def test_looks_cover_the_start_and_each_letter() -> None:
   model = start(build_vocab(TEXTS), CONFIG)
   assert [layer.shape for layer in model.looks("guarda")] == [(2, 7, 7)] * 2
   assert model.looks("guarda guarda")[0].shape == (2, 8, 8)
+
+
+def test_lab_parameter_counts() -> None:
+  vocab = CharVocab(tuple(chr(i) for i in range(97)))
+  sizes = (start(vocab, GptConfig()).size(), start(vocab, GptConfig(layers=5)).size())
+  assert (vocab.size, *sizes) == (99, 822_627, 1_019_875)
