@@ -166,6 +166,21 @@ CPU references, seed 0: statutes 1.181, + Civil Code 1.174 (6,000 steps).
 Lessons: one run can be off by ~0.05, so compare seed averages; extra text
 only pays off with more steps.
 
+**CPU depth comparison, 2026-11-26.** The lab GPT accepts `--layers` and defaults
+to four blocks. Both depths used the same statute and Civil Code bundle
+(`0cada48c…`), article splits, 6,000-step budget and 500-step validation interval.
+Each checkpoint was reloaded and scored on the held-out statute articles.
+
+| Layers | Parameters | Seed 0 loss | Seed 1 loss | Seed 2 loss | Mean loss |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 4 | 822,627 | 1.1990 | 1.1884 | 1.1829 | 1.1901 |
+| 5 | 1,019,875 | 1.1528 | 1.1662 | 1.1693 | 1.1628 |
+
+The fifth block reduced mean next-character loss by 0.0274 on this split.
+Validation selected 5,500 steps for the four-layer seed-0 run and 6,000 for
+the other five runs. Weights and run records are under
+`data/lab/runs/{four,five}-layer-civil-seed{0,1,2}/`.
+
 ## 7. Rule changes (approved 2026-11-25)
 
 - [x] `AGENTS.md`: state that the lab may *use* a GPU but never require one.
