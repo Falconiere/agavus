@@ -2,7 +2,7 @@
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
 chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export,
-build-sft, build-search, build-sft-context, sft.
+build-sft, build-search, build-sft-context, sft, eval-chat.
 """
 
 import argparse
@@ -29,6 +29,7 @@ from agavus.model.bigram import (
 )
 from agavus.model.bpe import FIRST_MERGE, BpeVocab, train_bpe
 from agavus.model.bundle import BUNDLE_FILE, local_texts, read_bundle, with_local, write_bundle
+from agavus.model.chat_eval import run_eval_chat
 from agavus.model.checkpoint import load_checkpoint
 from agavus.model.data import Split, load_articles, load_case_texts, split_articles
 from agavus.model.extra import fetch_wikipedia, save_wikipedia, without_leaks
@@ -425,6 +426,7 @@ def main(arguments: list[str]) -> int:
     "bpe": lambda _: run_bpe(),
     "agathe": run_agathe,
     "chat": serve,
+    "eval-chat": run_eval_chat,
     "recall": run_recall,
     "train-tokenizer": run_train_tokenizer,
     "fetch-federal": lambda _: run_fetch_federal(),

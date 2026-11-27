@@ -2,74 +2,23 @@
 
 import json
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from secrets import randbits
-from time import perf_counter
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from agavus.model.agathe import AgatheModel, framed
+from agavus.model.generation import CHAT_CHARS, Tally, pieces
 from agavus.model.grounding import checked, coverage
 from agavus.model.law_search import Hit, search
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import ROLES, prompt, render_turns
 from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
-from agavus.model.tokenizer import decode
 
 MAX_BODY = 1024 * 1024
-PARTIAL = "\ufffd"
-# Chat answers quote whole articles; plain continuations stay sample-sized.
-CHAT_CHARS = 2000
-# A tail of the same 1..LOOP_PERIOD tokens LOOP_REPEATS times running is a loop, not an answer.
-LOOP_PERIOD = 8
-LOOP_REPEATS = 6
 LOOPED = "\n\n[Resposta interrompida: o modelo entrou em repetição. Confira os textos citados.]"
 
 
 def _line(value: dict[str, object]) -> bytes:
   return (json.dumps(value, ensure_ascii=False) + "\n").encode()
-
-
-def looping(ids: Sequence[int]) -> bool:
-  """Whether the ids end in one short cycle repeated LOOP_REPEATS times."""
-  for period in range(1, LOOP_PERIOD + 1):
-    span = period * LOOP_REPEATS
-    if len(ids) >= span and all(ids[-i] == ids[-i - period] for i in range(1, span - period + 1)):
-      return True
-  return False
-
-
-@dataclass
-class _Tally:
-  """What one generation spent: decoding seconds and whether it ended in a loop."""
-
-  seconds: float = 0.0
-  looped: bool = False
-
-
-def _pieces(
-  model: AgatheModel, prefix: str, max_chars: int, greedy: bool, tally: _Tally
-) -> Iterator[str]:
-  """New text as it decodes, at most `max_chars`; stops at the end token or a loop."""
-  written: list[int] = []
-  sent = ""
-  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=max_chars, greedy=greedy)
-  while True:
-    began = perf_counter()
-    token = next(tokens, None)
-    tally.seconds += perf_counter() - began
-    if token is not None:
-      written.append(token)
-      tally.looped = looping(written)
-    text = decode(model.tokenizer, written)[:max_chars]
-    # A character split across tokens waits for its last byte.
-    if text.endswith(PARTIAL) and token is not None:
-      continue
-    if len(text) > len(sent):
-      yield text[len(sent) :]
-      sent = text
-    if token is None or tally.looped or len(sent) == max_chars:
-      return
 
 
 def _closing(
@@ -97,9 +46,9 @@ def continuation(
   A loop of repeated tokens ends the text with the LOOPED notice. The last line also lists
   the articles placed in context (`sources`). `greedy` decodes the likeliest tokens.
   """
-  tally = _Tally()
+  tally = Tally()
   sent = ""
-  for piece in _pieces(model, prefix, max_chars, greedy, tally):
+  for piece in pieces(model, prefix, max_chars, greedy, tally):
     sent += piece
     yield _line({"text": piece})
   if tally.looped:
@@ -115,8 +64,8 @@ def grounded_answer(
   Nothing streams before the check, so an invented answer is never shown. Metrics add
   `grounded` and the answer's `coverage` of the shown articles; a looped answer defers.
   """
-  tally = _Tally()
-  answer = "".join(_pieces(model, prefix, CHAT_CHARS, True, tally))
+  tally = Tally()
+  answer = "".join(pieces(model, prefix, CHAT_CHARS, True, tally))
   shown = NOT_FOUND if tally.looped else checked(answer, sources, question)
   extra: dict[str, object] = {"seconds": tally.seconds, "looped": tally.looped}
   extra |= {"grounded": shown == answer, "coverage": coverage(answer, sources)}

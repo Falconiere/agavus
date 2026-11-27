@@ -198,3 +198,14 @@ def article(db: Path, origin_ref: str) -> Hit | None:
       (origin_ref,),
     ).fetchone()
   return None if row is None else Hit(*row)
+
+
+def labeled(db: Path, name: str, number: str) -> Hit | None:
+  """The indexed row a context label names: law name and article number (EMENTA for ementa)."""
+  with closing(_connect(db)) as connection:
+    row = connection.execute(
+      "SELECT origin_ref, name, number, text FROM articles WHERE name = ? AND number = ? "
+      "ORDER BY id LIMIT 1",
+      (name, number),
+    ).fetchone()
+  return None if row is None else Hit(*row)

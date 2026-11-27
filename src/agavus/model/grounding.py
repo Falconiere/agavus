@@ -32,8 +32,8 @@ def _grams(words: Sequence[str], size: int) -> list[tuple[str, ...]]:
   return [tuple(words[start : start + size]) for start in range(len(words) - size + 1)]
 
 
-def coverage(answer: str, hits: Sequence[Hit]) -> float:
-  """Share of the answer body's word n-grams found in the hits' names and texts.
+def overlap(answer: str, texts: Sequence[str]) -> float:
+  """Share of the answer body's word n-grams found in `texts`.
 
   The body is the answer before its "Fonte:" line; answers shorter than GRAM words use
   their own length. An empty body covers nothing.
@@ -42,12 +42,17 @@ def coverage(answer: str, hits: Sequence[Hit]) -> float:
   if not words:
     return 0.0
   size = min(GRAM, len(words))
-  shown = {gram for hit in hits for gram in _grams(_words(f"{hit.name} {hit.text}"), size)}
+  shown = {gram for text in texts for gram in _grams(_words(text), size)}
   found = _grams(words, size)
   return sum(gram in shown for gram in found) / len(found)
 
 
-def _citation(answer: str) -> tuple[str, str | None] | None:
+def coverage(answer: str, hits: Sequence[Hit]) -> float:
+  """Share of the answer body's word n-grams found in the hits' names and texts."""
+  return overlap(answer, [f"{hit.name} {hit.text}" for hit in hits])
+
+
+def citation(answer: str) -> tuple[str, str | None] | None:
   """(law name, article number or None) from the "Fonte:" line, if it has one."""
   _, marker, cited = answer.partition(SOURCE)
   found = CITATION.match(cited) if marker else None
@@ -58,10 +63,10 @@ def cites_shown(answer: str, hits: Sequence[Hit]) -> bool:
   """Whether the "Fonte:" line, when present, names a shown law (and article, if given)."""
   if SOURCE not in answer:
     return True
-  citation = _citation(answer)
-  if citation is None:
+  found = citation(answer)
+  if found is None:
     return False
-  name, number = citation
+  name, number = found
   return any(hit.name == name and number in (None, hit.number) for hit in hits)
 
 
@@ -74,10 +79,10 @@ def cites_asked(answer: str, question: str) -> bool:
   law, numbers = named_law(question), named_articles(question)
   if law is None and not numbers:
     return True
-  citation = _citation(answer)
-  if citation is None:
+  found = citation(answer)
+  if found is None:
     return False
-  name, number = citation
+  name, number = found
   return (law is None or name.startswith(law.prefix)) and (not numbers or number in numbers)
 
 

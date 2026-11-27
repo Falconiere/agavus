@@ -7,13 +7,14 @@ articles found for another law's question.
 
 import multiprocessing
 import random
+import re
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
-from agavus.model.law_search import EMENTA, Hit, article, search
+from agavus.model.law_search import EMENTA, Hit, article, labeled, search
 from agavus.model.sft import Conversation
 from agavus.model.sft_rules import law_of
 
@@ -23,6 +24,9 @@ NOT_FOUND = "Os textos encontrados não respondem a essa pergunta."
 PAIR = ("user", "assistant")
 # Shard i of a parallel build draws from seed + SHARD_SEEDS * i, so one worker equals serial.
 SHARD_SEEDS = 1000
+QUESTION = "Pergunta: "
+# A label line `with_context` writes: "[2] <law>, art. 12-C:" or "[1] <law>, ementa:".
+LABEL = re.compile(r"(?m)^\[\d+\] (?P<name>.+?), (?:art\. (?P<number>\S+)|ementa):$")
 # Off-topic deferrals the build adds by default: the chat must also defer when nothing fits.
 UNRELATED = 0.05
 
@@ -50,7 +54,18 @@ def with_context(question: str, hits: Sequence[Hit]) -> str:
   shown = "".join(
     f"[{index}] {cited(hit)}:\n{_clipped(hit.text)}\n\n" for index, hit in enumerate(hits, 1)
   )
-  return f"{shown}Pergunta: {question}"
+  return f"{shown}{QUESTION}{question}"
+
+
+def question_of(turn: str) -> str:
+  """The question a `with_context` user turn asks."""
+  return turn.rpartition(QUESTION)[2]
+
+
+def shown_hits(turn: str, db: Path) -> list[Hit]:
+  """The articles a `with_context` user turn shows, read back whole from the index."""
+  found = (labeled(db, label["name"], label["number"] or EMENTA) for label in LABEL.finditer(turn))
+  return [hit for hit in found if hit is not None]
 
 
 def _shown(hits: list[Hit], own: Hit, negative: bool, chooser: random.Random) -> list[Hit]:

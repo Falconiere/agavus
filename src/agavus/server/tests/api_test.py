@@ -13,19 +13,18 @@ from wsgiref.types import WSGIApplication
 
 import httpx
 import pytest
-import torch
 
-from agavus.model.agathe import END_ID, AgatheConfig, AgatheModel, framed, start
+from agavus.model.agathe import framed, start
 from agavus.model.law_search import search
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import prompt, render_turns
 from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
+from agavus.model.tests.generation_test import TINY, TOKENIZER, silent
 from agavus.model.tests.law_search_test import LAW, NAME, synthetic_index
-from agavus.model.tokenizer import encode, train_tokenizer
-from agavus.server.api import LOOP_REPEATS, LOOPED, application, chat_prefix, looping
+from agavus.model.tokenizer import encode
+from agavus.server.api import LOOPED, application, chat_prefix
 
-TOKENIZER = train_tokenizer(["um papel ção", "papel"] * 3, 300)
-CONFIG = AgatheConfig(width=8, heads=2, kv_heads=1, context=4, layers=1)
+CONFIG = replace(TINY, context=4)
 MESSAGES = [
   {"role": "user", "text": "um papel"},
   {"role": "assistant", "text": "papel"},
@@ -102,21 +101,8 @@ def _lines(app: WSGIApplication, messages: list[dict[str, str]]) -> list[str]:
     return list(response.iter_lines())
 
 
-def _silent(context: int, favorite: int = END_ID) -> AgatheModel:
-  """A model that always picks `favorite`; by default it answers nothing (the end token)."""
-  model = start(TOKENIZER, replace(CONFIG, context=context))
-  # With the residual paths silenced, only the token table decides.
-  silenced = [weight for layer in model.layers for weight in (layer.mix, layer.down)]
-  with torch.no_grad():
-    for weight in silenced:
-      weight.zero_()
-    model.tokens.fill_(10.0)
-    model.tokens[favorite].fill_(30.0)
-  return model
-
-
 def test_chat_run_sends_turns_in_turn_format_and_stops_at_the_end_token() -> None:
-  model = _silent(64)
+  model = silent(64)
   assert chat_prefix(MESSAGES) == (TURNS, [])
   with serving(application(model, "conversa", chat=True)) as client:
     assert client.get("/api/model").json()["chat"] is True
@@ -137,7 +123,7 @@ def test_chat_with_a_search_index_answers_from_the_articles_found(tmp_path: Path
   expected = render_turns([("user", "um papel"), ("assistant", "papel")])
   expected += prompt(with_context(question, hits))
   assert chat_prefix(messages, db) == (expected, hits)
-  model = _silent(4096)
+  model = silent(4096)
   app = application(model, "conversa", chat=True, db=db)
   answer, event = [json.loads(line) for line in _lines(app, messages)]
   # An empty answer is grounded in nothing, so the chat defers.
@@ -149,10 +135,8 @@ def test_chat_with_a_search_index_answers_from_the_articles_found(tmp_path: Path
 
 
 def test_a_looping_answer_stops_with_a_notice() -> None:
-  assert looping([7] * LOOP_REPEATS) and looping([1, 2, 3] + [4, 5] * LOOP_REPEATS)
-  assert not looping([7] * (LOOP_REPEATS - 1)) and not looping(list(range(40)))
   favorite = encode(TOKENIZER, "papel")[0]
-  app = application(_silent(64, favorite), "eco", chat=True)
+  app = application(silent(64, favorite), "eco", chat=True)
   events = [json.loads(line) for line in _lines(app, MESSAGES)]
   texts = [event["text"] for event in events if "text" in event]
   assert texts[-1] == LOOPED and "papel" in "".join(texts[:-1])
@@ -162,7 +146,7 @@ def test_a_looping_answer_stops_with_a_notice() -> None:
 def test_a_looping_answer_from_the_articles_defers_without_streaming(tmp_path: Path) -> None:
   db = synthetic_index(tmp_path)
   favorite = encode(TOKENIZER, "papel")[0]
-  app = application(_silent(4096, favorite), "eco", chat=True, db=db)
+  app = application(silent(4096, favorite), "eco", chat=True, db=db)
   question = [{"role": "user", "text": "Quem fica com a guarda dos filhos?"}]
   answer, event = [json.loads(line) for line in _lines(app, question)]
   assert answer == {"text": NOT_FOUND}

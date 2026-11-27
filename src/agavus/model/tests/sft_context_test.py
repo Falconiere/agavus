@@ -14,6 +14,8 @@ from agavus.model.sft_context import (
   Deferrals,
   contextualize,
   contextualize_parallel,
+  question_of,
+  shown_hits,
   teacher_for_training,
   with_context,
 )
@@ -124,3 +126,12 @@ def test_teacher_pairs_from_held_out_laws_are_dropped() -> None:
   held_out = [_pair("q", "a", f"{OTHER}, art. 1")]
   teacher = [_pair("q", "a", f"{LAW}, art. 2", "t"), _pair("q", "a", f"{OTHER}, art. 2", "t")]
   assert teacher_for_training(teacher, held_out) == teacher[:1]
+
+
+def test_a_context_turn_reads_back_its_question_and_whole_articles(db: Path) -> None:
+  question = "Do que trata a Lei nº 99.999 e a guarda?"
+  hits = search(db, question)
+  turn = with_context(question, hits)
+  assert question_of(turn) == question and question_of("Oi?") == "Oi?"
+  assert shown_hits(turn, db) == hits and any(hit.number == EMENTA for hit in hits)
+  assert shown_hits(with_context("x", [Hit("r", "Lei Y", "9", "z")]), db) == []
