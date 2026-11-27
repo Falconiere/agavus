@@ -108,3 +108,16 @@ def test_federal_run_checks_the_bundle_plus_local_federal_text(
   (folder / f"{LAWS[0].stem}.jsonl").write_text('{"text":"Art. 2º Outra."}\n', encoding="utf-8")
   with pytest.raises(ValueError, match="SHA-256"):
     _load(run, bundle, tmp_path)
+
+
+def test_self_contained_bundle_needs_no_local_texts(
+  checkpoint: tuple[Path, Path], tmp_path: Path
+) -> None:
+  run, _ = checkpoint
+  bundle = tmp_path / "with-djen.json"
+  sha = write_bundle(bundle, Texts(("only held out", "abc", "bca"), {"djen": ("decisão",)}))
+  record = json.loads((run / "run.json").read_bytes())
+  (run / "run.json").write_text(json.dumps({**record, "extras": ["djen"], "data_sha256": sha}))
+  empty = tmp_path / "no-corpus-here"
+  empty.mkdir()
+  assert _load(run, bundle, empty).size() > 0

@@ -16,8 +16,13 @@ DIMENSIONS = ("context", "width", "heads", "kv_heads", "layers")
 
 
 def _inputs_sha256(bundle: Path, texts: Texts, extras: Sequence[str], data_dir: Path | None) -> str:
-  """Runs with local texts hash the bundle plus the local texts they trained on."""
-  if data_dir is None or not set(extras) & LOCAL.keys():
+  """Runs with local texts hash the bundle plus the local texts they trained on.
+
+  A self-contained bundle (one exported with those texts, as rented machines receive) is
+  hashed as it is.
+  """
+  local = set(extras) & LOCAL.keys()
+  if data_dir is None or not local or local <= texts.extras.keys():
     return digest(bundle)
   return sha256(bundle_bytes(merged(texts, data_dir, extras))).hexdigest()
 
