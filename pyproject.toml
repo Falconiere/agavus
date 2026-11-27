@@ -27,6 +27,7 @@ learned = [
 ]
 lab = [
     "torch>=2.7",
+    "tokenizers>=0.22",
 ]
 dev = [
     "torch>=2.7",

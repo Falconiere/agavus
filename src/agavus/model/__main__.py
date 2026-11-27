@@ -1,7 +1,7 @@
 """Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-chat, recall, fetch-wikipedia, fetch-federal, fetch-planalto, export.
+chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export.
 """
 
 import argparse
@@ -22,10 +22,10 @@ from agavus.model.bigram import (
   uniform_loss,
 )
 from agavus.model.bpe import FIRST_MERGE, BpeVocab, train_bpe
-from agavus.model.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
+from agavus.model.bundle import BUNDLE_FILE, local_texts, read_bundle, with_local, write_bundle
 from agavus.model.checkpoint import load_checkpoint
 from agavus.model.data import Split, load_articles, load_case_texts, split_articles
-from agavus.model.extra import fetch_wikipedia, save_wikipedia
+from agavus.model.extra import fetch_wikipedia, save_wikipedia, without_leaks
 from agavus.model.federal import fetch_federal
 from agavus.model.network import (
   CLUES,
@@ -41,6 +41,12 @@ from agavus.model.neural import train as train_neural
 from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
 from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.model.tokenizer import (
+  TOKENIZER_FILE,
+  chars_per_token,
+  save_tokenizer,
+  train_tokenizer,
+)
 from agavus.server.__main__ import serve
 
 HIDDEN = 8
@@ -193,6 +199,26 @@ def run_export() -> int:
   return 0
 
 
+def run_train_tokenizer(names: list[str]) -> int:
+  """Train the BPE tokenizer on statute training articles plus the named texts, leak-free."""
+  data_dir = load_settings().data_dir
+  try:
+    texts = with_local(data_dir, names or ["civil", "federal", "planalto", "djen"])
+  except (OSError, ValueError) as error:
+    print(f"lab: tokenizer failed: {error}")
+    return 1
+  split = split_articles(texts.statutes)
+  sources = {name: without_leaks(found, texts.statutes) for name, found in texts.extras.items()}
+  corpus = [*split.train, *(text for found in sources.values() for text in found)]
+  tokenizer = train_tokenizer(corpus)
+  save_tokenizer(tokenizer, data_dir / TOKENIZER_FILE)
+  print(f"tokenizer: {tokenizer.get_vocab_size():,} tokens from {sum(map(len, corpus)):,} chars")
+  for name, found in [("exam", split.holdout), *sources.items()]:
+    print(f"  {name}: {chars_per_token(tokenizer, sample_texts(found, 2000)):.2f} chars/token")
+  print(f"saved: {data_dir / TOKENIZER_FILE}")
+  return 0
+
+
 def run_recall(arguments: list[str]) -> int:
   """Probe how much of a text set a checkpoint reproduces verbatim."""
   data_dir = load_settings().data_dir
@@ -237,6 +263,7 @@ def main(arguments: list[str]) -> int:
     "agathe": run_agathe,
     "chat": serve,
     "recall": run_recall,
+    "train-tokenizer": run_train_tokenizer,
     "fetch-federal": lambda _: run_fetch_federal(),
     "fetch-planalto": lambda _: run_fetch_planalto(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),

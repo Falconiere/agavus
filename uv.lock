@@ -48,6 +48,7 @@ dev = [
     { name = "transformers" },
 ]
 lab = [
+    { name = "tokenizers" },
     { name = "torch", version = "2.15.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
 ]
@@ -75,6 +76,7 @@ requires-dist = [
     { name = "safetensors", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "safetensors", marker = "extra == 'learned'", specifier = ">=0.5" },
     { name = "tokenizers", specifier = ">=0.21" },
+    { name = "tokenizers", marker = "extra == 'lab'", specifier = ">=0.22" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'dev'", specifier = ">=2.7" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'lab'", specifier = ">=2.7" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'learned'", specifier = ">=2.7" },
