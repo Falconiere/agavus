@@ -3,50 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Agathe</title>
   <link rel="stylesheet" href="/chat.css">
   <script type="module" src="/chat.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Agathe</h1>
-    <p>Modelo experimental de continuação de texto.</p>
-  </header>
+  <aside id="history" aria-label="Histórico">
+    <div class="sidebar-head">
+      <span class="wordmark">Agathe</span>
+      <button class="icon mobile" popovertarget="history" popovertargetaction="hide"
+        aria-label="Fechar histórico" title="Fechar histórico">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#panel-icon"/></svg>
+      </button>
+    </div>
+    <button id="new-chat" class="action">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4H6a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-6"/>
+        <path d="m18 3 3 3-9 9-4 1 1-4z"/>
+      </svg>
+      Nova conversa
+    </button>
+    <h2 id="recents">Recentes</h2>
+    <nav aria-labelledby="recents"></nav>
+    <p class="no-history">Nenhuma conversa ainda.</p>
+    <button id="delete-chat" class="action" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/>
+      </svg>
+      Excluir conversa
+    </button>
+  </aside>
+
   <main>
-    <aside id="history">
-      <details>
-        <summary>Histórico</summary>
-        <button id="new-chat">Nova conversa</button>
-        <nav aria-label="Conversas salvas"></nav>
-        <button id="delete-chat" disabled>Excluir conversa</button>
-      </details>
+    <header>
+      <button class="mobile icon" popovertarget="history" aria-label="Abrir histórico"
+        title="Abrir histórico">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <g id="panel-icon">
+            <rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>
+          </g>
+        </svg>
+      </button>
+      <h1 id="chat-title">Nova conversa</h1>
+      <button class="action metrics-toggle" popovertarget="metrics">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18v-5m7 5V5m7 13V9"/></svg>
+        Métricas
+      </button>
+    </header>
+    <aside id="metrics" popover aria-labelledby="metrics-title">
+      <h2 id="metrics-title">Métricas</h2>
+      <dl>
+        <dt>Checkpoint ativo</dt><dd id="checkpoint">—</dd>
+        <dt>Parâmetros</dt><dd id="parameters">—</dd>
+        <dt>Tempo de geração</dt><dd id="elapsed">—</dd>
+        <dt>Caracteres gerados</dt><dd id="count">—</dd>
+        <dt>Caracteres por segundo</dt><dd id="rate">—</dd>
+        <dt>Contexto usado</dt><dd id="context">—</dd>
+      </dl>
     </aside>
-    <section class="conversation" aria-label="Conversa com Agathe">
-      <div id="transcript" role="log" aria-label="Transcrição">
-        <p class="empty">Escreva um trecho para o Agathe continuar.</p>
+
+    <div id="transcript" role="log" aria-label="Conversa com Agathe">
+      <div class="empty">
+        <h2>Que texto vamos continuar?</h2>
+        <p>Escreva as primeiras palavras para o Agathe continuar de onde você parou.</p>
       </div>
-      <form>
-        <label for="message">Mensagem</label>
-        <div class="compose">
-          <textarea id="message" rows="2" placeholder="Escreva uma mensagem…" required></textarea>
-          <button type="submit" disabled>Enviar</button>
-        </div>
-      </form>
+    </div>
+    <footer>
       <p id="status" role="status"></p>
-    </section>
-    <aside id="metrics">
-      <details>
-        <summary>Métricas</summary>
-        <dl>
-          <dt>Checkpoint ativo</dt><dd id="checkpoint">—</dd>
-          <dt>Parâmetros</dt><dd id="parameters">—</dd>
-          <dt>Tempo de geração</dt><dd id="elapsed">—</dd>
-          <dt>Caracteres gerados</dt><dd id="count">—</dd>
-          <dt>Caracteres por segundo</dt><dd id="rate">—</dd>
-          <dt>Contexto usado</dt><dd id="context">—</dd>
-        </dl>
-      </details>
-    </aside>
+      <form>
+        <textarea id="message" aria-label="Mensagem" rows="1"
+          placeholder="Escreva para o Agathe…" required></textarea>
+        <button type="submit" class="icon send" aria-label="Enviar mensagem"
+          title="Enviar" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+        </button>
+      </form>
+      <small>Modelo experimental de continuação de texto.</small>
+    </footer>
   </main>
 </body>
 </html>

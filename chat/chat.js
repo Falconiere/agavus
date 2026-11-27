@@ -3,6 +3,8 @@ const storageKey = "agathe-chat-v1";
 const input = $("#message");
 const transcript = $("#transcript");
 const empty = transcript.firstElementChild;
+const sidebar = $("#history");
+const narrow = matchMedia("(max-width: 760px)");
 const format = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 let model;
 let busy = false;
@@ -37,20 +39,20 @@ function controls() {
 function showMessage(role, text) {
   const article = document.createElement("article");
   article.className = "message " + role;
-  const author = document.createElement("strong");
-  author.textContent = role === "user" ? "Você" : "Agathe";
-  const body = document.createElement("p");
-  body.textContent = text;
-  article.append(author, body);
+  article.setAttribute("aria-label", role === "user" ? "Você" : "Agathe");
+  article.textContent = text;
   transcript.append(article);
-  return body;
+  return article;
 }
 
 function render() {
   const chat = active();
+  $("#chat-title").textContent = chat?.title || "Nova conversa";
+  $("#delete-chat").hidden = !chat;
   $("nav").replaceChildren(...history.threads.map((item) => {
     const button = document.createElement("button");
     button.textContent = item.title;
+    button.title = item.title;
     button.setAttribute("aria-current", String(item === chat));
     button.onclick = () => select(item.id);
     return button;
@@ -63,13 +65,15 @@ function render() {
   const metrics = chat?.metrics;
   $("#elapsed").textContent = metrics ? format.format(metrics.seconds) + " s" : "—";
   $("#count").textContent = metrics ? format.format(metrics.characters) : "—";
-  $("#rate").textContent = metrics?.seconds ? format.format(metrics.characters / metrics.seconds) : "—";
+  $("#rate").textContent = metrics?.seconds
+    ? format.format(metrics.characters / metrics.seconds) : "—";
   $("#context").textContent = metrics ? metrics.used + " de " + metrics.capacity : "—";
   transcript.scrollTop = transcript.scrollHeight;
   controls();
 }
 
 function select(id) {
+  if (sidebar.matches(":popover-open")) sidebar.hidePopover();
   history.activeId = id;
   input.value = "";
   $("#status").textContent = "";
@@ -112,7 +116,9 @@ $("form").onsubmit = async (event) => {
   if (!text.trim() || !model || busy) return;
   busy = true;
   const previous = active();
-  const chat = previous || { id: crypto.randomUUID(), title: text.trim().slice(0, 42), messages: [] };
+  const chat = previous || {
+    id: crypto.randomUUID(), title: text.trim().slice(0, 42), messages: [],
+  };
   if (!previous) history.threads.unshift(chat);
   history.activeId = chat.id;
   chat.messages.push({ role: "user", text });
@@ -160,12 +166,12 @@ input.onkeydown = (event) => {
   }
 };
 
-const narrow = matchMedia("(max-width: 760px)");
-function sizePanels() {
-  for (const panel of document.querySelectorAll("details")) panel.open = !narrow.matches;
+function sizeHistory() {
+  if (narrow.matches) sidebar.setAttribute("popover", "auto");
+  else sidebar.removeAttribute("popover");
 }
-sizePanels();
-narrow.addEventListener("change", sizePanels);
+sizeHistory();
+narrow.addEventListener("change", sizeHistory);
 render();
 try {
   const response = await fetch("/api/model");
@@ -175,5 +181,6 @@ try {
   $("#parameters").textContent = format.format(model.parameters);
   controls();
 } catch {
-  $("#status").textContent = "Não foi possível carregar o modelo. Recarregue a página para tentar.";
+  $("#status").textContent =
+    "Não foi possível carregar o modelo. Recarregue a página para tentar.";
 }
