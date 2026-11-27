@@ -5,6 +5,8 @@ const transcript = $("#transcript");
 const empty = transcript.firstElementChild;
 const sidebar = $("#history");
 const narrow = matchMedia("(max-width: 760px)");
+const metricsPanel = $("#metrics");
+const medium = matchMedia("(max-width: 1099px)");
 const format = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 let model;
 let busy = false;
@@ -166,12 +168,15 @@ input.onkeydown = (event) => {
   }
 };
 
-function sizeHistory() {
-  if (narrow.matches) sidebar.setAttribute("popover", "auto");
-  else sidebar.removeAttribute("popover");
+function sizePanels() {
+  for (const [panel, query] of [[sidebar, narrow], [metricsPanel, medium]]) {
+    if (query.matches) panel.setAttribute("popover", "auto");
+    else panel.removeAttribute("popover");
+  }
 }
-sizeHistory();
-narrow.addEventListener("change", sizeHistory);
+sizePanels();
+narrow.addEventListener("change", sizePanels);
+medium.addEventListener("change", sizePanels);
 render();
 try {
   const response = await fetch("/api/model");

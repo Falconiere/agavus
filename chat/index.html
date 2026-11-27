@@ -51,17 +51,6 @@
         Métricas
       </button>
     </header>
-    <aside id="metrics" popover aria-labelledby="metrics-title">
-      <h2 id="metrics-title">Métricas</h2>
-      <dl>
-        <dt>Checkpoint ativo</dt><dd id="checkpoint">—</dd>
-        <dt>Parâmetros</dt><dd id="parameters">—</dd>
-        <dt>Tempo de geração</dt><dd id="elapsed">—</dd>
-        <dt>Caracteres gerados</dt><dd id="count">—</dd>
-        <dt>Caracteres por segundo</dt><dd id="rate">—</dd>
-        <dt>Contexto usado</dt><dd id="context">—</dd>
-      </dl>
-    </aside>
 
     <div id="transcript" role="log" aria-label="Conversa com Agathe">
       <div class="empty">
@@ -82,5 +71,17 @@
       <small>Modelo experimental de continuação de texto.</small>
     </footer>
   </main>
+
+  <aside id="metrics" aria-labelledby="metrics-title">
+    <h2 id="metrics-title">Métricas</h2>
+    <dl>
+      <dt>Checkpoint ativo</dt><dd id="checkpoint">—</dd>
+      <dt>Parâmetros</dt><dd id="parameters">—</dd>
+      <dt>Tempo de geração</dt><dd id="elapsed">—</dd>
+      <dt>Caracteres gerados</dt><dd id="count">—</dd>
+      <dt>Caracteres por segundo</dt><dd id="rate">—</dd>
+      <dt>Contexto usado</dt><dd id="context">—</dd>
+    </dl>
+  </aside>
 </body>
 </html>
