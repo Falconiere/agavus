@@ -154,6 +154,14 @@ def test_seeded_continuation_starts_after_the_prefix_and_stops_at_the_end_token(
   assert len(list(model.continuation("a guarda", seed=7, max_tokens=5))) == len("abcde")
 
 
+def _endless() -> AgatheModel:
+  """A fresh model whose end token never wins, so continuations run to their limit."""
+  model = start(TOKENIZER, CONFIG)
+  with torch.no_grad():
+    model.tokens[END_ID] = -model.tokens[1:].sum(0)
+  return model
+
+
 def _recomputed(model: AgatheModel, prefix: str, seed: int, count: int) -> list[int]:
   """Seeded tokens read from the whole recent window each step, without a cache."""
   generator = torch.Generator().manual_seed(seed)
@@ -170,9 +178,7 @@ def _recomputed(model: AgatheModel, prefix: str, seed: int, count: int) -> list[
 
 
 def test_cached_continuation_matches_reading_the_whole_window_until_it_slides() -> None:
-  model = start(TOKENIZER, CONFIG)
-  with torch.no_grad():
-    model.tokens[END_ID] = -model.tokens[1:].sum(0)  # never stop early
+  model = _endless()
   prefix, seed = "a guarda", 3
   fill = CONFIG.context - len(encode(TOKENIZER, prefix))
   assert list(model.continuation(prefix, seed=seed, max_tokens=fill)) == _recomputed(
@@ -181,6 +187,20 @@ def test_cached_continuation_matches_reading_the_whole_window_until_it_slides() 
   long = list(model.continuation(prefix, seed=seed, max_tokens=3 * CONFIG.context))
   assert len(long) == 3 * CONFIG.context
   assert long[:fill] == _recomputed(model, prefix, seed, fill)
+
+
+def test_greedy_continuation_takes_the_likeliest_token_whatever_the_seed() -> None:
+  model = _endless()
+  count = 8
+  greedy = [
+    list(model.continuation("a guarda", seed=seed, max_tokens=count, greedy=True))
+    for seed in (1, 2)
+  ]
+  assert greedy[0] == greedy[1] and len(greedy[0]) == count
+  ids = framed(TOKENIZER, "a guarda")[:-1]
+  with torch.no_grad():
+    first = int(model.scores(torch.tensor([ids[-CONFIG.context :]]))[0, -1].argmax())
+  assert greedy[0][0] == first
 
 
 def test_training_reduces_loss_and_reports_bits_per_character() -> None:

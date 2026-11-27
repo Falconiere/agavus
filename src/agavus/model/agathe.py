@@ -272,18 +272,21 @@ class AgatheModel:
     mean, scored = self.surprise(texts)
     return mean * scored / (math.log(2) * max(1, sum(map(len, texts))))
 
-  def continuation(self, prefix: str, *, seed: int, max_tokens: int) -> Iterator[int]:
+  def continuation(
+    self, prefix: str, *, seed: int, max_tokens: int, greedy: bool = False
+  ) -> Iterator[int]:
     """Yield new token ids after the last `context` tokens of the prefix, until the end id.
 
     Keys and values stay cached; past `context`, the oldest drop out instead of the window
-    being read again.
+    being read again. `greedy` takes the likeliest token each time instead of sampling, so
+    quoting copies the context faithfully.
     """
     generator = torch.Generator().manual_seed(seed)
     window = framed(self.tokenizer, prefix)[:-1][-self.config.context :]
     cache: Cache = []
     found = self.extend(window, 0, cache)
     for position in range(len(window), len(window) + max_tokens):
-      chosen = pick(found, generator)
+      chosen = int(found.argmax()) if greedy else pick(found, generator)
       if chosen == END_ID:
         return
       yield chosen
