@@ -2,6 +2,7 @@
 
 import json
 import pickle
+from collections.abc import Sequence
 from hashlib import sha256
 from pathlib import Path
 
@@ -9,11 +10,20 @@ import torch
 
 from agavus.model.agathe import AgatheConfig, AgatheModel, start
 from agavus.model.bigram import build_vocab
-from agavus.model.bundle import digest, read_bundle
+from agavus.model.bundle import Texts, bundle_bytes, digest, read_bundle
 from agavus.model.data import split_articles
+from agavus.model.federal import load_federal
 
 
-def load_checkpoint(run: Path, bundle: Path) -> AgatheModel:
+def _inputs_sha256(bundle: Path, texts: Texts, extras: Sequence[str], data_dir: Path | None) -> str:
+  """Federal runs hash the bundle plus the local federal articles they trained on."""
+  if data_dir is None or "federal" not in extras:
+    return digest(bundle)
+  merged = Texts(texts.statutes, {**texts.extras, "federal": load_federal(data_dir)})
+  return sha256(bundle_bytes(merged)).hexdigest()
+
+
+def load_checkpoint(run: Path, bundle: Path, data_dir: Path | None = None) -> AgatheModel:
   """Validate the three artifacts before exposing the model to a chat session."""
   record_path = run / "run.json"
   try:
@@ -31,9 +41,10 @@ def load_checkpoint(run: Path, bundle: Path) -> AgatheModel:
     raise ValueError(f"Confira {record_path}: {error}") from error
 
   try:
-    if digest(bundle) != expected:
+    texts = read_bundle(bundle)
+    if _inputs_sha256(bundle, texts, record.get("extras", ()), data_dir) != expected:
       raise ValueError(f"o SHA-256 difere do registrado em {record_path}")
-    training = split_articles(read_bundle(bundle).statutes).train
+    training = split_articles(texts.statutes).train
     if not training:
       raise ValueError("faltam artigos de treino")
   except (OSError, AttributeError, KeyError, TypeError, ValueError) as error:

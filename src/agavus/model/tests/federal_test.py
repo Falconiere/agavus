@@ -95,13 +95,19 @@ def test_empty_response_can_be_retried(tmp_path: Path) -> None:
   assert not list(tmp_path.rglob("*.html"))
 
 
-def test_local_federal_inputs_use_only_the_reference_bundle(tmp_path: Path) -> None:
-  base = Texts(("a", "b"), {"civil": ("extra",)})
-  write_bundle(tmp_path / BUNDLE_FILE, base)
-  folder = tmp_path / FEDERAL_DIR
+def write_federal_inputs(data_dir: Path, base: Texts, text: str) -> Path:
+  """Reference bundle plus one synthetic article per catalogued law; returns the federal folder."""
+  write_bundle(data_dir / BUNDLE_FILE, base)
+  folder = data_dir / FEDERAL_DIR
   folder.mkdir(parents=True)
   for law in LAWS:
-    (folder / f"{law.stem}.jsonl").write_text('{"text":"synthetic"}\n', encoding="utf-8")
+    (folder / f"{law.stem}.jsonl").write_text(json.dumps({"text": text}) + "\n", encoding="utf-8")
+  return folder
+
+
+def test_local_federal_inputs_use_only_the_reference_bundle(tmp_path: Path) -> None:
+  base = Texts(("a", "b"), {"civil": ("extra",)})
+  folder = write_federal_inputs(tmp_path, base, "synthetic")
   (folder / "unexpected.jsonl").write_text("invalid", encoding="utf-8")
   merged = federal_texts(tmp_path)
   assert merged.statutes == base.statutes

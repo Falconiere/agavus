@@ -35,7 +35,7 @@ def serve(arguments: Sequence[str]) -> int:
   run: Path = options.run
   torch.set_num_threads(THREADS)
   try:
-    model = load_checkpoint(run, data_dir / BUNDLE_FILE)
+    model = load_checkpoint(run, data_dir / BUNDLE_FILE, data_dir)
   except ValueError as error:
     parser.exit(1, f"{error}\n")
   with make_server(

@@ -1,5 +1,6 @@
 """Restore or reject real checkpoint files generated with a synthetic text bundle."""
 
+import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -10,9 +11,11 @@ import torch
 from agavus.model.agathe import AgatheConfig, start
 from agavus.model.agathe_run import save_run
 from agavus.model.bigram import build_vocab
-from agavus.model.bundle import Texts, write_bundle
+from agavus.model.bundle import Texts, bundle_bytes, federal_texts, read_bundle, write_bundle
 from agavus.model.checkpoint import load_checkpoint
+from agavus.model.federal import LAWS
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED
+from agavus.model.tests.federal_test import write_federal_inputs
 
 
 @pytest.fixture
@@ -61,3 +64,20 @@ def test_corrupt_weight_file_names_the_checkpoint(checkpoint: tuple[Path, Path])
   (run / "model.pt").write_bytes(b"bad")
   with pytest.raises(ValueError, match=r"model\.pt"):
     load_checkpoint(run, bundle)
+
+
+def test_federal_run_checks_the_bundle_plus_local_federal_text(
+  checkpoint: tuple[Path, Path], tmp_path: Path
+) -> None:
+  run, bundle = checkpoint
+  folder = write_federal_inputs(tmp_path, read_bundle(bundle), "Art. 1º Lei.")
+  record = json.loads((run / "run.json").read_bytes())
+  record["extras"] = ["civil", "federal"]
+  record["data_sha256"] = hashlib.sha256(bundle_bytes(federal_texts(tmp_path))).hexdigest()
+  (run / "run.json").write_text(json.dumps(record))
+  assert load_checkpoint(run, bundle, tmp_path).vocab == build_vocab(["abc"])
+  with pytest.raises(ValueError, match="SHA-256"):
+    load_checkpoint(run, bundle)
+  (folder / f"{LAWS[0].stem}.jsonl").write_text('{"text":"Art. 2º Outra."}\n', encoding="utf-8")
+  with pytest.raises(ValueError, match="SHA-256"):
+    load_checkpoint(run, bundle, tmp_path)
