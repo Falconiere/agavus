@@ -28,6 +28,7 @@ AMENDED = SITE + "leis/l8069.htm"
 COMPILED = SITE + "leis/l8069compilado.htm"
 IN_PLACE = SITE + "_ato2023-2026/2024/lei/l14900.htm"
 MISSING = SITE + "leis/l1.htm"
+REVOKED = SITE + "leis/l2.htm"
 PAGES = {
   ORDINARY: '<a href="../_Ato2023-2026/2024/Lei/_leis2024.htm">2024</a>'
   '<a href="L8069.htm">ECA</a><a href="../MPV/Principal.htm">MPV</a>',
@@ -36,6 +37,7 @@ PAGES = {
   AMENDED: '<a href="L8069compilado.htm">Texto compilado</a><p>Art. 1º Texto original.</p>',
   COMPILED: f"<p>Art. 1º Texto <strike>antigo</strike> novo.</p><p>Art. 2º {COPIED}.</p>",
   IN_PLACE: "<p>Art. 1º Lei atual.</p><p>Brasília, 1º de março.</p><p>Assinatura</p>",
+  REVOKED: "<p><strike>Art. 1º Revogado.</strike></p>",
   **{SITE + path: "<p>Sem leis.</p>" for path in INDEXES[1:]},
 }
 
@@ -82,11 +84,18 @@ def test_discover_walks_indexes_and_saved_portal_listings(tmp_path: Path) -> Non
 
 def test_fetch_keeps_newest_text_and_refreshes_only_changes(tmp_path: Path) -> None:
   requests: list[httpx.Request] = []
-  laws = [AMENDED, IN_PLACE, MISSING]
+  laws = [AMENDED, IN_PLACE, MISSING, REVOKED]
   with serve(requests) as client:
     crawl = Crawl(client, interval=0)
     first = fetch_planalto(tmp_path, crawl, (COPIED, "abc"), laws)
-    assert first == {"changed": 2, "unchanged": 0, "failed": 1, "articles": 2, "dropped": 1}
+    assert first == {
+      "changed": 2,
+      "unchanged": 0,
+      "revoked": 1,
+      "failed": 1,
+      "articles": 2,
+      "dropped": 1,
+    }
     assert load_planalto(tmp_path) == ("Art. 1º Lei atual.", "Art. 1º Texto novo.")
     row = json.loads(
       (tmp_path / PLANALTO_DIR / "articles" / "leis" / "l8069.htm.jsonl").read_text(
@@ -101,6 +110,13 @@ def test_fetch_keeps_newest_text_and_refreshes_only_changes(tmp_path: Path) -> N
     }
     requests.clear()
     again = fetch_planalto(tmp_path, crawl, (COPIED, "abc"), laws)
-  assert again == {"changed": 0, "unchanged": 2, "failed": 1, "articles": 0, "dropped": 0}
+  assert again == {
+    "changed": 0,
+    "unchanged": 3,
+    "revoked": 0,
+    "failed": 1,
+    "articles": 0,
+    "dropped": 0,
+  }
   assert all("if-none-match" in r.headers for r in requests if str(r.url) != MISSING)
   assert load_planalto(tmp_path) == ("Art. 1º Lei atual.", "Art. 1º Texto novo.")

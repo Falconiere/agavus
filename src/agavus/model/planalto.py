@@ -132,7 +132,7 @@ def fetch_planalto(
   if not statutes:
     raise ValueError("the statute reference bundle is empty")
   folder = data_dir / PLANALTO_DIR
-  counts = {"changed": 0, "unchanged": 0, "failed": 0, "articles": 0, "dropped": 0}
+  counts = dict.fromkeys(("changed", "unchanged", "revoked", "failed", "articles", "dropped"), 0)
   for url in laws:
     out = folder / "articles" / f"{_relative(url)}.jsonl"
     try:
@@ -141,8 +141,13 @@ def fetch_planalto(
         counts["unchanged"] += 1
         continue
       found = dict(articles(FederalLaw(_relative(url), _relative(target)), payload))
-      if not found or any("�" in body for body in found.values()):
-        raise ValueError("missing or undecodable article text")
+      if any("�" in body for body in found.values()):
+        raise ValueError("undecodable article text")
+      if not found:
+        # Planalto strikes out every article of a revoked law; the empty file marks it done.
+        save_bytes(out, b"")
+        counts["revoked"] += 1
+        continue
     except (httpx.HTTPError, ValueError) as error:
       counts["failed"] += 1
       print(f"planalto: {url}: {error}")
