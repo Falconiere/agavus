@@ -16,39 +16,62 @@ from agavus.model.tokenizer import decode
 
 MAX_BODY = 1024 * 1024
 PARTIAL = "\ufffd"
+# Chat answers quote whole articles; plain continuations stay sample-sized.
+CHAT_CHARS = 2000
+# A tail of the same 1..LOOP_PERIOD tokens LOOP_REPEATS times running is a loop, not an answer.
+LOOP_PERIOD = 8
+LOOP_REPEATS = 6
+LOOPED = "\n\n[Resposta interrompida: o modelo entrou em repetição. Confira os textos citados.]"
 
 
 def _line(value: dict[str, object]) -> bytes:
   return (json.dumps(value, ensure_ascii=False) + "\n").encode()
 
 
-def continuation(model: AgatheModel, prefix: str, sources: Sequence[Hit] = ()) -> Iterator[bytes]:
+def looping(ids: Sequence[int]) -> bool:
+  """Whether the ids end in one short cycle repeated LOOP_REPEATS times."""
+  for period in range(1, LOOP_PERIOD + 1):
+    span = period * LOOP_REPEATS
+    if len(ids) >= span and all(ids[-i] == ids[-i - period] for i in range(1, span - period + 1)):
+      return True
+  return False
+
+
+def continuation(
+  model: AgatheModel, prefix: str, sources: Sequence[Hit] = (), max_chars: int = SAMPLE_CHARS
+) -> Iterator[bytes]:
   """Stream new text, then inference metrics including initial context usage in tokens.
 
-  The last line also lists the articles placed in context (`sources`).
+  A loop of repeated tokens ends the text with the LOOPED notice. The last line also lists
+  the articles placed in context (`sources`).
   """
   capacity = model.config.context
   used = min(len(framed(model.tokenizer, prefix)) - 1, capacity)
   written: list[int] = []
   sent = ""
   seconds = 0.0
-  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=SAMPLE_CHARS)
+  tokens = model.continuation(prefix, seed=randbits(63), max_tokens=max_chars)
+  looped = False
   while True:
     began = perf_counter()
     token = next(tokens, None)
     seconds += perf_counter() - began
     if token is not None:
       written.append(token)
-    text = decode(model.tokenizer, written)[:SAMPLE_CHARS]
+      looped = looping(written)
+    text = decode(model.tokenizer, written)[:max_chars]
     # A character split across tokens waits for its last byte.
     if text.endswith(PARTIAL) and token is not None:
       continue
     if len(text) > len(sent):
       yield _line({"text": text[len(sent) :]})
       sent = text
-    if token is None or len(sent) == SAMPLE_CHARS:
+    if token is None or looped or len(sent) == max_chars:
       break
+  if looped:
+    yield _line({"text": LOOPED})
   metrics = {"seconds": seconds, "characters": len(sent), "used": used, "capacity": capacity}
+  metrics |= {"looped": looped}
   cited = [
     {"name": hit.name, "number": hit.number, "origin_ref": hit.origin_ref} for hit in sources
   ]
@@ -123,6 +146,6 @@ def application(
       wanted = "as mensagens da conversa" if chat else "um prefixo de texto"
       return [_line({"error": f"Envie {wanted} em JSON."})]
     respond("200 OK", [("Content-Type", "application/x-ndjson"), ("Cache-Control", "no-store")])
-    return continuation(model, prefix, sources)
+    return continuation(model, prefix, sources, CHAT_CHARS if chat else SAMPLE_CHARS)
 
   return handle

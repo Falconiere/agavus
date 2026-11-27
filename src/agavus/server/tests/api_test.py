@@ -21,8 +21,8 @@ from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import prompt, render_turns
 from agavus.model.sft_context import SEARCHED, with_context
 from agavus.model.tests.law_search_test import LAW, NAME, synthetic_index
-from agavus.model.tokenizer import train_tokenizer
-from agavus.server.api import application, chat_prefix
+from agavus.model.tokenizer import encode, train_tokenizer
+from agavus.server.api import LOOP_REPEATS, LOOPED, application, chat_prefix, looping
 
 TOKENIZER = train_tokenizer(["um papel ção", "papel"] * 3, 300)
 CONFIG = AgatheConfig(width=8, heads=2, kv_heads=1, context=4, layers=1)
@@ -95,8 +95,8 @@ def test_browser_page_and_assets_share_the_api_origin(api: httpx.Client) -> None
   assert api.get("/run.json").is_client_error
 
 
-def _silent(context: int) -> AgatheModel:
-  """A model that answers nothing: every token scores the end token highest."""
+def _silent(context: int, favorite: int = END_ID) -> AgatheModel:
+  """A model that always picks `favorite`; by default it answers nothing (the end token)."""
   model = start(TOKENIZER, replace(CONFIG, context=context))
   # With the residual paths silenced, only the token table decides.
   silenced = [weight for layer in model.layers for weight in (layer.mix, layer.down)]
@@ -104,7 +104,7 @@ def _silent(context: int) -> AgatheModel:
     for weight in silenced:
       weight.zero_()
     model.tokens.fill_(10.0)
-    model.tokens[END_ID].fill_(20.0)
+    model.tokens[favorite].fill_(30.0)
   return model
 
 
@@ -138,3 +138,16 @@ def test_chat_with_a_search_index_answers_from_the_articles_found(tmp_path: Path
   assert event["metrics"]["used"] == len(framed(TOKENIZER, expected)) - 1
   assert event["sources"][0] == {"name": NAME, "number": "2º", "origin_ref": f"{LAW}, art. 2"}
   assert len(event["sources"]) == len(hits) <= SEARCHED
+
+
+def test_a_looping_answer_stops_with_a_notice() -> None:
+  assert looping([7] * LOOP_REPEATS) and looping([1, 2, 3] + [4, 5] * LOOP_REPEATS)
+  assert not looping([7] * (LOOP_REPEATS - 1)) and not looping(list(range(40)))
+  favorite = encode(TOKENIZER, "papel")[0]
+  app = application(_silent(64, favorite), "eco", chat=True)
+  body = {"messages": MESSAGES}
+  with serving(app) as client, client.stream("POST", "/api/continue", json=body) as response:
+    events = [json.loads(line) for line in response.iter_lines()]
+  texts = [event["text"] for event in events if "text" in event]
+  assert texts[-1] == LOOPED and "papel" in "".join(texts[:-1])
+  assert events[-1]["metrics"]["looped"] is True

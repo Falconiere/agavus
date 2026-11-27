@@ -48,7 +48,7 @@ function showSources(article, sources) {
     link.href = ref.split(", art. ")[0];
     link.target = "_blank";
     link.rel = "noreferrer";
-    link.textContent = name + ", art. " + number;
+    link.textContent = name + (number ? ", art. " + number : ", ementa");
     const item = document.createElement("li");
     item.append(link);
     return item;
