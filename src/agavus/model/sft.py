@@ -25,6 +25,9 @@ ROLES = {"user": USER, "assistant": ASSISTANT}
 CHECK_CONVERSATIONS = 256
 
 
+SFT_DIR = Path("lab") / "sft"
+
+
 @dataclass(frozen=True)
 class Conversation:
   """Turns as (role, text), with where they came from and under which license."""

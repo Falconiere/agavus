@@ -46,8 +46,16 @@ from agavus.model.neural import train as train_neural
 from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
 from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
-from agavus.model.sft import TuneConfig, load_conversations, masked_loss, save_conversations, tune
+from agavus.model.sft import (
+  SFT_DIR,
+  TuneConfig,
+  load_conversations,
+  masked_loss,
+  save_conversations,
+  tune,
+)
 from agavus.model.sft_rules import law_of, load_rule_sources, rule_conversations, split_by_law
+from agavus.model.teacher import run_teach
 from agavus.model.tokenizer import (
   TOKENIZER_FILE,
   chars_per_token,
@@ -73,7 +81,6 @@ WIKIPEDIA_CHARS = 1500
 WIKIPEDIA_TIMEOUT = 60.0
 RATE = 0.5
 SHOWN_STEPS = (0, 10, 50, 100, 200, 500, 1000, 2000)
-SFT_DIR = Path("lab/sft")
 SFT_STEPS = 2000
 # What load_checkpoint needs from the base run to load the tuned one.
 BASE_FIELDS = ("config", "data_sha256", "tokenizer_sha256", "extras")
@@ -350,6 +357,7 @@ def main(arguments: list[str]) -> int:
     "export": lambda _: run_export(),
     "build-sft": lambda _: run_build_sft(),
     "sft": run_sft,
+    "teach": run_teach,
   }
   name = arguments[0] if arguments else "bigram"
   if name not in experiments:
