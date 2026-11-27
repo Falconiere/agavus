@@ -1,11 +1,13 @@
 """Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-chat, fetch-wikipedia, fetch-federal, fetch-planalto, export.
+chat, recall, fetch-wikipedia, fetch-federal, fetch-planalto, export.
 """
 
+import argparse
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 import httpx
 import torch
@@ -21,7 +23,8 @@ from agavus.model.bigram import (
 )
 from agavus.model.bpe import FIRST_MERGE, BpeVocab, train_bpe
 from agavus.model.bundle import BUNDLE_FILE, local_texts, read_bundle, write_bundle
-from agavus.model.data import Split, load_articles, split_articles
+from agavus.model.checkpoint import load_checkpoint
+from agavus.model.data import Split, load_articles, load_case_texts, split_articles
 from agavus.model.extra import fetch_wikipedia, save_wikipedia
 from agavus.model.federal import fetch_federal
 from agavus.model.network import (
@@ -36,6 +39,7 @@ from agavus.model.network import (
 from agavus.model.neural import NeuralConfig
 from agavus.model.neural import train as train_neural
 from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
+from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 from agavus.server.__main__ import serve
 
@@ -189,6 +193,40 @@ def run_export() -> int:
   return 0
 
 
+def run_recall(arguments: list[str]) -> int:
+  """Probe how much of a text set a checkpoint reproduces verbatim."""
+  data_dir = load_settings().data_dir
+  parser = argparse.ArgumentParser(prog="python -m agavus.model recall")
+  parser.add_argument("--run", type=Path, default=data_dir / "lab/runs/long-civil")
+  parser.add_argument("--set", choices=("train", "exam", "djen"), default="exam")
+  parser.add_argument("--limit", type=int, default=200)
+  parser.add_argument("--prompt", type=int, default=64, help="prompt characters")
+  parser.add_argument("--answer", type=int, default=64, help="answer characters")
+  options = parser.parse_args(arguments)
+  torch.set_num_threads(THREADS)
+  try:
+    model = load_checkpoint(options.run, data_dir / BUNDLE_FILE, data_dir)
+    split = split_articles(read_bundle(data_dir / BUNDLE_FILE).statutes)
+  except (OSError, ValueError) as error:
+    print(f"lab: recall failed: {error}")
+    return 1
+  if options.set == "djen":
+    texts = load_case_texts(data_dir)
+  else:
+    texts = split.train if options.set == "train" else split.holdout
+  found = recall(
+    model,
+    sample_texts(texts, options.limit),
+    prompt_chars=options.prompt,
+    answer_chars=options.answer,
+  )
+  print(
+    f"recall {options.set}: texts {found.texts}, exact {found.exact:.1%}, "
+    f"matched {found.matched:.1%}, loss {found.loss:.4f}"
+  )
+  return 0
+
+
 def main(arguments: list[str]) -> int:
   """Choose the experiment; the bigram is the default."""
   experiments: dict[str, Callable[[list[str]], int]] = {
@@ -198,6 +236,7 @@ def main(arguments: list[str]) -> int:
     "bpe": lambda _: run_bpe(),
     "agathe": run_agathe,
     "chat": serve,
+    "recall": run_recall,
     "fetch-federal": lambda _: run_fetch_federal(),
     "fetch-planalto": lambda _: run_fetch_planalto(),
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
