@@ -19,6 +19,7 @@ STATUTES = tuple(f"Art. {n}º A guarda do filho {n} será compartilhada." for n 
 TEXTS = Texts(statutes=STATUTES, extras={"civil": ("Art. 900. A posse.",), "wikipedia": ()})
 BASELINE_LAYERS = 4
 FIVE_LAYERS = 5
+RATE = 1e-3
 
 
 def test_defaults_run_on_cpu() -> None:
@@ -32,6 +33,12 @@ def test_defaults_run_on_cpu() -> None:
 def test_zero_dimension_is_refused(flag: str) -> None:
   with pytest.raises(SystemExit):
     parse([flag, "0"])
+
+
+@pytest.mark.parametrize("rate", ["0", "-1e-3", "nan"])
+def test_non_positive_rate_is_refused(rate: str) -> None:
+  with pytest.raises(SystemExit):
+    parse(["--rate", rate])
 
 
 def test_width_must_divide_into_heads() -> None:
@@ -60,6 +67,7 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   out = tmp_path / "run"
   arguments = ["civil", "--steps", "2", "--check-every", "1", "--seed", "3", "--texts", str(bundle)]
   shape = ["--layers", "5", "--width", "12", "--heads", "3", "--context", "2", "--batch", "8"]
+  shape += ["--rate", "1e-3"]
   assert run_agathe([*arguments, *shape, "--out", str(out)]) == 0
   record = json.loads((out / "run.json").read_text(encoding="utf-8"))
   assert record["data_sha256"] == digest(bundle)
@@ -71,5 +79,6 @@ def test_run_from_bundle_saves_record_and_weights(tmp_path: Path) -> None:
   expected = start(build_vocab(split_articles(STATUTES).train), config)
   assert record["parameters"] == expected.size()
   assert record["config"]["batch"] == config.batch
+  assert record["config"]["rate"] == RATE
   assert [w.shape for w in torch.load(out / "model.pt")] == [w.shape for w in expected.parameters()]
   assert not list(out.glob("*.partial"))

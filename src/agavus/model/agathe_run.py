@@ -50,6 +50,7 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("--heads", type=int, default=defaults.heads, help="attention heads per block")
   parser.add_argument("--context", type=int, default=defaults.context, help="tokens per window")
   parser.add_argument("--batch", type=int, default=defaults.batch, help="windows per update")
+  parser.add_argument("--rate", type=float, default=defaults.rate, help="AdamW learning rate")
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--seed", type=int, default=0, help="starting weights, batches, dropout")
   parser.add_argument("--texts", type=Path, help="exported bundle instead of the local corpus")
@@ -59,6 +60,8 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
     parser.error("layers, width, heads, context and batch must be positive integers")
   if options.width % options.heads:
     parser.error("--width must be divisible by --heads")
+  if not options.rate > 0:
+    parser.error("--rate must be positive")
   return options
 
 
@@ -132,6 +135,7 @@ def run_agathe(arguments: Sequence[str]) -> int:
     heads=options.heads,
     context=options.context,
     batch=options.batch,
+    rate=options.rate,
     check_every=options.check_every,
     device=options.device,
     seed=options.seed,
