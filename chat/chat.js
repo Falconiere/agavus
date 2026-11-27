@@ -40,7 +40,7 @@ function showMessage(role, text) {
   const article = document.createElement("article");
   article.className = "message " + role;
   article.setAttribute("aria-label", role === "user" ? "Você" : "Agathe");
-  article.textContent = text;
+  article.textContent = text.trimStart();
   transcript.append(article);
   return article;
 }
@@ -133,7 +133,7 @@ $("form").onsubmit = async (event) => {
     const prefix = Array.from(full).slice(-model.context).join("");
     chat.metrics = await generate(prefix, (piece) => {
       answer += piece;
-      body.textContent = answer;
+      body.textContent = answer.trimStart();
       transcript.scrollTop = transcript.scrollHeight;
     });
     chat.messages.push({ role: "assistant", text: answer });
