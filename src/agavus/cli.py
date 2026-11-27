@@ -25,7 +25,7 @@ from agavus.decide.rule import decide
 from agavus.evals.goldset import GOLD_VERSION, ROUTING_V1
 from agavus.evals.passageset import FRESH
 from agavus.evals.retrieval import TOP_K, evaluate_citations, evaluate_retrieval
-from agavus.evals.retrievalset import DEV
+from agavus.evals.retrievalset import DEV, RETRIEVAL_VERSION
 from agavus.evals.run import evaluate, gold_mappings
 from agavus.greeting.greet import greet
 from agavus.publish.bootstrap import bootstrap_corpus
@@ -215,9 +215,11 @@ def _run_retrieval_eval(settings: Settings, split: str) -> int:
   )
   outcomes = evaluate_citations(items, respond)
   mode = "meaning" if encoder is not None else "words"
+  version = "citation-v1" if split == "fresh" else RETRIEVAL_VERSION
   print(
-    f"retrieval ({split}, {len(answerable)} answerable, by {mode}): "
-    f"first {report.first} · top-{TOP_K} {report.in_top_k} · MRR {report.mrr:.3f}"
+    f"retrieval ({version} {split}, {len(answerable)} answerable, by {mode}): "
+    f"first {report.first} · top-{TOP_K} {report.in_top_k}"
+    f" · recall@{TOP_K} {report.in_top_k / len(answerable):.3f} · MRR {report.mrr:.3f}"
   )
   print(
     f"answers ({len(items)}): correct primary {outcomes.correct} · wrong primary {outcomes.wrong}"

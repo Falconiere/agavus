@@ -46,6 +46,7 @@ def test_score_only_the_displayed_primary_excerpt() -> None:
     Answer("accept-M", "a:\n\nprova\tlegal", ("a",)),
     Answer("accept-M", "Fatos: prova legal\n\na:\noutra coisa\n\nContexto: prova legal", ("a",)),
     Answer("accept-F", "b:\n\nprova legal\n\nContexto: a", ("b", "a")),
+    Answer("accept-M", "b:\n\nprova legal\n\nContexto: a", ("a", "b")),
     Answer("reject", "", ()),
     Answer("defer", "", ()),
   )
@@ -53,4 +54,4 @@ def test_score_only_the_displayed_primary_excerpt() -> None:
     RetrievalItem("", str(i), ("a",), MARIA_DA_PENHA.code, ("prova legal",))
     for i in range(len(outcomes))
   ]
-  assert evaluate_citations(items, lambda q: outcomes[int(q)]) == CitationReport(2, 1, 1, 1, 1, 2)
+  assert evaluate_citations(items, lambda q: outcomes[int(q)]) == CitationReport(2, 2, 1, 1, 1, 2)

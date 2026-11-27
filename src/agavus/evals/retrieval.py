@@ -52,14 +52,13 @@ class CitationReport:
   unsafe_m: int
 
 
-def _supports(answer: Answer, item: RetrievalItem, primary: str) -> bool:
-  """Score only the rendered excerpt or verified premise following its citation."""
-  _, heading, body = answer.text.partition(f"{primary}:\n")
-  quote = body.partition("\n\nContexto: ")[0].removesuffix(f"\n\n{DISCLAIMER}")
-  return bool(heading) and any(
-    ref == primary and passage in " ".join(quote.split())
-    for ref, passage in zip(item.relevant, item.passages, strict=True)
-  )
+def _primary_excerpt(answer: Answer) -> str:
+  """Read the displayed primary source, excluding rule framing and context references."""
+  if not answer.sources:
+    return ""
+  heading = f"\n{answer.sources[0]}:\n"
+  _, _, body = ("\n" + answer.text).partition(heading)
+  return body.partition("\n\nContexto: ")[0].removesuffix(f"\n\n{DISCLAIMER}").strip()
 
 
 def evaluate_citations(
@@ -78,9 +77,12 @@ def evaluate_citations(
       deferred += 1
     elif answer.decision == "reject":
       rejected += 1
-    elif answer.sources and answer.sources[0] in item.relevant:
+    elif (quote := _primary_excerpt(answer)) and answer.sources[0] in item.relevant:
       correct += 1
-      if item.passages and _supports(answer, item, answer.sources[0]):
+      if item.passages and any(
+        ref == answer.sources[0] and passage in " ".join(quote.split())
+        for ref, passage in zip(item.relevant, item.passages, strict=True)
+      ):
         supported += 1
     else:
       wrong += 1

@@ -208,3 +208,39 @@ and only **one** out-of-scope case. Weak organ labels are not expert gold.
 The candidate also fails the query gold M-recall gate (0.75); it remains a
 local candidate rather than replacing the document artifact. More independently
 reviewed out-of-scope documents and a fresh query gold set remain necessary.
+
+## Paired primary citation evaluation (2026-11-26)
+
+The answer candidate did not meet the adoption criteria. The CLI and Space keep the
+baseline answer path. The local candidate branch `feat/cited-passage-candidate` preserves
+the implementation and its shared-answer regression tests (commit `fa502dc`).
+
+| Questions | Answer path | Correct primary | Wrong primary | Deferred | Rejected | Passage-supported | Unsafe M |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Development (40) | Baseline | 17 | 5 | 16 | 2 | — | — |
+| Development (40) | Candidate | 9 | 8 | 21 | 2 | — | — |
+| Fresh (40) | Baseline | 17 | 7 | 16 | 0 | 14 | 1 |
+| Fresh (40) | Candidate | 15 | 7 | 18 | 0 | 14 | 1 |
+
+The development gate required at least 17 correct and at most 4 wrong primary citations.
+On fresh questions the candidate had to reduce wrong citations, preserve the number of
+passage-supported answers and record zero unsafe M decisions. Both paths accepted p25,
+a question about property division in a domestic-violence court, as family law.
+The sample contained 20 M questions. Passage support and area labels were annotated
+only for the fresh set. Independent legal review is pending.
+
+The freeze at `7e2deb5` preceded the answer changes. Each domain contributed 18
+questions with an article and supporting passage, one unavailable provision and one
+question requiring facts outside the corpus. All 36 annotated passages were checked
+against the stored articles. The fresh set was used for comparison only. The baseline
+answer code matches `5b578315`. Both runs used the same local corpus (347 statutes,
+414 indexed chunks and 133,234 DJEN texts), CPU E5 revision `614241f6` and stored
+router fingerprint `a090e342af2b`. SHA-256 checks confirmed identical corpus and
+router databases, ONNX weights and tokenizer before and after the comparison.
+
+For both paths, development first rank was 29/40, recall@5 was 34/40 and MRR was
+0.762. On the 36 answerable fresh questions these were 28/36, 34/36 and 0.841.
+The four expected deferrals count in all answer outcomes. Ranking used the existing
+index. The candidate selected quotes from the winning chunk and preferred the excerpt
+with the most distinct topical matches among five articles. This comparison measures
+the combined change.
