@@ -35,11 +35,15 @@ def parse(arguments: Sequence[str]) -> argparse.Namespace:
   parser.add_argument("extras", nargs="*", choices=EXTRA_NAMES, help="extra training text")
   parser.add_argument("--steps", type=int, default=STEPS, help="most steps to try on validation")
   parser.add_argument("--check-every", type=int, default=CHECK_EVERY)
+  parser.add_argument("--layers", type=int, default=GptConfig().layers, help="transformer blocks")
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--seed", type=int, default=0, help="starting weights, batches, dropout")
   parser.add_argument("--texts", type=Path, help="exported bundle instead of the local corpus")
   parser.add_argument("--out", type=Path, help="folder for run.json and model.pt")
-  return parser.parse_args(list(arguments))
+  options = parser.parse_args(list(arguments))
+  if options.layers < 1:
+    parser.error("--layers must be a positive integer")
+  return options
 
 
 def show_attention(model: GptModel) -> None:
@@ -101,7 +105,9 @@ def run_gpt(arguments: Sequence[str]) -> int:
   split = split_articles(texts.statutes)
   inner = split_articles(split.train)
   vocab = build_vocab(split.train)
-  config = GptConfig(check_every=options.check_every, device=options.device, seed=options.seed)
+  config = GptConfig(
+    layers=options.layers, check_every=options.check_every, device=options.device, seed=options.seed
+  )
   began = time.monotonic()
   _, history = train(Split(inner.train + extra, inner.holdout), vocab, config, steps=options.steps)
   best = chosen_steps(history, len(history))
