@@ -125,6 +125,40 @@ def _newest(crawl: Crawl, url: str, folder: Path) -> tuple[str, bytes, bool]:
   return target, newest, changed or newer
 
 
+def _rows(url: str, target: str, payload: bytes, statutes: Sequence[str]) -> tuple[list[str], int]:
+  """JSONL rows of the articles that survive the leak check, and how many articles there were."""
+  found = dict(articles(FederalLaw(_relative(url), _relative(target)), payload))
+  if any("\ufffd" in body for body in found.values()):
+    raise ValueError("undecodable article text")
+  clean = set(without_leaks(tuple(found.values()), statutes))
+  rows = [
+    json.dumps(
+      {"license": PUBLIC_DOMAIN, "url": target, "origin_ref": ref, "text": body},
+      ensure_ascii=False,
+    )
+    + "\n"
+    for ref, body in found.items()
+    if body in clean
+  ]
+  return rows, len(found)
+
+
+def _store(out: Path, rows: list[str], found: int, counts: dict[str, int]) -> None:
+  """Write one law's rows; a law with no articles left is revoked, and its empty file says so."""
+  save_bytes(out, "".join(rows).encode())
+  if not found:
+    # Planalto strikes out every article of a revoked law.
+    counts["revoked"] += 1
+    return
+  counts["changed"] += 1
+  counts["articles"] += len(rows)
+  counts["dropped"] += found - len(rows)
+
+
+def _counts() -> dict[str, int]:
+  return dict.fromkeys(("changed", "unchanged", "revoked", "failed", "articles", "dropped"), 0)
+
+
 def fetch_planalto(
   data_dir: Path, crawl: Crawl, statutes: Sequence[str], laws: Sequence[str]
 ) -> dict[str, int]:
@@ -132,7 +166,7 @@ def fetch_planalto(
   if not statutes:
     raise ValueError("the statute reference bundle is empty")
   folder = data_dir / PLANALTO_DIR
-  counts = dict.fromkeys(("changed", "unchanged", "revoked", "failed", "articles", "dropped"), 0)
+  counts = _counts()
   for url in laws:
     out = folder / "articles" / f"{_relative(url)}.jsonl"
     try:
@@ -140,32 +174,33 @@ def fetch_planalto(
       if not changed and out.is_file():
         counts["unchanged"] += 1
         continue
-      found = dict(articles(FederalLaw(_relative(url), _relative(target)), payload))
-      if any("�" in body for body in found.values()):
-        raise ValueError("undecodable article text")
-      if not found:
-        # Planalto strikes out every article of a revoked law; the empty file marks it done.
-        save_bytes(out, b"")
-        counts["revoked"] += 1
-        continue
+      _store(out, *_rows(url, target, payload, statutes), counts)
     except (httpx.HTTPError, ValueError) as error:
       counts["failed"] += 1
       print(f"planalto: {url}: {error}")
+  return counts
+
+
+def reextract_planalto(data_dir: Path, statutes: Sequence[str]) -> dict[str, int]:
+  """Rebuild every saved law's articles from its captures, without the network."""
+  folder = data_dir / PLANALTO_DIR
+  counts = _counts()
+  for out in sorted((folder / "articles").rglob("*.jsonl")):
+    url = SITE + out.relative_to(folder / "articles").as_posix().removesuffix(".jsonl")
+    page = folder / "sources" / f"{_relative(url)}.html"
+    if not page.is_file():
       continue
-    clean = set(without_leaks(tuple(found.values()), statutes))
-    rows = [
-      json.dumps(
-        {"license": PUBLIC_DOMAIN, "url": target, "origin_ref": ref, "text": body},
-        ensure_ascii=False,
-      )
-      + "\n"
-      for ref, body in found.items()
-      if body in clean
-    ]
-    save_bytes(out, "".join(rows).encode())
-    counts["changed"] += 1
-    counts["articles"] += len(rows)
-    counts["dropped"] += len(found) - len(rows)
+    payload, target = page.read_bytes(), url
+    for link in links(decode_html(payload), url):
+      newest = folder / "sources" / f"{_relative(link)}.html"
+      if CONSOLIDATED.search(link) and newest.is_file():
+        payload, target = newest.read_bytes(), link
+        break
+    try:
+      _store(out, *_rows(url, target, payload, statutes), counts)
+    except ValueError as error:
+      counts["failed"] += 1
+      print(f"planalto: {url}: {error}")
   return counts
 
 

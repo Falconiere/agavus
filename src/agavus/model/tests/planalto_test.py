@@ -19,6 +19,7 @@ from agavus.model.planalto import (
   fetch_planalto,
   links,
   load_planalto,
+  reextract_planalto,
 )
 
 COPIED = "x" * LEAK_RUN
@@ -120,3 +121,16 @@ def test_fetch_keeps_newest_text_and_refreshes_only_changes(tmp_path: Path) -> N
   }
   assert all("if-none-match" in r.headers for r in requests if str(r.url) != MISSING)
   assert load_planalto(tmp_path) == ("Art. 1º Lei atual.", "Art. 1º Texto novo.")
+
+
+def test_offline_reextraction_rebuilds_articles_from_captures(tmp_path: Path) -> None:
+  laws = [AMENDED, IN_PLACE]
+  with serve([]) as client:
+    fetch_planalto(tmp_path, Crawl(client, interval=0), (COPIED, "abc"), laws)
+  files = sorted((tmp_path / PLANALTO_DIR / "articles").rglob("*.jsonl"))
+  before = [path.read_bytes() for path in files]
+  for path in files:
+    path.write_text("stale\n", encoding="utf-8")
+  counts = reextract_planalto(tmp_path, (COPIED, "abc"))
+  assert [path.read_bytes() for path in files] == before
+  assert (counts["changed"], counts["articles"], counts["dropped"]) == (2, 2, 1)

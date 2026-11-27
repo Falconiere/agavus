@@ -13,6 +13,7 @@ from agavus.model.extra import LEAK_RUN
 from agavus.model.federal import (
   ADCT,
   CLT,
+  END,
   FEDERAL_DIR,
   LAWS,
   FederalLaw,
@@ -112,3 +113,18 @@ def test_local_federal_inputs_use_only_the_reference_bundle(tmp_path: Path) -> N
   merged = federal_texts(tmp_path)
   assert merged.statutes == base.statutes
   assert merged.extras == {**base.extras, "federal": ("synthetic",) * len(LAWS)}
+
+
+@pytest.mark.parametrize(
+  ("text", "kept"),
+  [
+    ("em contrário. Rio de Janeiro, 16 de Setembro de 1946, 125º", "em contrário."),
+    ("Art. 3º Vigência.\nBrasília, 7 de agosto de 2006; 185º", "Art. 3º Vigência.\n"),
+    ("fim. Brasília, 1º de março de 2020.", "fim."),
+    ("Art. 9º Fim. Este texto não substitui o publicado no DOU", "Art. 9º Fim. "),
+    ("promulgada em Brasília, 5 de outubro de 1988, nos termos", None),
+    ("com sede no Rio de Janeiro, onde funcionará", None),
+  ],
+)
+def test_law_text_ends_at_signature_annex_or_footer(text: str, kept: str | None) -> None:
+  assert END.split(text, maxsplit=1)[0] == (text if kept is None else kept)

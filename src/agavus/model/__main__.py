@@ -43,7 +43,13 @@ from agavus.model.network import (
 )
 from agavus.model.neural import NeuralConfig
 from agavus.model.neural import train as train_neural
-from agavus.model.planalto import PLANALTO_DIR, Crawl, discover, fetch_planalto
+from agavus.model.planalto import (
+  PLANALTO_DIR,
+  Crawl,
+  discover,
+  fetch_planalto,
+  reextract_planalto,
+)
 from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 from agavus.model.sft import (
@@ -187,11 +193,15 @@ def run_fetch_federal() -> int:
   return 0
 
 
-def run_fetch_planalto() -> int:
-  """Refresh every indexed federal law to its newest consolidated text."""
+def run_fetch_planalto(arguments: list[str]) -> int:
+  """Refresh every indexed federal law; `--offline` re-extracts the saved captures instead."""
   data_dir = load_settings().data_dir
   try:
     statutes = read_bundle(data_dir / BUNDLE_FILE).statutes
+    if arguments == ["--offline"]:
+      counts = reextract_planalto(data_dir, statutes)
+      print("planalto offline: " + ", ".join(f"{key} {value}" for key, value in counts.items()))
+      return 0
     captured = sorted((data_dir / PLANALTO_DIR / "indexes").glob("*.html"))
     with httpx.Client(timeout=60) as client:
       crawl = Crawl(client)
@@ -352,7 +362,7 @@ def main(arguments: list[str]) -> int:
     "recall": run_recall,
     "train-tokenizer": run_train_tokenizer,
     "fetch-federal": lambda _: run_fetch_federal(),
-    "fetch-planalto": lambda _: run_fetch_planalto(),
+    "fetch-planalto": run_fetch_planalto,
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
     "build-sft": lambda _: run_build_sft(),
