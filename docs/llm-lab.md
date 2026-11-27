@@ -297,6 +297,33 @@ Validation selected 5,500 steps for the four-layer seed-0 run and 6,000 for
 the other five runs. Weights and run records are under
 `data/lab/runs/{four,five}-layer-civil-seed{0,1,2}/`.
 
+### Memory investigation, 2026-11-27
+
+**Training memory.** RTX 4090, 8 layers, width 512, 8 heads, about 16,384 tokens per step,
+peak allocated memory under a 45% per-process cap while two runs shared the card:
+
+| Context | Batch | Explicit attention, fp32 | Fused attention, fp32 | Fused attention, bf16 |
+| ---: | ---: | --- | --- | --- |
+| 256 | 64 | 6.6 GiB, 46k tokens/s | 5.5 GiB, 62k tokens/s | 3.8 GiB, 112k tokens/s |
+| 1,024 | 16 | out of memory | 8.5 GiB, 50k tokens/s | 3.8 GiB, 108k tokens/s |
+| 4,096 | 4 | out of memory | 4.7 GiB, 28k tokens/s | 3.8 GiB, 87k tokens/s |
+| 16,384 | 1 | out of memory | 4.8 GiB, 10k tokens/s | 3.9 GiB, 54k tokens/s |
+
+Agathe now trains with fused attention (`--bf16` adds mixed precision); the explicit table is
+built only to show attention. Context length is no longer limited by GPU memory on this card.
+
+**Long-term memory.** `python -m agavus.model recall` prompts with the first 64 characters of a
+text and compares the greedy next 64. `long-civil` (822,627 parameters, context 64) reproduced
+none of 80 training articles exactly and matched 4.9% of answer characters before the first
+mistake (exam: 63 articles, 0%, 6.0%). Training and exam loss were close (0.978 and 1.025), so
+the model generalizes letter patterns but stores almost no wording. The same probe on `djen`
+is the memorization test §3 requires before a DJEN-trained model leaves this machine.
+
+**Working memory in chat.** The chat sends only the last `context` characters of the whole
+conversation, so `long-civil` sees 64 characters. Each new character reruns the model over the
+full window; long windows need a key/value cache before chat with a 4k-16k context is usable on
+CPU.
+
 ## 7. Rule changes (approved 2026-11-25)
 
 - [x] `AGENTS.md`: state that the lab may *use* a GPU but never require one.
