@@ -38,11 +38,33 @@ function controls() {
   for (const button of document.querySelectorAll("nav button")) button.disabled = busy;
 }
 
-function showMessage(role, text) {
+function showSources(article, sources) {
+  if (!sources?.length) return;
+  const title = document.createElement("p");
+  title.textContent = "Fontes consultadas";
+  const list = document.createElement("ul");
+  list.append(...sources.map(({ name, number, origin_ref: ref }) => {
+    const link = document.createElement("a");
+    link.href = ref.split(", art. ")[0];
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = name + ", art. " + number;
+    const item = document.createElement("li");
+    item.append(link);
+    return item;
+  }));
+  const box = document.createElement("aside");
+  box.className = "sources";
+  box.append(title, list);
+  article.append(box);
+}
+
+function showMessage(role, text, sources) {
   const article = document.createElement("article");
   article.className = "message " + role;
   article.setAttribute("aria-label", role === "user" ? "Você" : "Agathe");
   article.textContent = text.trimStart();
+  showSources(article, sources);
   transcript.append(article);
   return article;
 }
@@ -62,7 +84,7 @@ function render() {
   transcript.replaceChildren();
   if (!chat?.messages.length) transcript.append(empty);
   for (const message of chat?.messages || []) {
-    showMessage(message.role, message.text || "Fim do texto.");
+    showMessage(message.role, message.text || "Fim do texto.", message.sources);
   }
   const metrics = chat?.metrics;
   $("#elapsed").textContent = metrics ? format.format(metrics.seconds) + " s" : "—";
@@ -101,7 +123,7 @@ async function generate(request, append) {
       pending = lines.pop();
       for (const line of lines) {
         const event = JSON.parse(line);
-        if (event.metrics) return event.metrics;
+        if (event.metrics) return event;
         if (typeof event.text !== "string") throw new Error("Resposta inválida.");
         append(event.text);
       }
@@ -137,12 +159,13 @@ $("form").onsubmit = async (event) => {
     // A chat-tuned model gets the turns and answers in turn format.
     const turns = chat.messages.map(({ role, text }) => ({ role, text }));
     const request = model.chat ? { messages: turns } : { prefix };
-    chat.metrics = await generate(request, (piece) => {
+    const { metrics, sources } = await generate(request, (piece) => {
       answer += piece;
       body.textContent = answer.trimStart();
       transcript.scrollTop = transcript.scrollHeight;
     });
-    chat.messages.push({ role: "assistant", text: answer });
+    chat.metrics = metrics;
+    chat.messages.push({ role: "assistant", text: answer, sources });
   } catch {
     chat.messages.pop();
     if (!previous) {

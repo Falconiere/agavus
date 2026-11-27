@@ -14,6 +14,7 @@ import torch
 from agavus.config.settings import load_settings
 from agavus.model.bundle import BUNDLE_FILE
 from agavus.model.checkpoint import load_checkpoint
+from agavus.model.law_search import SEARCH_FILE
 from agavus.model.report import THREADS
 from agavus.model.tokenizer import TOKENIZER_FILE
 from agavus.server.api import application
@@ -36,6 +37,9 @@ def serve(arguments: Sequence[str]) -> int:
   parser.add_argument(
     "--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE, help="tokenizer do checkpoint"
   )
+  parser.add_argument(
+    "--search", type=Path, default=data_dir / SEARCH_FILE, help="índice de busca dos artigos"
+  )
   options = parser.parse_args(arguments)
   run: Path = options.run
   torch.set_num_threads(THREADS)
@@ -45,7 +49,9 @@ def serve(arguments: Sequence[str]) -> int:
     chat = json.loads((run / "run.json").read_bytes()).get("chat") is True
   except (OSError, ValueError) as error:
     parser.exit(1, f"{error}\n")
-  app = application(model, run.resolve().name, chat=chat)
+  # Without an index, a chat run answers from memory as before.
+  db = options.search if chat and options.search.is_file() else None
+  app = application(model, run.resolve().name, chat=chat, db=db)
   with make_server("127.0.0.1", options.port, app, server_class=LocalServer) as server:
     print(f"Agathe · http://127.0.0.1:{server.server_port}", flush=True)
     with suppress(KeyboardInterrupt):

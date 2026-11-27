@@ -2,11 +2,12 @@
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
 chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export,
-build-sft, sft.
+build-sft, build-search, build-sft-context, sft.
 """
 
 import argparse
 import json
+import sqlite3
 import sys
 from collections import Counter
 from collections.abc import Callable
@@ -32,6 +33,7 @@ from agavus.model.checkpoint import load_checkpoint
 from agavus.model.data import Split, load_articles, load_case_texts, split_articles
 from agavus.model.extra import fetch_wikipedia, save_wikipedia, without_leaks
 from agavus.model.federal import fetch_federal
+from agavus.model.law_search import SEARCH_FILE, build_index, index_counts
 from agavus.model.network import (
   CLUES,
   REFUSED,
@@ -54,12 +56,14 @@ from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
 from agavus.model.sft import (
   SFT_DIR,
+  Conversation,
   TuneConfig,
   load_conversations,
   masked_loss,
   save_conversations,
   tune,
 )
+from agavus.model.sft_context import NOT_FOUND, contextualize, teacher_for_training
 from agavus.model.sft_rules import law_of, load_rule_sources, rule_conversations, split_by_law
 from agavus.model.teacher import run_teach
 from agavus.model.tokenizer import (
@@ -282,6 +286,12 @@ def run_recall(arguments: list[str]) -> int:
   return 0
 
 
+def _kinds(conversations: list[Conversation]) -> str:
+  """Conversation counts per source, as 'source count, ...'."""
+  counts = sorted(Counter(conversation.source for conversation in conversations).items())
+  return ", ".join(f"{kind} {count}" for kind, count in counts)
+
+
 def run_build_sft() -> int:
   """Rule conversations from the Planalto crawl, whole laws held out, saved for `sft`."""
   data_dir = load_settings().data_dir
@@ -297,11 +307,52 @@ def run_build_sft() -> int:
   print(f"build-sft: {len(cards)} law cards, {sum(map(len, articles.values()))} articles")
   for name, part in zip(("rules-train", "rules-eval"), split_by_law(conversations), strict=True):
     save_conversations(data_dir / SFT_DIR / f"{name}.jsonl", part)
-    kinds = ", ".join(
-      f"{kind} {count}" for kind, count in sorted(Counter(c.source for c in part).items())
-    )
     laws = len({law_of(conversation) for conversation in part})
-    print(f"{name}: {len(part)} conversations from {laws} laws ({kinds})")
+    print(f"{name}: {len(part)} conversations from {laws} laws ({_kinds(part)})")
+  return 0
+
+
+def run_build_search() -> int:
+  """Index every crawled Planalto article for BM25 search."""
+  data_dir = load_settings().data_dir
+  try:
+    articles, laws = index_counts(build_index(data_dir))
+  except (OSError, KeyError, ValueError, sqlite3.Error) as error:
+    print(f"lab: build-search failed: {error}")
+    return 1
+  print(f"build-search: {articles} articles from {laws} laws: {data_dir / SEARCH_FILE}")
+  return 0
+
+
+def run_build_sft_context(arguments: list[str]) -> int:
+  """Rule (and teacher) conversations with their search hits in context, for `sft`."""
+  data_dir = load_settings().data_dir
+  parser = argparse.ArgumentParser(prog="python -m agavus.model build-sft-context")
+  parser.add_argument("--teacher", type=Path, help="teacher JSONL, joins the train side only")
+  parser.add_argument("--rules", type=int, help="seeded sample of training rule conversations")
+  parser.add_argument("--eval", type=int, help="seeded sample of held-out rule conversations")
+  options = parser.parse_args(arguments)
+  db, folder = data_dir / SEARCH_FILE, data_dir / SFT_DIR
+  try:
+    train = load_conversations(folder / "rules-train.jsonl")
+    held_out = load_conversations(folder / "rules-eval.jsonl")
+    # Search costs ~50 ms per conversation; a seeded sample keeps the build under an hour.
+    train = list(sample_texts(train, options.rules or len(train)))
+    evaluated = list(sample_texts(held_out, options.eval or len(held_out)))
+    if options.teacher and not options.teacher.is_file():
+      print(f"build-sft-context: no teacher file at {options.teacher}, skipped")
+    elif options.teacher:
+      train += teacher_for_training(load_conversations(options.teacher), held_out)
+    if not db.is_file():
+      raise ValueError(f"no search index at {db}")
+    for name, part in (("context-train", train), ("context-eval", evaluated)):
+      found = contextualize(part, db, seed=0, negatives=0.1)
+      save_conversations(folder / f"{name}.jsonl", found)
+      negatives = sum(conversation.turns[-1][1] == NOT_FOUND for conversation in found)
+      print(f"{name}: {len(found)} of {len(part)}, {negatives} not found ({_kinds(found)})")
+  except (OSError, ValueError, sqlite3.Error) as error:
+    print(f"lab: build-sft-context failed: {error} — run build-sft and build-search first?")
+    return 1
   return 0
 
 
@@ -318,6 +369,8 @@ def run_sft(arguments: list[str]) -> int:
   parser.add_argument("--device", default="cpu", help="cpu, cuda, ...")
   parser.add_argument("--bf16", action="store_true", help="bfloat16 mixed precision")
   parser.add_argument("--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE)
+  parser.add_argument("--train", type=Path, default=data_dir / SFT_DIR / "rules-train.jsonl")
+  parser.add_argument("--eval", type=Path, default=data_dir / SFT_DIR / "rules-eval.jsonl")
   options = parser.parse_args(arguments)
   if options.steps < 1 or options.batch < 1 or not options.rate > 0:
     parser.error("--steps, --batch and --rate must be positive")
@@ -325,8 +378,8 @@ def run_sft(arguments: list[str]) -> int:
   try:
     base = load_checkpoint(options.run, data_dir / BUNDLE_FILE, options.tokenizer, data_dir)
     record = json.loads((options.run / "run.json").read_bytes())
-    train_set = load_conversations(data_dir / SFT_DIR / "rules-train.jsonl")
-    held_out = load_conversations(data_dir / SFT_DIR / "rules-eval.jsonl")
+    train_set = load_conversations(options.train)
+    held_out = load_conversations(options.eval)
   except (OSError, ValueError) as error:
     print(f"lab: sft failed: {error} — run `python -m agavus.model build-sft` first?")
     return 1
@@ -366,6 +419,8 @@ def main(arguments: list[str]) -> int:
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
     "build-sft": lambda _: run_build_sft(),
+    "build-search": lambda _: run_build_search(),
+    "build-sft-context": run_build_sft_context,
     "sft": run_sft,
     "teach": run_teach,
   }

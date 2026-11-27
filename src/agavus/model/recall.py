@@ -88,7 +88,7 @@ def recall(
   return RecallReport(count, exact / count, matched / count, loss / count)
 
 
-def sample_texts(texts: Sequence[str], limit: int, seed: int = 0) -> tuple[str, ...]:
+def sample_texts[T](texts: Sequence[T], limit: int, seed: int = 0) -> tuple[T, ...]:
   """Seeded sample without replacement; everything if there are fewer than `limit`."""
   if len(texts) <= limit:
     return tuple(texts)

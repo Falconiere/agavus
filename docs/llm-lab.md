@@ -374,6 +374,20 @@ is held out whole for evaluation, so no law sits on both sides.
 on them (rate 1e-4 by default) and saves it with `"chat": true`. The local chat then sends
 the turns and stops at `<|end|>`.
 
+Agathe answers from retrieved articles placed in its context, not from memory
+(`model/law_search.py`, `model/sft_context.py`). `build-search` indexes every crawled Planalto
+article in SQLite FTS5 (BM25, accents folded) at `data/lab/text/planalto/search.db`, keeping
+each row's `origin_ref` and law name. `build-sft-context [--teacher FILE]` searches each rule
+(and teacher) question, puts the top three articles, at most 1,200 characters each, numbered
+before `Pergunta:` in the user turn, and adds the cited article when search misses it. One
+conversation in ten, seeded, has the cited article taken out and answers "Os textos
+encontrados não respondem a essa pergunta.", so the model learns to defer. Teacher pairs join
+the train side only, and pairs from held-out laws are dropped. It writes
+`data/lab/sft/context-train.jsonl` and `context-eval.jsonl`; tune with
+`sft --run <base> --out <dir> --train <context-train> --eval <context-eval>`. The chat
+server (`--search PATH`, this index by default) wraps the last question the same way when the
+run is chat-tuned and the index exists, and lists the articles as "Fontes consultadas".
+
 Agathe in `model/agathe.py` now uses this architecture; character-level runs before
 2026-11-27 are archived (loadable from git history). Parameters: `V·d + L·(2d + 2d² +
 2d·k·h + 3d·f) + d`, with vocabulary V, width d, layers L, key/value heads k, head size

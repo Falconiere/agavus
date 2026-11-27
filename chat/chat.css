@@ -158,6 +158,15 @@ dd {
   color: #f4f8ff;
 }
 .message.assistant { align-self: stretch; }
+.sources {
+  margin-top: .75rem;
+  white-space: normal;
+  font-size: .85rem;
+  line-height: 1.4;
+  opacity: .8;
+}
+.sources p { margin: 0 0 .25rem; font-weight: 600; }
+.sources ul { margin: 0; padding-left: 1.1rem; }
 
 footer {
   width: min(var(--measure), calc(100% - 2 * var(--gutter)));

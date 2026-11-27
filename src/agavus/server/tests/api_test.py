@@ -15,8 +15,12 @@ import httpx
 import pytest
 import torch
 
-from agavus.model.agathe import END_ID, AgatheConfig, framed, start
+from agavus.model.agathe import END_ID, AgatheConfig, AgatheModel, framed, start
+from agavus.model.law_search import search
 from agavus.model.report import SAMPLE_CHARS
+from agavus.model.sft import prompt, render_turns
+from agavus.model.sft_context import SEARCHED, with_context
+from agavus.model.tests.law_search_test import LAW, NAME, synthetic_index
 from agavus.model.tokenizer import train_tokenizer
 from agavus.server.api import application, chat_prefix
 
@@ -91,16 +95,22 @@ def test_browser_page_and_assets_share_the_api_origin(api: httpx.Client) -> None
   assert api.get("/run.json").is_client_error
 
 
-def test_chat_run_sends_turns_in_turn_format_and_stops_at_the_end_token() -> None:
-  model = start(TOKENIZER, replace(CONFIG, context=64))
-  # With the residual paths silenced, every token scores the end token highest.
+def _silent(context: int) -> AgatheModel:
+  """A model that answers nothing: every token scores the end token highest."""
+  model = start(TOKENIZER, replace(CONFIG, context=context))
+  # With the residual paths silenced, only the token table decides.
   silenced = [weight for layer in model.layers for weight in (layer.mix, layer.down)]
   with torch.no_grad():
     for weight in silenced:
       weight.zero_()
     model.tokens.fill_(10.0)
     model.tokens[END_ID].fill_(20.0)
-  assert chat_prefix(MESSAGES) == TURNS
+  return model
+
+
+def test_chat_run_sends_turns_in_turn_format_and_stops_at_the_end_token() -> None:
+  model = _silent(64)
+  assert chat_prefix(MESSAGES) == (TURNS, [])
   with serving(application(model, "conversa", chat=True)) as client:
     assert client.get("/api/model").json()["chat"] is True
     with client.stream("POST", "/api/continue", json={"messages": MESSAGES}) as response:
@@ -109,3 +119,22 @@ def test_chat_run_sends_turns_in_turn_format_and_stops_at_the_end_token() -> Non
       assert client.post("/api/continue", json=body).is_client_error
   assert len(events) == 1 and events[0]["metrics"]["characters"] == 0
   assert events[0]["metrics"]["used"] == len(framed(TOKENIZER, TURNS)) - 1
+  assert events[0]["sources"] == []
+
+
+def test_chat_with_a_search_index_answers_from_the_articles_found(tmp_path: Path) -> None:
+  db = synthetic_index(tmp_path)
+  question = "Quem fica com a guarda dos filhos?"
+  messages = [*MESSAGES[:2], {"role": "user", "text": question}]
+  hits = search(db, question)
+  expected = render_turns([("user", "um papel"), ("assistant", "papel")])
+  expected += prompt(with_context(question, hits))
+  assert chat_prefix(messages, db) == (expected, hits)
+  model = _silent(4096)
+  app = application(model, "conversa", chat=True, db=db)
+  body = {"messages": messages}
+  with serving(app) as client, client.stream("POST", "/api/continue", json=body) as response:
+    (event,) = [json.loads(line) for line in response.iter_lines()]
+  assert event["metrics"]["used"] == len(framed(TOKENIZER, expected)) - 1
+  assert event["sources"][0] == {"name": NAME, "number": "2º", "origin_ref": f"{LAW}, art. 2"}
+  assert len(event["sources"]) == len(hits) <= SEARCHED
