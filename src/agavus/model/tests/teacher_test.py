@@ -59,6 +59,7 @@ def test_request_sends_the_law_name_and_article_to_s5_at_low_effort() -> None:
   system = messages[0]["content"]
   assert "4 pares" in system
   assert "compreensíveis sozinhas" in system
+  assert "nome completo" in system
   assert "assinatura" in system
   assert messages[1]["content"] == f"{CARD.name}\n\n{ARTICLE[1]}"
 
