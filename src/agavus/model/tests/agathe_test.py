@@ -4,8 +4,8 @@ import pytest
 import torch
 
 from agavus.model.agathe import AgatheConfig, attend, start, stream, windows
-from agavus.model.bigram import CharVocab, build_vocab
-from agavus.model.training import IGNORED
+from agavus.model.bigram import BOUNDARY, CharVocab, build_vocab
+from agavus.model.training import IGNORED, pick
 
 # Many threads only fight over work this small.
 torch.set_num_threads(1)
@@ -102,3 +102,22 @@ def test_fused_attention_matches_the_shown_attention() -> None:
   assert looks is not None
   assert none is None
   assert torch.allclose(shown, fused, atol=1e-6)
+
+
+def test_cached_continuation_matches_reading_the_whole_window_each_time() -> None:
+  model = start(build_vocab(TEXTS), AgatheConfig(context=8, width=12, heads=3, layers=2))
+  prefix, seed, chars = "a guarda", 3, 30
+  with torch.no_grad():
+    model.out_bias[BOUNDARY] = -1e9  # never stop early, so the window must slide
+  generator = torch.Generator().manual_seed(seed)
+  ids = model.vocab.encode(prefix)[:-1]
+  expected: list[int] = []
+  with torch.no_grad():
+    while len(expected) < chars:
+      chosen = pick(model.scores(torch.tensor([ids[-8:]]))[0, -1], generator)
+      if chosen == BOUNDARY:
+        break
+      ids.append(chosen)
+      expected.append(chosen)
+  assert len(expected) == chars
+  assert list(model.continuation(prefix, seed=seed, max_chars=chars)) == expected

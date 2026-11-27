@@ -83,21 +83,51 @@ def attend(
   Without `show`, PyTorch's fused attention never builds the positions x positions table,
   so memory grows with the context instead of its square.
   """
-  batch, length, width = vectors.shape
-  size = width // heads
-
-  def per_head(weights: Tensor) -> Tensor:
-    return (vectors @ weights).view(batch, length, heads, size).transpose(1, 2)
-
-  query, key, value = per_head(layer.query), per_head(layer.key), per_head(layer.value)
+  query, key, value = _project(layer, vectors, heads)
   if not show:
-    fused = scaled_dot_product_attention(query, key, value, is_causal=True)
-    return fused.transpose(1, 2).reshape(batch, length, width) @ layer.mix, None
-  scores = query @ key.transpose(-2, -1) / math.sqrt(size)
+    return _merge(layer, scaled_dot_product_attention(query, key, value, is_causal=True)), None
+  length = vectors.shape[1]
+  scores = query @ key.transpose(-2, -1) / math.sqrt(query.shape[-1])
   future = torch.ones(length, length, dtype=torch.bool, device=vectors.device).triu(1)
   looks = torch.softmax(scores.masked_fill(future, float("-inf")), dim=-1)
-  gathered = (looks @ value).transpose(1, 2).reshape(batch, length, width)
-  return gathered @ layer.mix, looks
+  return _merge(layer, looks @ value), looks
+
+
+def attend_cached(
+  layer: Layer, vectors: Tensor, heads: int, past: tuple[Tensor, Tensor] | None
+) -> tuple[Tensor, tuple[Tensor, Tensor]]:
+  """Attention for positions after `past`, the keys and values earlier positions left.
+
+  Without `past`, positions see each other causally. With it, one new position sees every
+  earlier one. Returns the gathered vectors and the keys and values including the new ones.
+  """
+  query, key, value = _project(layer, vectors, heads)
+  if past is not None:
+    key, value = torch.cat((past[0], key), dim=2), torch.cat((past[1], value), dim=2)
+  gathered = scaled_dot_product_attention(query, key, value, is_causal=past is None)
+  return _merge(layer, gathered), (key, value)
+
+
+def _project(layer: Layer, vectors: Tensor, heads: int) -> tuple[Tensor, Tensor, Tensor]:
+  """Queries, keys and values, split per head: batch x heads x positions x size."""
+  batch, length, width = vectors.shape
+
+  def per_head(weights: Tensor) -> Tensor:
+    return (vectors @ weights).view(batch, length, heads, width // heads).transpose(1, 2)
+
+  return per_head(layer.query), per_head(layer.key), per_head(layer.value)
+
+
+def _merge(layer: Layer, gathered: Tensor) -> Tensor:
+  """Join the heads back into one vector per position and mix them."""
+  batch, heads, length, size = gathered.shape
+  return gathered.transpose(1, 2).reshape(batch, length, heads * size) @ layer.mix
+
+
+def _think(layer: Layer, vectors: Tensor, rate: float, training: bool) -> Tensor:
+  """The small network each position runs on what it gathered, added to its vector."""
+  hidden = gelu(layer_norm(vectors, (vectors.shape[-1],)) @ layer.up + layer.up_bias)
+  return vectors + dropout(hidden @ layer.down + layer.down_bias, rate, training)
 
 
 @dataclass(frozen=True)
@@ -132,10 +162,26 @@ class AgatheModel:
       gathered, looks = attend(layer, layer_norm(vectors, (width,)), self.config.heads, show=show)
       if looks is not None:
         all_looks.append(looks)
-      vectors = vectors + dropout(gathered, rate, training)
-      hidden = gelu(layer_norm(vectors, (width,)) @ layer.up + layer.up_bias)
-      vectors = vectors + dropout(hidden @ layer.down + layer.down_bias, rate, training)
+      vectors = _think(layer, vectors + dropout(gathered, rate, training), rate, training)
     return layer_norm(vectors, (width,)) @ self.out_weights + self.out_bias, all_looks
+
+  def extend(self, ids: Sequence[int], cache: list[tuple[Tensor, Tensor]]) -> Tensor:
+    """Next-token scores after `ids`, placed after the positions `cache` holds; updates it.
+
+    An empty cache starts at position 0. With a cache, pass one new id at a time.
+    """
+    width = self.config.width
+    offset = cache[0][0].shape[2] if cache else 0
+    tensor = torch.tensor([list(ids)], device=self.config.device)
+    vectors = self.tokens[tensor] + self.positions[offset : offset + len(ids)]
+    updated: list[tuple[Tensor, Tensor]] = []
+    for index, layer in enumerate(self.layers):
+      past = cache[index] if cache else None
+      gathered, keys = attend_cached(layer, layer_norm(vectors, (width,)), self.config.heads, past)
+      updated.append(keys)
+      vectors = _think(layer, vectors + gathered, 0.0, False)
+    cache[:] = updated
+    return (layer_norm(vectors[0, -1], (width,)) @ self.out_weights + self.out_bias).detach()
 
   def scores(self, ids: Tensor, *, training: bool = False) -> Tensor:
     """One score per next token at every position."""
@@ -160,17 +206,29 @@ class AgatheModel:
     )
 
   def continuation(self, prefix: str, *, seed: int, max_chars: int) -> Iterator[int]:
-    """Yield only new tokens, starting from the most recent window of the prefix."""
+    """Yield only new tokens, starting from the most recent window of the prefix.
+
+    Keys and values of earlier positions are cached while the window has room; once it is
+    full, the window slides and is read again, as without a cache.
+    """
     generator = torch.Generator().manual_seed(seed)
+    context = self.config.context
     ids = self.vocab.encode(prefix)[:-1]
+    cache: list[tuple[Tensor, Tensor]] = []
+    with torch.no_grad():
+      scores = self.extend(ids[-context:], cache)
     for _ in range(max_chars):
-      recent = torch.tensor([ids[-self.config.context :]], device=self.config.device)
-      with torch.no_grad():
-        chosen = pick(self.scores(recent)[0, -1], generator)
+      chosen = pick(scores, generator)
       if chosen == BOUNDARY:
         break
       ids.append(chosen)
       yield chosen
+      with torch.no_grad():
+        if cache[0][0].shape[2] < context:
+          scores = self.extend([chosen], cache)
+        else:
+          cache.clear()
+          scores = self.extend(ids[-context:], cache)
 
   def sample(self, *, seed: int, max_chars: int) -> str:
     """Decode a seeded continuation from the start boundary."""
