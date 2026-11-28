@@ -14,7 +14,7 @@ import torch
 from agavus.config.settings import load_settings
 from agavus.model.bundle import BUNDLE_FILE
 from agavus.model.checkpoint import load_checkpoint
-from agavus.model.law_search import SEARCH_FILE
+from agavus.model.law_search import CHAT_SEARCH_FILE
 from agavus.model.report import THREADS
 from agavus.model.tokenizer import TOKENIZER_FILE
 from agavus.server.api import application
@@ -38,7 +38,10 @@ def serve(arguments: Sequence[str]) -> int:
     "--tokenizer", type=Path, default=data_dir / TOKENIZER_FILE, help="tokenizer do checkpoint"
   )
   parser.add_argument(
-    "--search", type=Path, default=data_dir / SEARCH_FILE, help="índice de busca dos artigos"
+    "--search",
+    type=Path,
+    default=data_dir / CHAT_SEARCH_FILE,
+    help="índice de busca do chat (build-search --chat)",
   )
   options = parser.parse_args(arguments)
   run: Path = options.run

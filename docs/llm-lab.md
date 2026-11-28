@@ -394,9 +394,17 @@ law's question. Search costs about 0.25 s per rule question on one core; `--work
 the build into N interleaved shards, shard i seeded `seed + 1000·i` (one worker equals the
 serial build). Teacher pairs join the train side only, and pairs from held-out laws are
 dropped. It writes `data/lab/sft/context-train.jsonl` and `context-eval.jsonl`; tune with
-`sft --run <base> --out <dir> --train <context-train> --eval <context-eval>`. The chat
-server (`--search PATH`, this index by default) wraps the last question the same way when the
-run is chat-tuned and the index exists, lists the articles as "Fontes consultadas", allows
+`sft --run <base> --out <dir> --train <context-train> --eval <context-eval>`.
+
+The Planalto crawl drops the exam statutes (Lei 11.340, 12.318, 13.058, 14.994 and the Civil
+Code, `corpus/statutes.py`), so the training index cannot answer the product's own domain.
+`build-search --chat` writes a separate chat index, `data/lab/text/planalto/search-chat.db`:
+the training rows with those statutes' crawled articles replaced by their whole corpus text,
+cited by the Planalto url, plus their ementas. Retrieval only shows articles to the reader and
+trains nothing; `build-sft-context` reads only `search.db`, so no exam text reaches training.
+
+The chat server (`--search PATH`, the chat index by default) wraps the last question the same
+way when the run is chat-tuned and the index exists, lists the articles as "Fontes consultadas", allows
 answers up to 2,000 characters, and stops an answer that repeats one short token cycle six
 times. Chat answers decode greedily (the likeliest token, so quotes copy the context), and
 with the index nothing streams until the answer passes `model/grounding.py`: at least 80% of
@@ -405,6 +413,13 @@ must cite a shown article, and a question naming a law or article by number must
 one cited. Otherwise, or after a loop, the chat answers "Os textos encontrados não respondem
 a essa pergunta." and still lists the articles consulted. A plain "which law amends Lei X"
 question therefore defers, since its answer carries no "Fonte:" line.
+
+`eval-chat --run <tuned run> [--limit N] [--workers N]` measures this offline (CPU): each
+held-out context conversation is answered greedily from the same user turn, the shown
+articles are read back whole from the training index, and the answer goes through the same
+check. Answerable questions end correct (same citation, body copied from the gold answer),
+deferred or wrong-shown; NOT_FOUND questions end deferred or answered. Every case goes to
+`<run>/eval-chat.jsonl`.
 
 First context run (2026-11-27, `q-chat-context-100m`, 12k steps on q-planalto-djen-100m-60k,
 RTX 4090, ~40 min): masked held-out loss 0.281 nats per answer token on 1,621 held-out article
@@ -421,6 +436,19 @@ dispõe sobre a proteção do consumidor" were answered correctly, while férias
 revogar uma medida protetiva" were invented (4-gram coverage 0.20 and 0.09). With greedy
 decoding and the check (on CPU), those two, a cooking question and "art. 22 da Lei 11.340"
 (not indexed; the model quoted art. 46 instead) defer, and the three correct answers stay.
+
+`eval-chat` on all 2,000 held-out questions (2026-11-28, 8 CPU workers, ~35 min):
+
+| Kind | Correct | Deferred, answerable | Wrong shown | Deferred negative | Answered negative |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| article | 1,270 | 109 | 0 | 241 | 1 |
+| ementa | 163 | 1 | 0 | 27 | 0 |
+| reverse ("qual lei…") | 123 | 39 | 4 | 13 | 9 |
+
+Answerable 1,709: 1,556 correct (91%), 149 deferred, 4 wrong shown; negatives 291: 10
+answered. The check blocked 205 written answers (7 loops). Most errors are reverse questions,
+whose answers carry no "Fonte:" line, so only coverage guards them; long articles defer when
+the answer is cut at 2,000 characters before its "Fonte:" line.
 
 Agathe in `model/agathe.py` now uses this architecture; character-level runs before
 2026-11-27 are archived (loadable from git history). Parameters: `V·d + L·(2d + 2d² +

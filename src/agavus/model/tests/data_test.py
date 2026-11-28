@@ -7,13 +7,19 @@ import agavus
 from agavus.corpus.records import LabelSource, TextDocument, TextSource
 from agavus.corpus.storage import CorpusStorage
 from agavus.model.bigram import build_vocab
-from agavus.model.data import load_articles, load_case_texts, split_articles
+from agavus.model.data import (
+  load_articles,
+  load_case_texts,
+  load_statute_articles,
+  split_articles,
+)
 
 PACKAGE = Path(agavus.__file__).parent
 LAB_PACKAGES = {"model", "server"}
 
 
-def _document(name: str, source: TextSource, text: str) -> TextDocument:
+def document(name: str, source: TextSource, text: str) -> TextDocument:
+  """A synthetic corpus text whose id and origin_ref are `name`."""
   return TextDocument(
     id=name,
     source=source,
@@ -31,23 +37,24 @@ def test_only_statutes_are_loaded(tmp_path: Path) -> None:
   storage = CorpusStorage(tmp_path)
   storage.save_texts(
     [
-      _document("b", TextSource.STATUTE, "segundo"),
-      _document("a", TextSource.STATUTE, "primeiro"),
-      _document("c", TextSource.DJEN, "decisao sintetica"),
-      _document("d", TextSource.PORTAL, "acordao sintetico"),
+      document("b", TextSource.STATUTE, "segundo"),
+      document("a", TextSource.STATUTE, "primeiro"),
+      document("c", TextSource.DJEN, "decisao sintetica"),
+      document("d", TextSource.PORTAL, "acordao sintetico"),
     ]
   )
   assert load_articles(tmp_path) == ("primeiro", "segundo")
+  assert load_statute_articles(tmp_path) == (("a", "primeiro"), ("b", "segundo"))
 
 
 def test_case_texts_are_anonymized_djen_once_without_flagged_data(tmp_path: Path) -> None:
   CorpusStorage(tmp_path).save_texts(
     [
-      _document("a", TextSource.DJEN, "decisão sintética"),
-      _document("b", TextSource.DJEN, "decisão sintética"),
-      _document("c", TextSource.DJEN, "contato fulano@exemplo.com.br"),
-      _document("d", TextSource.STATUTE, "Art. 1º Lei."),
-      _document("e", TextSource.DJEN, "outra decisão"),
+      document("a", TextSource.DJEN, "decisão sintética"),
+      document("b", TextSource.DJEN, "decisão sintética"),
+      document("c", TextSource.DJEN, "contato fulano@exemplo.com.br"),
+      document("d", TextSource.STATUTE, "Art. 1º Lei."),
+      document("e", TextSource.DJEN, "outra decisão"),
     ]
   )
   assert load_case_texts(tmp_path) == ("decisão sintética", "outra decisão")
