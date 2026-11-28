@@ -34,7 +34,7 @@ from agavus.model.checkpoint import load_checkpoint
 from agavus.model.data import Split, load_articles, load_case_texts, split_articles
 from agavus.model.extra import fetch_wikipedia, save_wikipedia, without_leaks
 from agavus.model.federal import fetch_federal
-from agavus.model.law_search import SEARCH_FILE, build_chat_index, build_index, index_counts
+from agavus.model.law_search import SEARCH_FILE, build_index, index_counts
 from agavus.model.network import (
   CLUES,
   REFUSED,
@@ -320,19 +320,15 @@ def run_build_sft() -> int:
   return 0
 
 
-def run_build_search(arguments: list[str]) -> int:
-  """Index every crawled Planalto article for BM25 search; --chat adds the exam statutes."""
+def run_build_search() -> int:
+  """Index every crawled Planalto article for BM25 search."""
   data_dir = load_settings().data_dir
-  parser = argparse.ArgumentParser(prog="python -m agavus.model build-search")
-  parser.add_argument("--chat", action="store_true", help="the chat index, exam statutes in")
-  options = parser.parse_args(arguments)
   try:
-    path = build_chat_index(data_dir) if options.chat else build_index(data_dir)
-    articles, laws = index_counts(path)
+    articles, laws = index_counts(build_index(data_dir))
   except (OSError, KeyError, ValueError, sqlite3.Error) as error:
     print(f"lab: build-search failed: {error}")
     return 1
-  print(f"build-search: {articles} articles from {laws} laws: {path}")
+  print(f"build-search: {articles} articles from {laws} laws: {data_dir / SEARCH_FILE}")
   return 0
 
 
@@ -438,7 +434,7 @@ def main(arguments: list[str]) -> int:
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),
     "build-sft": lambda _: run_build_sft(),
-    "build-search": run_build_search,
+    "build-search": lambda _: run_build_search(),
     "build-sft-context": run_build_sft_context,
     "sft": run_sft,
     "teach": run_teach,

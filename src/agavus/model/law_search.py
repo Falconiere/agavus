@@ -13,14 +13,11 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from agavus.corpus.statutes import LAW_ALIASES, STATUTES, TOPICLESS_NAMES
-from agavus.model.data import load_statute_articles
-from agavus.model.planalto import PLANALTO_DIR, SITE
-from agavus.model.sft_rules import LawCard, article_number, law_card, load_rule_sources
+from agavus.corpus.statutes import LAW_ALIASES, TOPICLESS_NAMES
+from agavus.model.planalto import PLANALTO_DIR
+from agavus.model.sft_rules import article_number, load_rule_sources
 
 SEARCH_FILE = PLANALTO_DIR / "search.db"
-# The chat's index adds the exam statutes; training never reads it.
-CHAT_SEARCH_FILE = PLANALTO_DIR / "search-chat.db"
 STOP_WORDS = frozenset(
   {"de", "da", "do", "o", "a", "que", "e", "em", "um", "uma", "para", "com", "por", "no", "na"}
   | {"os", "as", "dos", "das"}
@@ -68,78 +65,31 @@ class Hit:
   text: str
 
 
-Row = tuple[str, str, str, str, str]
-
-
-def _planalto_rows(data_dir: Path) -> list[Row]:
-  """(origin_ref, url, name, number, text) for every crawled article, then every ementa."""
+def build_index(data_dir: Path) -> Path:
+  """Index every crawled Planalto article and ementa; rebuilt whole, replaced at once."""
   cards, articles = load_rule_sources(data_dir)
   names = {card.url: card.name for card in cards}
-  rows = [
-    (origin_ref, url, names.get(url, url), article_number(origin_ref, text), text)
-    for url, found in sorted(articles.items())
-    for origin_ref, text in found
-  ]
   ementas = [(card.url, card.url, card.name, EMENTA, card.ementa) for card in cards if card.ementa]
-  return rows + ementas
-
-
-def _statute_rows(data_dir: Path) -> list[Row]:
-  """The exam statutes whole, from the corpus, cited by their Planalto url like other rows.
-
-  Each statute's name and ementa come from its Planalto capture.
-  """
-  folder, urls = data_dir / PLANALTO_DIR, {ref.name: ref.url for ref in STATUTES}
-  cards: dict[str, LawCard] = {}
-  for url in urls.values():
-    capture = folder / "sources" / f"{url.removeprefix(SITE)}.html"
-    card = law_card(url, capture.read_bytes()) if capture.is_file() else None
-    if card is not None:
-      cards[url] = card
-  rows: list[Row] = []
-  for origin_ref, text in load_statute_articles(data_dir):
-    law, _, number = origin_ref.partition(", art. ")
-    page = urls.get(law)
-    if page is not None:
-      name = cards[page].name if page in cards else law
-      rows.append((f"{page}, art. {number}", page, name, article_number(origin_ref, text), text))
-  return rows + [(url, url, card.name, EMENTA, card.ementa) for url, card in cards.items()]
-
-
-def _write_index(path: Path, rows: list[Row]) -> Path:
-  """A fresh index of `rows` at `path`, replacing the old one at once."""
+  path = data_dir / SEARCH_FILE
   temporary = path.with_name(path.name + ".tmp")
   path.parent.mkdir(parents=True, exist_ok=True)
   temporary.unlink(missing_ok=True)
   with closing(sqlite3.connect(temporary)) as connection, connection:
     connection.executescript(SCHEMA)
     connection.executemany(
-      "INSERT INTO articles (origin_ref, url, name, number, text) VALUES (?, ?, ?, ?, ?)", rows
+      "INSERT INTO articles (origin_ref, url, name, number, text) VALUES (?, ?, ?, ?, ?)",
+      (
+        (origin_ref, url, names.get(url, url), article_number(origin_ref, text), text)
+        for url, found in sorted(articles.items())
+        for origin_ref, text in found
+      ),
+    )
+    connection.executemany(
+      "INSERT INTO articles (origin_ref, url, name, number, text) VALUES (?, ?, ?, ?, ?)", ementas
     )
     connection.execute("INSERT INTO search (search) VALUES ('rebuild')")
   temporary.replace(path)
   return path
-
-
-def build_index(data_dir: Path) -> Path:
-  """The training index: every crawled Planalto article and ementa, exam statutes left out.
-
-  `build-sft-context` reads only this one, so no exam text reaches training.
-  """
-  return _write_index(data_dir / SEARCH_FILE, _planalto_rows(data_dir))
-
-
-def build_chat_index(data_dir: Path) -> Path:
-  """The chat index: the training rows plus the exam statutes' articles and ementas.
-
-  Retrieval only shows articles to the reader; it trains nothing, so the exam stays clean.
-  """
-  statutes = _statute_rows(data_dir)
-  # The corpus holds only part of a code (the Civil Code's família book): replace article by
-  # article, so the rest of the crawl stays.
-  replaced = {(row[1], row[3]) for row in statutes}
-  kept = [row for row in _planalto_rows(data_dir) if (row[1], row[3]) not in replaced]
-  return _write_index(data_dir / CHAT_SEARCH_FILE, kept + statutes)
 
 
 def _connect(db: Path) -> sqlite3.Connection:

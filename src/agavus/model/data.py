@@ -26,26 +26,16 @@ class Split:
   holdout: tuple[str, ...]
 
 
-def _rows(data_dir: Path, source: TextSource) -> tuple[tuple[str, str], ...]:
-  """(origin_ref, text) of one source in id order, read-only."""
+def _texts(data_dir: Path, source: TextSource) -> tuple[str, ...]:
   path = (data_dir / "processed" / DB_NAME).resolve()
   with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as conn:
-    query = "SELECT origin_ref, text FROM texts WHERE source = ? ORDER BY id"
-    return tuple((str(ref), str(text)) for ref, text in conn.execute(query, (source.value,)))
-
-
-def _texts(data_dir: Path, source: TextSource) -> tuple[str, ...]:
-  return tuple(text for _, text in _rows(data_dir, source))
+    rows = conn.execute("SELECT text FROM texts WHERE source = ? ORDER BY id", (source.value,))
+    return tuple(str(row[0]) for row in rows)
 
 
 def load_articles(data_dir: Path) -> tuple[str, ...]:
   """Statute article texts in stable id order."""
   return _texts(data_dir, ALLOWED_SOURCE)
-
-
-def load_statute_articles(data_dir: Path) -> tuple[tuple[str, str], ...]:
-  """(origin_ref, text) of every statute article, e.g. ('Lei 11.340/2006, art. 22', …)."""
-  return _rows(data_dir, ALLOWED_SOURCE)
 
 
 def load_case_texts(data_dir: Path) -> tuple[str, ...]:

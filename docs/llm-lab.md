@@ -396,14 +396,7 @@ serial build). Teacher pairs join the train side only, and pairs from held-out l
 dropped. It writes `data/lab/sft/context-train.jsonl` and `context-eval.jsonl`; tune with
 `sft --run <base> --out <dir> --train <context-train> --eval <context-eval>`.
 
-The Planalto crawl drops the exam statutes (Lei 11.340, 12.318, 13.058, 14.994 and the Civil
-Code, `corpus/statutes.py`), so the training index cannot answer the product's own domain.
-`build-search --chat` writes a separate chat index, `data/lab/text/planalto/search-chat.db`:
-the training rows with those statutes' crawled articles replaced by their whole corpus text,
-cited by the Planalto url, plus their ementas. Retrieval only shows articles to the reader and
-trains nothing; `build-sft-context` reads only `search.db`, so no exam text reaches training.
-
-The chat server (`--search PATH`, the chat index by default) wraps the last question the same
+The chat server (`--search PATH`, this index by default) wraps the last question the same
 way when the run is chat-tuned and the index exists, lists the articles as "Fontes consultadas", allows
 answers up to 2,000 characters, and stops an answer that repeats one short token cycle six
 times. Chat answers decode greedily (the likeliest token, so quotes copy the context), and

@@ -3,18 +3,13 @@
 import json
 from pathlib import Path
 
-from agavus.corpus.records import TextSource
-from agavus.corpus.statutes import STATUTES
-from agavus.corpus.storage import CorpusStorage
 from agavus.model.federal import PUBLIC_DOMAIN
 from agavus.model.law_search import (
-  CHAT_SEARCH_FILE,
   EMENTA,
   SEARCH_FILE,
   Hit,
   NamedLaw,
   article,
-  build_chat_index,
   build_index,
   index_counts,
   match_terms,
@@ -23,7 +18,6 @@ from agavus.model.law_search import (
   search,
 )
 from agavus.model.planalto import PLANALTO_DIR, SITE
-from agavus.model.tests.data_test import document
 
 LAW = SITE + "leis/l99999.htm"
 OTHER = SITE + "leis/l88888.htm"
@@ -114,32 +108,3 @@ def test_law_and_article_numbers_are_read_the_way_names_write_them() -> None:
   assert named_articles("Art. 12-c") == ["12-C", "12º-C"]
   assert named_articles("Do que trata a lei?") == []
   assert match_terms("Art. 2 da Lei 8.078") == '"8.078"'
-
-
-LMP = STATUTES[0]
-LMP_NAME = "Lei nº 11.340, de 7 de agosto de 2006"
-PROTECTIVE = "Art. 22. O juiz poderá aplicar medidas protetivas fictícias de urgência ao agressor."
-
-
-def test_the_chat_index_adds_exam_statutes_that_training_never_sees(tmp_path: Path) -> None:
-  synthetic_index(tmp_path)
-  folder = tmp_path / PLANALTO_DIR
-  page = f"<p>{LMP_NAME.upper()}</p><p>Cria mecanismos fictícios.</p><p>Art. 1º Esta Lei.</p>"
-  (folder / "sources" / f"{LMP.url.removeprefix(SITE)}.html").parent.mkdir(parents=True)
-  (folder / "sources" / f"{LMP.url.removeprefix(SITE)}.html").write_text(page, encoding="utf-8")
-  crawled = {"license": PUBLIC_DOMAIN, "url": LMP.url, "origin_ref": f"{LMP.url}, art. 46"}
-  crawl = folder / "articles" / "lmp.jsonl"
-  crawl.write_text(json.dumps(crawled | {"text": "Art. 46. Vigência fictícia."}) + "\n")
-  CorpusStorage(tmp_path).save_texts(
-    [document(f"{LMP.name}, art. 22", TextSource.STATUTE, PROTECTIVE)]
-  )
-  training, chat = build_index(tmp_path), build_chat_index(tmp_path)
-  assert chat == tmp_path / CHAT_SEARCH_FILE
-  question = "O que diz o art. 22 da Lei 11.340 sobre medidas protetivas?"
-  assert search(chat, question)[0] == Hit(f"{LMP.url}, art. 22", LMP_NAME, "22", PROTECTIVE)
-  assert article(chat, LMP.url) == Hit(LMP.url, LMP_NAME, EMENTA, "Cria mecanismos fictícios.")
-  assert search(chat, "art. 22 da Lei Maria da Penha")[0].number == "22"
-  # Training keeps only the crawl; the chat adds the corpus articles and keeps the rest.
-  assert all("fictícias de urgência" not in hit.text for hit in search(training, question, k=9))
-  assert article(training, f"{LMP.url}, art. 46") == article(chat, f"{LMP.url}, art. 46")
-  assert index_counts(training) == (6, 3) and index_counts(chat) == (7, 3)
