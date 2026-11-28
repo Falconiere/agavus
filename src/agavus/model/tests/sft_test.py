@@ -6,7 +6,7 @@ import pytest
 import torch
 from torch.nn.functional import cross_entropy
 
-from agavus.model.agathe import END_ID, AgatheConfig, start
+from agavus.model.agathe import END_ID, EVAL_BATCH, AgatheConfig, start
 from agavus.model.federal import PUBLIC_DOMAIN
 from agavus.model.sft import (
   Conversation,
@@ -76,6 +76,21 @@ def test_masked_loss_scores_only_answer_tokens() -> None:
   answers = every[torch.tensor(mask)].mean()
   assert masked_loss(model, TOKENIZER, [CONVERSATION]) == pytest.approx(float(answers), rel=1e-5)
   assert float(answers) != pytest.approx(float(every.mean()), rel=1e-3)
+
+
+def test_masked_loss_is_the_mean_per_answer_token_across_blocks() -> None:
+  model = start(TOKENIZER, CONFIG)
+  short = Conversation((("user", "E?"), ("assistant", "Sim.")), "s", "ref", PUBLIC_DOMAIN)
+  # One block of short answers, then one of long ones: a mean of block means would weigh
+  # each short answer token as much as all the long ones together.
+  shorts, longs = [short] * EVAL_BATCH, [CONVERSATION] * EVAL_BATCH
+  counts = [
+    int((rows(TOKENIZER, part, CONFIG.context)[1] != IGNORED).sum()) for part in (shorts, longs)
+  ]
+  means = [masked_loss(model, TOKENIZER, part) for part in (shorts, longs)]
+  expected = (means[0] * counts[0] + means[1] * counts[1]) / sum(counts)
+  assert masked_loss(model, TOKENIZER, shorts + longs) == pytest.approx(expected, rel=1e-5)
+  assert expected != pytest.approx((means[0] + means[1]) / 2, rel=1e-3)
 
 
 def test_tune_lowers_the_masked_loss_in_place() -> None:
