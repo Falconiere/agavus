@@ -12,11 +12,17 @@ from wsgiref.simple_server import WSGIServer, make_server
 import torch
 
 from agavus.config.settings import load_settings
+from agavus.corpus.db import DB_NAME
+from agavus.corpus.storage import CorpusStorage
 from agavus.model.bundle import BUNDLE_FILE
+from agavus.model.chat_search import ChatSearch
 from agavus.model.checkpoint import load_checkpoint
 from agavus.model.law_search import SEARCH_FILE
+from agavus.model.passages import Extractor
 from agavus.model.report import THREADS
+from agavus.model.reranker import load_reranker
 from agavus.model.tokenizer import TOKENIZER_FILE
+from agavus.retrieve.encoder import load_encoder
 from agavus.server.api import application
 
 
@@ -24,6 +30,18 @@ class LocalServer(ThreadingMixIn, WSGIServer):
   """Serve browser assets while other connections are idle or generating replies."""
 
   daemon_threads = True
+
+
+def _extractor(data_dir: Path, db: Path) -> Extractor | None:
+  """Quoted answers when the reranker is installed: domain statutes from the corpus (if any)
+  by E5 meaning, the rest of Planalto from `db`."""
+  reranker = load_reranker(data_dir)
+  if reranker is None:
+    return None
+  has_corpus = (data_dir / "processed" / DB_NAME).is_file()
+  storage = CorpusStorage(data_dir) if has_corpus else None
+  finder = ChatSearch(data_dir, db, storage, load_encoder(data_dir))
+  return Extractor(finder, reranker)
 
 
 def serve(arguments: Sequence[str]) -> int:
@@ -51,7 +69,10 @@ def serve(arguments: Sequence[str]) -> int:
     parser.exit(1, f"{error}\n")
   # Without an index, a chat run answers from memory as before.
   db = options.search if chat and options.search.is_file() else None
-  app = application(model, run.resolve().name, chat=chat, db=db)
+  extractor = _extractor(data_dir, db) if chat and db is not None else None
+  if extractor is None and chat:
+    print("lab: no reranker (python -m agavus.model fetch-reranker); answers are generated")
+  app = application(model, run.resolve().name, chat=chat, db=db, extractor=extractor)
   with make_server("127.0.0.1", options.port, app, server_class=LocalServer) as server:
     print(f"Agathe · http://127.0.0.1:{server.server_port}", flush=True)
     with suppress(KeyboardInterrupt):

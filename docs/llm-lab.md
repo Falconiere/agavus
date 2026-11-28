@@ -407,6 +407,30 @@ one cited. Otherwise, or after a loop, the chat answers "Os textos encontrados n
 a essa pergunta." and still lists the articles consulted. A plain "which law amends Lei X"
 question therefore defers, since its answer carries no "Fonte:" line.
 
+**Quoted answers (default when the reranker is installed).** A 100M model trained from
+scratch paraphrases and invents even with the right articles in context, and its own
+likelihoods do not tell a relevant passage from an easy-to-copy one (tried 2026-11-28: per-token
+loss and question-vs-neutral PMI both picked wrong passages and failed to defer). So the chat
+quotes instead of generating (`model/chat_search.py`, `model/passages.py`, `model/reranker.py`):
+
+- Search: the domain statutes (Lei 11.340, 12.318, 13.058, 14.994, Civil Code família book)
+  come from the product's `corpus.db` through its E5 statute search, cited by their Planalto url
+  and name; the rest from `search.db` by BM25. Training reads neither path: the exam stays clean.
+- Passages: each article whole, its caput with incisos, and each paragraph.
+- Reranker: pretrained `BAAI/bge-reranker-v2-m3` (Apache-2.0), onnx-community int8 export pinned
+  by revision, on CPU (`python -m agavus.model fetch-reranker`, ~560 MB in `data/models/`). It
+  reads question and passage (under its citation) together.
+- Answer: the best passage verbatim (whitespace collapsed) with "Fonte:" built from its article;
+  below a logit of 1.0 the chat defers. A question naming law and article ("art. 22 da Lei Maria
+  da Penha") is a lookup: that article is quoted whole and nothing else competes.
+
+Calibration (2026-11-28): on 300 held-out rule questions the reranker's best passage came from the
+cited article 99.6% of the time (mMiniLM-mMARCO, the smaller alternative, 96.9%); on 600 natural
+teacher questions, 89%, and the 1.0 threshold kept 96% of answerable ones while off-topic
+questions score near -11. Known gap: plain-language questions whose law BM25 never retrieves
+(férias do servidor → Lei 8.112) get a confident wrong-law quote; dense search over all of
+Planalto is the next step.
+
 `eval-chat --run <tuned run> [--limit N] [--workers N]` measures this offline (CPU): each
 held-out context conversation is answered greedily from the same user turn, the shown
 articles are read back whole from the training index, and the answer goes through the same

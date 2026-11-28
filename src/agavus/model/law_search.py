@@ -9,6 +9,7 @@ number ("Lei 8.078", "art. 49 da Lei nº 8.078") gets that law's article, or its
 import re
 import sqlite3
 import unicodedata
+from collections.abc import Sequence
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -190,6 +191,14 @@ def _ranked(
   return hits if law is None else [hit for hit in hits if hit.name.startswith(law.prefix)][:k]
 
 
+def unique_hits(hits: Sequence[Hit]) -> list[Hit]:
+  """`hits` in order, each citation once."""
+  unique: dict[str, Hit] = {}
+  for hit in hits:
+    unique.setdefault(hit.origin_ref, hit)
+  return list(unique.values())
+
+
 def search(db: Path, query: str, k: int = 3) -> list[Hit]:
   """The `k` best articles for `query`; a law named by number comes first, then BM25."""
   expression, law = match_terms(query), named_law(query)
@@ -201,10 +210,7 @@ def search(db: Path, query: str, k: int = 3) -> list[Hit]:
       found += _ranked(connection, expression, law, k)
     if expression:
       found += _ranked(connection, expression, None, k)
-  unique: dict[str, Hit] = {}
-  for hit in found:
-    unique.setdefault(hit.origin_ref, hit)
-  return list(unique.values())[:k]
+  return unique_hits(found)[:k]
 
 
 def article(db: Path, origin_ref: str) -> Hit | None:

@@ -1,7 +1,8 @@
 """Run the lab: `uv run python -m agavus.model [experiment] [options]`.
 
 Experiments: bigram (default), network, neural, bpe, agathe (see agathe_run.py),
-chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, export,
+chat, recall, train-tokenizer, fetch-wikipedia, fetch-federal, fetch-planalto, fetch-reranker,
+export,
 build-sft, build-search, build-sft-context, sft, eval-chat.
 """
 
@@ -55,6 +56,7 @@ from agavus.model.planalto import (
 )
 from agavus.model.recall import recall, sample_texts
 from agavus.model.report import SAMPLE_CHARS, SAMPLE_SEED, THREADS, chosen_steps, report
+from agavus.model.reranker import MODEL_VERSION, download_reranker
 from agavus.model.sft import (
   SFT_DIR,
   Conversation,
@@ -189,6 +191,18 @@ def run_fetch_wikipedia() -> int:
     found = fetch_wikipedia(client, articles=WIKIPEDIA_ARTICLES, chars=WIKIPEDIA_CHARS)
   path = save_wikipedia(data_dir, found)
   print(f"saved {len(found)} articles, {sum(len(a.text) for a in found):,} characters: {path}")
+  return 0
+
+
+def run_fetch_reranker() -> int:
+  """Download the pinned reranker weights the chat quotes passages with."""
+  data_dir = load_settings().data_dir
+  try:
+    folder = download_reranker(data_dir)
+  except OSError as error:
+    print(f"lab: fetch-reranker failed: {error}")
+    return 1
+  print(f"fetch-reranker: {MODEL_VERSION} in {folder}")
   return 0
 
 
@@ -430,6 +444,7 @@ def main(arguments: list[str]) -> int:
     "recall": run_recall,
     "train-tokenizer": run_train_tokenizer,
     "fetch-federal": lambda _: run_fetch_federal(),
+    "fetch-reranker": lambda _: run_fetch_reranker(),
     "fetch-planalto": run_fetch_planalto,
     "fetch-wikipedia": lambda _: run_fetch_wikipedia(),
     "export": lambda _: run_export(),

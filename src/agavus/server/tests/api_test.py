@@ -16,11 +16,13 @@ import pytest
 
 from agavus.model.agathe import framed, start
 from agavus.model.law_search import search
+from agavus.model.passages import Extractor
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import prompt, render_turns
 from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
 from agavus.model.tests.generation_test import TINY, TOKENIZER, silent
 from agavus.model.tests.law_search_test import LAW, NAME, synthetic_index
+from agavus.model.tests.passages_test import EMENTA_HIT, GUARD, FixedFinder, KeywordReranker
 from agavus.model.tokenizer import encode
 from agavus.server.api import LOOPED, application, chat_prefix
 
@@ -152,3 +154,19 @@ def test_a_looping_answer_from_the_articles_defers_without_streaming(tmp_path: P
   assert answer == {"text": NOT_FOUND}
   assert event["metrics"]["looped"] is True and event["metrics"]["grounded"] is False
   assert event["metrics"]["characters"] == len(NOT_FOUND)
+
+
+def test_an_extractor_quotes_the_best_passage_without_generating() -> None:
+  # The silent model would answer nothing; the quote comes from the extractor alone.
+  extractor = Extractor(FixedFinder(), KeywordReranker())
+  app = application(silent(64), "citacoes", chat=True, extractor=extractor)
+  question = [{"role": "user", "text": "cria medidas fictícias de proteção"}]
+  answer, event = [json.loads(line) for line in _lines(app, question)]
+  assert answer == {"text": f"{EMENTA_HIT.text}\n\nFonte: {EMENTA_HIT.name}."}
+  assert event["metrics"]["extractive"] is True and event["metrics"]["score"] > 0
+  assert [source["origin_ref"] for source in event["sources"]] == [
+    GUARD.origin_ref,
+    EMENTA_HIT.origin_ref,
+  ]
+  off_topic = [{"role": "user", "text": "bolo de cenoura"}]
+  assert json.loads(_lines(app, off_topic)[0]) == {"text": NOT_FOUND}

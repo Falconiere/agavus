@@ -3,12 +3,14 @@
 import json
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
+from time import perf_counter
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from agavus.model.agathe import AgatheModel, framed
 from agavus.model.generation import CHAT_CHARS, Tally, pieces
 from agavus.model.grounding import checked, coverage
 from agavus.model.law_search import Hit, search
+from agavus.model.passages import Extractor
 from agavus.model.report import SAMPLE_CHARS
 from agavus.model.sft import ROLES, prompt, render_turns
 from agavus.model.sft_context import NOT_FOUND, SEARCHED, with_context
@@ -73,6 +75,21 @@ def grounded_answer(
   yield _closing(model, prefix, sources, shown, extra)
 
 
+def extractive_answer(
+  model: AgatheModel, prefix: str, extractor: Extractor, question: str
+) -> Iterator[bytes]:
+  """The best passage of the articles found, verbatim with its source, or NOT_FOUND.
+
+  Metrics add the reranker `score` of the chosen passage; the articles consulted follow.
+  """
+  began = perf_counter()
+  shown, hits, choice = extractor.answer(question)
+  extra: dict[str, object] = {"seconds": perf_counter() - began, "extractive": True}
+  extra |= {"score": None if choice is None else round(choice.score, 3)}
+  yield _line({"text": shown})
+  yield _closing(model, prefix, hits, shown, extra)
+
+
 def chat_prefix(messages: object, db: Path | None = None) -> tuple[str, list[Hit]]:
   """Earlier turns in turn format, then the last user message as a prompt.
 
@@ -94,13 +111,19 @@ def chat_prefix(messages: object, db: Path | None = None) -> tuple[str, list[Hit
 
 
 def application(
-  model: AgatheModel, name: str, *, chat: bool = False, db: Path | None = None
+  model: AgatheModel,
+  name: str,
+  *,
+  chat: bool = False,
+  db: Path | None = None,
+  extractor: Extractor | None = None,
 ) -> WSGIApplication:
   """Serve checkpoint metadata and newline-delimited continuations from the same model.
 
-  A chat-tuned run (`chat`) takes {"messages": [...]} and answers greedily in turn format;
-  with a search index `db`, from the articles found, shown only when grounded in them.
-  Others take {"prefix": "..."} and sample.
+  A chat-tuned run (`chat`) takes {"messages": [...]}. With an `extractor` it quotes the best
+  passage found for the last question; else it answers greedily in turn format, with a
+  search index `db` from the articles found, shown only when grounded in them. Others take
+  {"prefix": "..."} and sample.
   """
   assets = Path(__file__).with_name("static")
   if not assets.is_dir():
@@ -113,6 +136,14 @@ def application(
   info = _line(
     {"name": name, "parameters": model.size(), "context": model.config.context, "chat": chat}
   )
+
+  def reply(prefix: str, sources: list[Hit], question: str) -> Iterator[bytes]:
+    """Quoted, grounded-generated or plain continuation, by what the chat was given."""
+    if chat and extractor is not None:
+      return extractive_answer(model, prefix, extractor, question)
+    if chat and db is not None:
+      return grounded_answer(model, prefix, sources, question)
+    return continuation(model, prefix, sources, CHAT_CHARS if chat else SAMPLE_CHARS, chat)
 
   def handle(env: WSGIEnvironment, respond: StartResponse) -> Iterable[bytes]:
     headers = [("Content-Type", "application/json"), ("Cache-Control", "no-store")]
@@ -134,7 +165,8 @@ def application(
       if not 0 < length <= MAX_BODY or media_type != "application/json":
         raise ValueError
       body = json.loads(env["wsgi.input"].read(length))
-      prefix, sources = chat_prefix(body["messages"], db) if chat else (body["prefix"], [])
+      searched = None if extractor is not None else db
+      prefix, sources = chat_prefix(body["messages"], searched) if chat else (body["prefix"], [])
       if not isinstance(prefix, str):
         raise ValueError
     except (ValueError, TypeError, KeyError):
@@ -142,8 +174,6 @@ def application(
       wanted = "as mensagens da conversa" if chat else "um prefixo de texto"
       return [_line({"error": f"Envie {wanted} em JSON."})]
     respond("200 OK", [("Content-Type", "application/x-ndjson"), ("Cache-Control", "no-store")])
-    if chat and db is not None:
-      return grounded_answer(model, prefix, sources, body["messages"][-1]["text"])
-    return continuation(model, prefix, sources, CHAT_CHARS if chat else SAMPLE_CHARS, chat)
+    return reply(prefix, sources, body["messages"][-1]["text"] if chat else "")
 
   return handle

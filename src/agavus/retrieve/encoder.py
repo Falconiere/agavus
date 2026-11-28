@@ -49,14 +49,19 @@ def download_encoder(data_dir: Path) -> Path:
   return folder
 
 
+def onnx_model(model: Path, tokenizer: Path) -> tuple[Tokenizer, InferenceSession]:
+  """An XLM-R tokenizer (truncated to MAX_TOKENS, padded with <pad>) and its CPU session."""
+  loaded = Tokenizer.from_file(str(tokenizer))
+  loaded.enable_truncation(MAX_TOKENS)
+  loaded.enable_padding(pad_id=1, pad_token="<pad>")
+  return loaded, InferenceSession(str(model), providers=["CPUExecutionProvider"])
+
+
 class OnnxEncoder:
   """E5 encoder: prefix, mean pooling over tokens, L2 normalization."""
 
   def __init__(self, folder: Path) -> None:
-    self._tokenizer = Tokenizer.from_file(str(folder / TOKENIZER_FILE))
-    self._tokenizer.enable_truncation(MAX_TOKENS)
-    self._tokenizer.enable_padding(pad_id=1, pad_token="<pad>")
-    self._session = InferenceSession(str(folder / MODEL_FILE), providers=["CPUExecutionProvider"])
+    self._tokenizer, self._session = onnx_model(folder / MODEL_FILE, folder / TOKENIZER_FILE)
 
   def encode_queries(self, texts: Sequence[str]) -> FloatArray:
     """One unit vector per question."""
