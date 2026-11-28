@@ -427,7 +427,11 @@ quotes instead of generating (`model/chat_search.py`, `model/passages.py`, `mode
 Calibration (2026-11-28): on 300 held-out rule questions the reranker's best passage came from the
 cited article 99.6% of the time (mMiniLM-mMARCO, the smaller alternative, 96.9%); on 600 natural
 teacher questions, 89%, and the 1.0 threshold kept 96% of answerable ones while off-topic
-questions score near -11. Known gap: plain-language questions whose law BM25 never retrieves
+questions score near -11. On the authored retrieval DEV set (40 F+M questions, `evals/retrievalset.py`; HIDDEN untouched)
+quoted answers were 25 correct, 4 wrong and 11 deferred with 8 domain articles per question
+(3 articles: 22/6/12; a relevant article was among the hits for 34 of 40). Dropping Planalto laws
+that only amend a domain statute changed nothing; a 0.5 threshold gave 27/5/8, so 1.0 stays.
+Known gap: plain-language questions whose law BM25 never retrieves
 (férias do servidor → Lei 8.112) get a confident wrong-law quote; dense search over all of
 Planalto is the next step.
 

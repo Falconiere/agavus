@@ -17,8 +17,10 @@ from agavus.model.sft_rules import article_number, law_card
 from agavus.retrieve.dense import search_statutes
 from agavus.retrieve.encoder import Encoder
 
-# Articles taken from each side: the domain statutes and the whole Planalto index.
-DOMAIN_HITS = 3
+# Articles taken from each side: the domain statutes and the whole Planalto index. On the
+# retrieval DEV set (2026-11-28) 8 domain articles put a relevant one among the hits for 34 of
+# 40 questions (3: 31), and quoted answers went from 22 to 25 correct, 6 to 4 wrong.
+DOMAIN_HITS = 8
 PLANALTO_HITS = 3
 
 
